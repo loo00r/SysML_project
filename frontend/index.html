@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SysML AI Generator</title>
+</head>
+<body>
+  <h1>SysML Generator UI</h1>
+  <button onclick="ping()">Test Backend</button>
+  <pre id="output"></pre>
+
+  <script>
+    async function ping() {
+      const res = await fetch("http://localhost:8000/api/ping");
+      const data = await res.json();
+      document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
