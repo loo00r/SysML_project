@@ -1,3 +1,46 @@
-__pycache__/
+# Environment Variables
 .env
-*.pyc
+
+# Git-related
+/.git/
+
+# Database and Data Storage
+/data/
+/data/db/
+
+# Compiled Files and Caches
+__pycache__/
+/*.pyc
+/*.pyo
+/*.pyd
+/.pytest_cache/
+
+# Virtual Environments
+/venv/
+/.venv/
+
+# Editor and IDE Config Files
+/.vscode/
+/.vscode/
+/.idea/
+/*.swp
+
+# Backend Python Cache
+/backend/app/__pycache__/
+/backend/alembic/__pycache__/
+/backend/alembic/versions/__pycache__/
+
+# Alembic Migrations
+/backend/alembic/versions/script.py.mako
+
+# Logs and Temp Files
+/logs/
+/tmp/
+/*.log
+
+# Devcontainer
+.devcontainer/
+/.devcontainer/
+
+# Semantic Kernel
+/.semantic-kernel/
