@@ -3,18 +3,9 @@ services:
     container_name: fastapi
     build:
       context: ./backend
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
-    depends_on:
-      - db
-      - redis
-    environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
     volumes:
       - ./backend/app:/app
     restart: unless-stopped
@@ -22,18 +13,3 @@ services:
       - .env
 
   
-  frontend:
-    container_name: next.js
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
-    depends_on:
-      - fastapi
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    restart: unless-stopped
-    env_file:
-      - .env

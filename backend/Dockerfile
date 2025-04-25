@@ -13,7 +13,6 @@ COPY pyproject.toml poetry.lock* /sysml-backend/
 RUN poetry install --no-interaction --no-root
 
 COPY app /sysml-backend/app
-COPY alembic /sysml-backend/alembic
 
 
 COPY launch.sh /sysml-backend/launch.sh

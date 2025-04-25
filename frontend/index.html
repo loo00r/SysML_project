@@ -1,20 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>SysML AI Generator</title>
+    <meta charset="UTF-8">
+    <title>SysML Parser MVP</title>
 </head>
 <body>
-  <h1>SysML Generator UI</h1>
-  <button onclick="ping()">Test Backend</button>
-  <pre id="output"></pre>
+    <h1>SysML Parser</h1>
+    <textarea id="input-text" rows="10" cols="50" placeholder="Enter requirement text..."></textarea><br>
+    <button onclick="parseText()">Parse</button>
 
-  <script>
-    async function ping() {
-      const res = await fetch("http://localhost:8000/api/ping");
-      const data = await res.json();
-      document.getElementById("output").innerText = JSON.stringify(data, null, 2);
-    }
-  </script>
+    <pre id="output"></pre>
+
+    <script>
+        async function parseText() {
+            const text = document.getElementById('input-text').value;
+            const response = await fetch('http://localhost:8000/api/parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await response.json();
+            document.getElementById('output').innerText = JSON.stringify(data, null, 2);
+        }
+    </script>
 </body>
 </html>
