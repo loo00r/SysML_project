@@ -13,7 +13,7 @@ This document outlines a practical 4-week plan for delivering a semi-automated S
 ### 🔧 1.1. Environment Setup
 - [x] Create Git repository
 - [x] Set up Python environment (FastAPI for API backend)
-- [ ] Connect basic frontend template (HTML/JS, GoJS, or Mermaid)
+- [x] Connect basic frontend template (HTML/JS, GoJS, or Mermaid)
 - [ ] Setup GPT API access or local LLM model
 - [x] Basic Docker + docker-compose setup
 
