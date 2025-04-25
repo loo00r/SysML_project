@@ -1,27 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>SysML Parser MVP</title>
+  <meta charset="UTF-8">
+  <title>SysML Generator UI</title>
+  <script src="https://unpkg.com/gojs/release/go.js"></script>
+  <script src="main.js"></script>
 </head>
 <body>
-    <h1>SysML Parser</h1>
-    <textarea id="input-text" rows="10" cols="50" placeholder="Enter requirement text..."></textarea><br>
-    <button onclick="parseText()">Parse</button>
-
-    <pre id="output"></pre>
-
-    <script>
-        async function parseText() {
-            const text = document.getElementById('input-text').value;
-            const response = await fetch('http://localhost:8000/api/parse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text })
-            });
-            const data = await response.json();
-            document.getElementById('output').innerText = JSON.stringify(data, null, 2);
-        }
-    </script>
+  <h1>SysML Generator UI (GoJS Example)</h1>
+  <div id="myDiagramDiv" style="width:800px; height:600px; border:1px solid black;"></div>
 </body>
 </html>

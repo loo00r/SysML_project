@@ -1,0 +1,11 @@
+{
+    "name": "sysml-frontend",
+    "version": "1.0.0",
+    "scripts": {
+      "dev": "live-server --port=3000 --host=0.0.0.0"
+    },
+    "devDependencies": {
+      "live-server": "^1.2.1"
+    }
+  }
+  

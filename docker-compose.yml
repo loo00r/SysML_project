@@ -7,7 +7,25 @@ services:
     ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
-      - ./backend/app:/app
+      - ./backend:/sysml-backend
+    environment:
+      - PYTHONPATH=/sysml-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+    depends_on:
+      - fastapi
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     restart: unless-stopped
     env_file:
       - .env

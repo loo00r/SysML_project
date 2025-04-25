@@ -14,5 +14,4 @@ app.add_middleware(
     allow_headers=["*"],  
 )
 
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 app.include_router(api_router, prefix="/api")
