@@ -1,11 +1,25 @@
 {
-    "name": "sysml-frontend",
-    "version": "1.0.0",
-    "scripts": {
-      "dev": "live-server --port=3000 --host=0.0.0.0"
-    },
-    "devDependencies": {
-      "live-server": "^1.2.1"
-    }
+  "name": "sysml-modeling-tool",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@projectstorm/react-diagrams": "^7.0.2",
+    "@projectstorm/react-canvas-core": "^7.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "styled-components": "^6.0.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5"
   }
-  
+}
