@@ -13,7 +13,7 @@ import createEngine, {
 } from '@projectstorm/react-diagrams';
 import { CanvasWidget } from '@projectstorm/react-canvas-core';
 import { SysMLBlockModel, SysMLActivityModel } from '../models/SysMLNodeModels';
-import { NODE_TYPES, getNodeStyle, validateConnection } from '../utils/sysmlUtils';
+import { NODE_TYPES, validateConnection } from '../utils/sysmlUtils';
 import { validateDiagram, ValidationError, validateNodePosition } from '../utils/validationUtils';
 import Toolbar from './Toolbar';
 import DiagramGenerator from './DiagramGenerator';
@@ -27,7 +27,6 @@ import {
   setupDiagramInteractions
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
-import { loadAutosavedDiagram } from '../utils/diagramUtils';
 import { SysMLBlockFactory, SysMLActivityFactory } from '../models/SysMLNodeFactories';
 
 const CanvasWrapper = styled.div`
@@ -67,7 +66,52 @@ const CanvasContainer = styled.div<{ isResizing?: boolean }>`
     cursor: move;
     overflow: visible;
   }
-  
+
+  .srd-default-link {
+    path {
+      stroke: #0073e6;
+      stroke-width: 2;
+      pointer-events: all;
+
+      &.selected {
+        stroke: #1890ff;
+        stroke-width: 3;
+      }
+    }
+
+    &:hover {
+      path {
+        stroke: #1890ff;
+        stroke-width: 3;
+        filter: drop-shadow(0 0 3px rgba(24,144,255,0.3));
+      }
+    }
+  }
+
+  .srd-default-link-point {
+    fill: #0073e6;
+    stroke: none;
+    
+    &:hover {
+      fill: #1890ff;
+      r: 6;
+    }
+  }
+
+  .srd-default-link-label {
+    background: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    user-select: none;
+    cursor: pointer;
+    pointer-events: all;
+    
+    &:hover {
+      background: #f0f0f0;
+    }
+  }
+
   .node {
     transition: box-shadow 0.3s ease;
     &:hover {
@@ -203,8 +247,6 @@ const Canvas: React.FC = () => {
   const [history] = useState(() => new DiagramHistory(engine.getModel()));
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [undoStack, setUndoStack] = useState<DiagramState[]>([]);
-  const [redoStack, setRedoStack] = useState<DiagramState[]>([]);
 
   // Move checkDiagramValidity up before it's used
   const checkDiagramValidity = useCallback(() => {
@@ -584,6 +626,20 @@ const Canvas: React.FC = () => {
             unmountOnExit
           >
             <ValidationPanel>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span>Validation Issues</span>
+                <button
+                  onClick={() => setShowValidationPanel(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '16px'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
               {validationErrors.map((error, index) => (
                 <ValidationMessage
                   key={index}
