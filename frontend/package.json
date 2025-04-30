@@ -9,10 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@projectstorm/react-diagrams": "^7.0.2",
     "@projectstorm/react-canvas-core": "^7.0.2",
+    "@projectstorm/react-diagrams": "^7.0.2",
+    "@types/react-transition-group": "^4.4.12",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-icons": "^5.5.0",
+    "react-transition-group": "^4.4.5",
     "styled-components": "^6.0.7"
   },
   "devDependencies": {

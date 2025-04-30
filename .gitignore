@@ -1,6 +1,8 @@
 # Environment Variables
 .env
 
+/frontend/node_modules/
+
 # Git-related
 /.git/
 
