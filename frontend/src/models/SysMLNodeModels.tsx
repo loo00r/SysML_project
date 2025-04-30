@@ -1,4 +1,4 @@
-import { DefaultNodeModel, NodeModel, DefaultPortModel } from '@projectstorm/react-diagrams';
+import { DefaultNodeModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
 import EditableText from '../components/custom/EditableText';
 import React from 'react';
 import styled from 'styled-components';
@@ -34,21 +34,38 @@ export interface NodeSize {
 }
 
 export class SysMLBlockModel extends DefaultNodeModel {
-  private size: NodeSize;
-  private description: string;
-  private resizing: boolean;
+  private size: NodeSize = { width: 200, height: 150 };
+  private description: string = '';
+  private resizing: boolean = false;
 
   constructor(options: SysMLNodeOptions) {
     super({
       ...options,
-      type: 'sysml-block'
+      type: 'sysml-block',
+      name: options.name || 'Block'
     });
+    
     this.size = options.size || { width: 200, height: 150 };
     this.description = options.description || '';
-    this.resizing = false;
 
-    // Override the default widget
-    this.addListener({
+    // Initialize ports
+    this.addPort(
+      new DefaultPortModel({
+        in: true,
+        name: 'in',
+        alignment: PortModelAlignment.LEFT
+      })
+    );
+    this.addPort(
+      new DefaultPortModel({
+        in: false,
+        name: 'out',
+        alignment: PortModelAlignment.RIGHT
+      })
+    );
+
+    // Override the default widget after ensuring super() is called
+    this.registerListener({
       widgetGenerated: (event: any) => {
         const widget = event.widget;
         if (widget) {
@@ -56,7 +73,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
             <NodeContainer>
               <NodeTitle>
                 <EditableText
-                  value={this.getOptions().name}
+                  value={this.getOptions().name || ''}
                   onChange={(value) => {
                     this.getOptions().name = value;
                     this.fireEvent({ type: 'labelChanged' }, 'labelChanged');
@@ -139,21 +156,37 @@ export class SysMLBlockModel extends DefaultNodeModel {
 }
 
 export class SysMLActivityModel extends DefaultNodeModel {
-  private size: NodeSize;
-  private description: string;
-  private resizing: boolean;
+  private size: NodeSize = { width: 180, height: 100 };
+  private description: string = '';
+  private resizing: boolean = false;
 
   constructor(options: SysMLNodeOptions) {
     super({
       ...options,
-      type: 'sysml-activity'
+      type: 'sysml-activity',
+      name: options.name || 'Activity'
     });
     this.size = options.size || { width: 180, height: 100 };
     this.description = options.description || '';
-    this.resizing = false;
+
+    // Initialize ports
+    this.addPort(
+      new DefaultPortModel({
+        in: true,
+        name: 'in',
+        alignment: PortModelAlignment.LEFT
+      })
+    );
+    this.addPort(
+      new DefaultPortModel({
+        in: false,
+        name: 'out',
+        alignment: PortModelAlignment.RIGHT
+      })
+    );
 
     // Override the default widget
-    this.addListener({
+    this.registerListener({
       widgetGenerated: (event: any) => {
         const widget = event.widget;
         if (widget) {
@@ -161,7 +194,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
             <NodeContainer>
               <NodeTitle>
                 <EditableText
-                  value={this.getOptions().name}
+                  value={this.getOptions().name || ''}
                   onChange={(value) => {
                     this.getOptions().name = value;
                     this.fireEvent({ type: 'labelChanged' }, 'labelChanged');
@@ -249,7 +282,7 @@ export class SysMLFlowPortModel extends DefaultPortModel {
       in: isInput,
       name: isInput ? 'in' : 'out',
       label: isInput ? 'Input' : 'Output',
-      alignment: isInput ? 'left' : 'right'
+      alignment: isInput ? PortModelAlignment.LEFT : PortModelAlignment.RIGHT
     });
   }
 }

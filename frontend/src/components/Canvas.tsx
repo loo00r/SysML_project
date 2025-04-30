@@ -28,6 +28,7 @@ import {
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
 import { loadAutosavedDiagram } from '../utils/diagramUtils';
+import { SysMLBlockFactory, SysMLActivityFactory } from '../models/SysMLNodeFactories';
 
 const CanvasWrapper = styled.div`
   flex: 1;
@@ -171,11 +172,15 @@ const Canvas: React.FC = () => {
     const engine = createEngine();
     const model = new DiagramModel();
 
-    // Set model properties first
+    // Register custom factories
+    engine.getNodeFactories().registerFactory(new SysMLBlockFactory());
+    engine.getNodeFactories().registerFactory(new SysMLActivityFactory());
+
+    // Set model properties
     model.setGridSize(DEFAULT_GRID_SIZE);
     engine.setModel(model);
 
-    // Configure engine with performance optimizations
+    // Configure engine with optimizations
     configureEngineForPerformance(engine);
     optimizeDiagramForLargeGraphs(engine);
     setupSmartRouting(engine);
@@ -390,7 +395,9 @@ const Canvas: React.FC = () => {
     const model = engine.getModel();
     model.registerListener({
       nodesUpdated: (event: any) => {
+        if (!event?.nodes) return;
         event.nodes.forEach((node: NodeModel) => {
+          if (!node) return;
           node.setLocked(false);
           const { x, y } = validateNodePosition(node, model);
           node.setPosition(x, y);
@@ -398,9 +405,13 @@ const Canvas: React.FC = () => {
         checkDiagramValidity();
       },
       linksUpdated: (event: any) => {
+        if (!event?.links) return;
         event.links.forEach((link: DefaultLinkModel) => {
-          if (link.getSourcePort() && link.getTargetPort()) {
-            const isValid = validateConnection(link.getSourcePort(), link.getTargetPort());
+          if (!link) return;
+          const sourcePort = link.getSourcePort();
+          const targetPort = link.getTargetPort();
+          if (sourcePort && targetPort) {
+            const isValid = validateConnection(sourcePort, targetPort);
             if (!isValid) {
               model.removeLink(link);
               engine.repaintCanvas();
