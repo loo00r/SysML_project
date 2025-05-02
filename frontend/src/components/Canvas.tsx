@@ -222,7 +222,12 @@ const Canvas: React.FC = () => {
   }, [engine]);
 
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    // Не видаляти вузол, якщо фокус у input, textarea або contentEditable
+    const active = document.activeElement;
+    if (
+      (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) ||
+      (active && (active as HTMLElement).isContentEditable)
+    ) {
       return;
     }
 
