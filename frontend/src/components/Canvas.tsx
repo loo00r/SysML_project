@@ -650,6 +650,7 @@ const Canvas: React.FC = () => {
     // --- DEBUG: log after links ---
     console.log('Links after:', Object.values(engine.getModel().getLinks()).length);
     engine.repaintCanvas();
+    updateLinkPositions(); // Додаємо одразу після repaintCanvas для коректної позиції стрілки
     history.saveState();
   };
 
