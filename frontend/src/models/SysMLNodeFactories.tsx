@@ -1,6 +1,6 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine } from '@projectstorm/react-diagrams';
-import { SysMLBlockModel, SysMLActivityModel } from './SysMLNodeModels';
+import { DiagramEngine, DefaultLinkFactory } from '@projectstorm/react-diagrams';
+import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
 import { NODE_TYPES } from '../utils/sysmlUtils';
@@ -104,5 +104,16 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
         <SysMLWidget node={event.model} engine={this.engine} />
       </DiagramContext.Provider>
     );
+  }
+}
+
+// Factory for our custom links
+export class SysMLLinkFactory extends DefaultLinkFactory {
+  constructor() {
+    super('sysml-link');
+  }
+
+  generateModel(): SysMLLinkModel {
+    return new SysMLLinkModel();
   }
 }

@@ -81,11 +81,22 @@ const MenuItem = styled.div`
   }
 `;
 
+const LinkButton = styled(Button)<{ $active: boolean }>`
+  background: ${props => props.$active ? '#0066cc' : '#0073e6'};
+  border: ${props => props.$active ? '2px solid #003366' : 'none'};
+  
+  &:hover {
+    background: ${props => props.$active ? '#0055b3' : '#0066cc'};
+  }
+`;
+
 interface ToolbarProps {
   engine: DiagramEngine;
+  onToggleLink?: () => void;
+  isLinkingMode?: boolean;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ engine, onToggleLink, isLinkingMode = false }) => {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const handleLoad = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,6 +217,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
         <Button onClick={handleZoomIn}>🔍+ Zoom In</Button>
         <Button onClick={handleZoomOut}>🔍- Zoom Out</Button>
         <Button onClick={handleFitView}>🔲 Fit View</Button>
+      </ButtonGroup>
+      <ButtonGroup>
+        <LinkButton 
+          onClick={onToggleLink} 
+          $active={isLinkingMode}
+          title={isLinkingMode ? "Exit Link Mode" : "Enter Link Mode"}
+        >
+          {isLinkingMode ? "✓ Link Mode" : "🔗 Create Link"}
+        </LinkButton>
       </ButtonGroup>
     </ToolbarContainer>
   );

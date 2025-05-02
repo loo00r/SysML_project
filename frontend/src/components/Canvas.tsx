@@ -6,10 +6,11 @@ import { CSSTransition } from 'react-transition-group';
 import createEngine, { 
   DiagramModel, 
   NodeModel,
-  BasePositionModelOptions
+  BasePositionModelOptions,
+  PointModel
 } from '@projectstorm/react-diagrams';
 import { CanvasWidget } from '@projectstorm/react-canvas-core';
-import { SysMLBlockModel, SysMLActivityModel } from '../models/SysMLNodeModels';
+import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from '../models/SysMLNodeModels';
 import { NODE_TYPES } from '../utils/sysmlUtils';
 import { validateDiagram, ValidationError, validateNodePosition } from '../utils/validationUtils';
 import Toolbar from './Toolbar';
@@ -23,7 +24,7 @@ import {
   setupDiagramInteractions
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
-import { SysMLBlockFactory, SysMLActivityFactory } from '../models/SysMLNodeFactories';
+import { SysMLBlockFactory, SysMLActivityFactory, SysMLLinkFactory } from '../models/SysMLNodeFactories';
 
 const CanvasWrapper = styled.div`
   flex: 1;
@@ -139,6 +140,12 @@ interface ExtendedNodeModel extends NodeModel {
   getOptions(): ExtendedNodeModelOptions;
 }
 
+interface LinkState {
+  sourceNode: NodeModel | null;
+  targetNode: NodeModel | null;
+  isCreatingLink: boolean;
+}
+
 const Canvas: React.FC = () => {
   const DEFAULT_GRID_SIZE = 15;
   const [engine] = React.useState(() => {
@@ -150,6 +157,7 @@ const Canvas: React.FC = () => {
     // Register custom factories
     engine.getNodeFactories().registerFactory(new SysMLBlockFactory());
     engine.getNodeFactories().registerFactory(new SysMLActivityFactory());
+    engine.getLinkFactories().registerFactory(new SysMLLinkFactory());
 
     // Set model properties
     model.setGridSize(DEFAULT_GRID_SIZE);
@@ -177,6 +185,12 @@ const Canvas: React.FC = () => {
   const [history] = useState(() => new DiagramHistory(engine.getModel()));
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [linkState, setLinkState] = useState<LinkState>({
+    sourceNode: null,
+    targetNode: null,
+    isCreatingLink: false
+  });
+  const [isLinkingMode, setIsLinkingMode] = useState(false);
 
   const checkDiagramValidity = useCallback(() => {
     const model = engine.getModel();
@@ -479,6 +493,97 @@ const Canvas: React.FC = () => {
     }
   };
 
+  const handleNodeClick = (node: NodeModel) => {
+    if (!isLinkingMode) return;
+    
+    if (!linkState.isCreatingLink) {
+      setLinkState({
+        sourceNode: node,
+        targetNode: null,
+        isCreatingLink: true
+      });
+    } else {
+      if (linkState.sourceNode && linkState.sourceNode.getID() !== node.getID()) {
+        createLinkBetweenNodes(linkState.sourceNode, node);
+        setLinkState({
+          sourceNode: null,
+          targetNode: null,
+          isCreatingLink: false
+        });
+      }
+    }
+  };
+
+  const createLinkBetweenNodes = (sourceNode: NodeModel, targetNode: NodeModel) => {
+    const link = new SysMLLinkModel();
+    const sourcePosition = sourceNode.getPosition();
+    const targetPosition = targetNode.getPosition();
+    
+    const sourcePoint = new PointModel({
+      link,
+      position: {
+        x: sourcePosition.x + (sourceNode as any).getSize().width / 2,
+        y: sourcePosition.y + (sourceNode as any).getSize().height / 2
+      }
+    });
+    
+    const targetPoint = new PointModel({
+      link,
+      position: {
+        x: targetPosition.x + (targetNode as any).getSize().width / 2,
+        y: targetPosition.y + (targetNode as any).getSize().height / 2
+      }
+    });
+    
+    link.addPoint(sourcePoint);
+    link.addPoint(targetPoint);
+    
+    engine.getModel().addLink(link);
+    engine.repaintCanvas();
+    history.saveState();
+    checkDiagramValidity();
+  };
+
+  const toggleLinkingMode = () => {
+    setIsLinkingMode(!isLinkingMode);
+    setLinkState({
+      sourceNode: null,
+      targetNode: null,
+      isCreatingLink: false
+    });
+  };
+
+  useEffect(() => {
+    const attachNodeClickEvents = () => {
+      engine.getModel().getNodes().forEach(node => {
+        const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
+        if (element) {
+          element.removeEventListener('click', () => handleNodeClick(node));
+          element.addEventListener('click', (e) => {
+            if ((e as MouseEvent).button !== 2) {
+              handleNodeClick(node);
+            }
+          });
+        }
+      });
+    };
+    
+    engine.getModel().registerListener({
+      nodesUpdated: attachNodeClickEvents
+    });
+    
+    attachNodeClickEvents();
+    
+    return () => {
+      engine.getModel().getNodes().forEach(node => {
+        const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
+        if (element) {
+          element.removeEventListener('click', () => handleNodeClick(node));
+        }
+      });
+    };
+  }, [engine, isLinkingMode, linkState]);
+
   return (
     <CanvasWrapper>
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
@@ -498,11 +603,30 @@ const Canvas: React.FC = () => {
           </marker>
         </defs>
       </svg>
-      <Toolbar engine={engine} />
+      <Toolbar engine={engine} onToggleLink={toggleLinkingMode} isLinkingMode={isLinkingMode} />
       <CanvasContainer
         onDrop={onDrop}
         onDragOver={onDragOver}
+        style={isLinkingMode ? { cursor: 'crosshair' } : {}}
       >
+        {isLinkingMode && linkState.sourceNode && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '8px 16px',
+              background: 'rgba(0, 115, 230, 0.8)',
+              color: 'white',
+              borderRadius: '4px',
+              zIndex: 100,
+              fontSize: '14px'
+            }}
+          >
+            Select target node to create a link
+          </div>
+        )}
         <CanvasWidget engine={engine} />
         {contextMenu.isOpen && (
           <ContextMenu

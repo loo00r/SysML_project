@@ -1,4 +1,4 @@
-import { DefaultNodeModel } from '@projectstorm/react-diagrams';
+import { DefaultNodeModel, DefaultLinkModel } from '@projectstorm/react-diagrams';
 import EditableText from '../components/custom/EditableText';
 import React from 'react';
 import styled from 'styled-components';
@@ -219,5 +219,17 @@ export class SysMLActivityModel extends DefaultNodeModel {
     super.deserialize(event);
     this.size = event.size || { width: 180, height: 100 };
     this.description = event.description || '';
+  }
+}
+
+export class SysMLLinkModel extends DefaultLinkModel {
+  constructor(options: any = {}) {
+    super({
+      type: 'sysml-link',
+      width: 2,
+      color: '#0073e6',
+      selectedColor: '#1890ff',
+      ...options
+    });
   }
 }
