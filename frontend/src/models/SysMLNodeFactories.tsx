@@ -144,26 +144,27 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
 
   // Визначаємо кольори для System Block, Sensor, Processor — як у тулбарі
   const name = node.getOptions().name;
-  let color = undefined;
-  let borderColor = undefined;
-  let dotColor = '#111';
+  let color = node.getOptions().color || '#fff';
+  let borderColor;
+  let dotColor;
   if (name === 'System Block') {
-    color = '#e6ffe6';
     borderColor = '#00b300';
     dotColor = '#00b300';
   } else if (name === 'Sensor') {
-    color = '#ffe6e6';
     borderColor = '#e53935';
     dotColor = '#e53935';
   } else if (name === 'Processor') {
-    color = '#fffbe6';
     borderColor = '#ffd600';
     dotColor = '#ffd600';
-  } else {
-    // fallback: якщо є color в options — використовуємо, інакше білий
-    color = node.getOptions().color || '#fff';
+  } else if ((node.getOptions().type || 'sysml-block') === NODE_TYPES.BLOCK) {
     borderColor = '#0073e6';
-    dotColor = '#111';
+    dotColor = '#0073e6';
+  } else if ((node.getOptions().type || 'sysml-block') === NODE_TYPES.ACTIVITY) {
+    borderColor = '#00b300';
+    dotColor = '#00b300';
+  } else {
+    borderColor = '#666';
+    dotColor = '#666';
   }
 
   return (

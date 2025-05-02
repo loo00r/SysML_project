@@ -423,7 +423,7 @@ body {
 
 .sysml-link.selected path,
 .sysml-link:hover path {
-  stroke: #1890ff;
+  stroke: #111 !important;
   stroke-width: 3;
   filter: drop-shadow(0 0 3px rgba(24,144,255,0.3));
 }
@@ -457,10 +457,11 @@ body {
 
 /* Точки видимі тільки при hover на блок */
 .connector-dot {
-  opacity: 1;
+  opacity: 0;
   transition: opacity 0.2s;
 }
-.connector-dot:hover {
+.node:hover .connector-dot,
+.srd-node:hover .connector-dot {
   opacity: 1;
   z-index: 20;
 }

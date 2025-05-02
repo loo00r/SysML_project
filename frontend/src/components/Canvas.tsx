@@ -308,11 +308,11 @@ const Canvas: React.FC = () => {
       const nodeOptions = {
         name: data.label,
         color:
-          data.label === 'System Block' ? 'rgb(0,192,255)' :
-          data.label === 'Sensor' ? 'rgb(229,57,53)' :
-          data.label === 'Processor' ? 'rgb(255,214,0)' :
-          data.type === NODE_TYPES.BLOCK ? 'rgb(0,192,255)' :
-          'rgb(192,255,0)',
+          data.label === 'System Block' ? 'linear-gradient(to bottom, #e6ffe6, #fff)' :
+          data.label === 'Sensor' ? 'linear-gradient(to bottom, #ffe6e6, #fff)' :
+          data.label === 'Processor' ? 'linear-gradient(to bottom, #fffbe6, #fff)' :
+          data.type === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
+          'linear-gradient(to bottom, #e6ffe6, #fff)',
         description: data.description
       };
 
@@ -504,10 +504,26 @@ const Canvas: React.FC = () => {
         const sourceRect = sourceConnector.getBoundingClientRect();
         const targetRect = targetConnector.getBoundingClientRect();
         
-        const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left;
-        const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top;
-        const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left;
-        const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top;
+        // Calculate offset for better arrow visibility
+        const OFFSET = 4; // px, reduced for closer connection
+        let sourceOffsetX = 0, sourceOffsetY = 0, targetOffsetX = 0, targetOffsetY = 0;
+        // Offset based on connector position
+        switch (sourcePosition) {
+          case 'top': sourceOffsetY = -OFFSET; break;
+          case 'bottom': sourceOffsetY = OFFSET; break;
+          case 'left': sourceOffsetX = -OFFSET; break;
+          case 'right': sourceOffsetX = OFFSET; break;
+        }
+        switch (targetPosition) {
+          case 'top': targetOffsetY = -OFFSET; break;
+          case 'bottom': targetOffsetY = OFFSET; break;
+          case 'left': targetOffsetX = -OFFSET; break;
+          case 'right': targetOffsetX = OFFSET; break;
+        }
+        const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left + sourceOffsetX;
+        const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top + sourceOffsetY;
+        const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left + targetOffsetX;
+        const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top + targetOffsetY;
         
         if (link.getPoints().length >= 2) {
           link.getPoints()[0].setPosition(sourceX, sourceY);
@@ -679,7 +695,7 @@ const Canvas: React.FC = () => {
             refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#888" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="#111" />
           </marker>
           <marker
             id="arrowhead-temp"

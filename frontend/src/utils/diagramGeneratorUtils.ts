@@ -144,9 +144,16 @@ export const generateNodesFromParsedData = async (
 
   // Create all nodes with temporary positions
   for (const nodeData of parsedNodes) {
+    // Assign color based on name for special blocks, else default
+    let color = nodeData.type === NODE_TYPES.BLOCK ? 'rgb(0,192,255)' : 'rgb(192,255,0)';
+    if (nodeData.type === NODE_TYPES.BLOCK) {
+      if (nodeData.name.trim() === 'System Block') color = '#e6ffe6';
+      else if (nodeData.name.trim() === 'Sensor') color = '#ffe6e6';
+      else if (nodeData.name.trim() === 'Processor') color = '#fffbe6';
+    }
     const options: SysMLNodeOptions = {
       name: nodeData.name,
-      color: nodeData.type === NODE_TYPES.BLOCK ? 'rgb(0,192,255)' : 'rgb(192,255,0)',
+      color,
       description: nodeData.description,
     };
 
