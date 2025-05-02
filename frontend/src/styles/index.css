@@ -427,12 +427,11 @@ body {
 }
 
 .sysml-link path {
-  stroke: #0073e6;
+  stroke: #111 !important;
   stroke-width: 2;
   fill: none;
   pointer-events: stroke;
   transition: stroke-width 0.2s, stroke 0.2s;
-  marker-end: url(#arrowhead);
 }
 
 .sysml-link.selected path,
@@ -457,14 +456,16 @@ body {
 }
 
 .srd-link path {
-  marker-end: url(#arrowhead);
+  stroke: #111 !important;
+  stroke-width: 2;
+  fill: none;
+  pointer-events: stroke;
+  transition: stroke-width 0.2s, stroke 0.2s;
 }
 
-/* Приховати ellipse (облако) Storm React Diagrams */
-.srd-port svg ellipse,
-.sysml-port svg ellipse,
-.node svg ellipse {
-  display: none !important;
+/* Лінки сині, стрілка завжди */
+.sysml-link path, .srd-link path {
+  stroke: #111 !important;
 }
 
 /* Точки видимі тільки при hover на блок */

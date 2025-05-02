@@ -37,16 +37,16 @@ const BlockItem = styled.div.withConfig({
   padding: 15px;
   margin: 8px 0;
   background: ${props => {
+    if (props.blockLabel === 'System Block') return 'linear-gradient(to bottom, #e6ffe6, #fff)';
     if (props.blockLabel === 'Sensor') return 'linear-gradient(to bottom, #ffe6e6, #fff)';
     if (props.blockLabel === 'Processor') return 'linear-gradient(to bottom, #fffbe6, #fff)';
-    if (props.blockLabel === 'System Block') return 'linear-gradient(to bottom, #e6f3ff, #fff)';
     return props.blockType === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
       props.blockType === NODE_TYPES.ACTIVITY ? 'linear-gradient(to bottom, #e6ffe6, #fff)' : '#fff';
   }};
   border: 2px solid ${props => {
+    if (props.blockLabel === 'System Block') return '#00b300';
     if (props.blockLabel === 'Sensor') return '#e53935';
     if (props.blockLabel === 'Processor') return '#ffd600';
-    if (props.blockLabel === 'System Block') return '#0073e6';
     return props.blockType === NODE_TYPES.BLOCK ? '#0073e6' :
       props.blockType === NODE_TYPES.ACTIVITY ? '#00b300' : '#666';
   }};

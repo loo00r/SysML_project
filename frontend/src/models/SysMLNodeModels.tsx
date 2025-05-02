@@ -243,8 +243,8 @@ export class SysMLLinkModel extends DefaultLinkModel {
     super({
       type: 'sysml-link',
       width: 2,
-      color: '#111', // чорний лінк
-      selectedColor: '#111',
+      color: '#0073e6', // синій лінк
+      selectedColor: '#0073e6',
       ...options
     });
   }

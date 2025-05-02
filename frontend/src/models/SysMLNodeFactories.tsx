@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
+import { DiagramEngine, DefaultLinkFactory, PortWidget, PortModelAlignment } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -133,9 +133,9 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     borderColor = '#ffd600';
     dotColor = '#ffd600';
   } else if (name === 'System Block') {
-    color = 'linear-gradient(135deg, #e6f3ff 0%, #fff 100%)';
-    borderColor = '#0073e6';
-    dotColor = '#0073e6';
+    color = 'linear-gradient(135deg, #e6ffe6 0%, #fff 100%)';
+    borderColor = '#00b300';
+    dotColor = '#00b300';
   }
 
   return (
@@ -245,7 +245,28 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
   }
 }
 
-// Factory for our custom links
+// Кастомний LinkWidget для умовної стрілки
+const SysMLLinkWidget = (props: any) => {
+  const { link, diagramEngine } = props;
+  const sourcePort = link.getSourcePort();
+  const targetPort = link.getTargetPort();
+  // Стрілка тільки якщо лінк завершений (є targetPort)
+  const markerEnd = targetPort ? 'url(#arrowhead)' : undefined;
+  return (
+    <g className={link.getOptions().className || 'sysml-link'} data-linkid={link.getID()}>
+      {link.getPoints().length >= 2 && (
+        <path
+          d={`M ${link.getPoints()[0].getX()} ${link.getPoints()[0].getY()} L ${link.getPoints()[link.getPoints().length-1].getX()} ${link.getPoints()[link.getPoints().length-1].getY()}`}
+          stroke="#111"
+          strokeWidth={2}
+          fill="none"
+          markerEnd={markerEnd}
+        />
+      )}
+    </g>
+  );
+};
+
 export class SysMLLinkFactory extends DefaultLinkFactory {
   constructor() {
     super('sysml-link');
@@ -253,5 +274,9 @@ export class SysMLLinkFactory extends DefaultLinkFactory {
 
   generateModel(): SysMLLinkModel {
     return new SysMLLinkModel();
+  }
+
+  generateReactWidget(event: any) {
+    return <SysMLLinkWidget link={event.model} diagramEngine={event.engine} />;
   }
 }

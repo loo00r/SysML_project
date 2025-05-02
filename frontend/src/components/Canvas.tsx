@@ -679,10 +679,17 @@ const Canvas: React.FC = () => {
             refY="3.5"
             orient="auto"
           >
-            <polygon
-              points="0 0, 10 3.5, 0 7"
-              fill="#111" // чорний
-            />
+            <polygon points="0 0, 10 3.5, 0 7" fill="#888" />
+          </marker>
+          <marker
+            id="arrowhead-temp"
+            markerWidth="8"
+            markerHeight="6"
+            refX="7"
+            refY="3"
+            orient="auto"
+          >
+            <polygon points="0 0, 8 3, 0 6" fill="#888" />
           </marker>
         </defs>
       </svg>
@@ -703,10 +710,14 @@ const Canvas: React.FC = () => {
           >
             <path
               d={`M ${linkDragging.tempLink.x1} ${linkDragging.tempLink.y1} L ${linkDragging.tempLink.x2} ${linkDragging.tempLink.y2}`}
-              stroke="#0073e6"
+              stroke="#888"
               strokeWidth="2"
               fill="none"
-              markerEnd="url(#arrowhead)"
+              strokeDasharray="6 4"
+              style={{
+                animation: 'dashmove 1s linear infinite'
+              }}
+              markerEnd="url(#arrowhead-temp)"
             />
           </svg>
         )}
