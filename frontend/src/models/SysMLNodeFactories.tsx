@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkFactory } from '@projectstorm/react-diagrams';
+import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -127,44 +127,52 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
       
       {/* Connection points with propagation prevention */}
       {topPort && (
-        <TopConnector 
-          className="connector-dot"
-          data-connector="top" 
-          data-nodeid={node.getID()}
-          data-portid={topPort.getID()}
-          onClick={preventPropagation}
-          onMouseDown={preventPropagation}
-        />
+        <PortWidget port={topPort} engine={engine}>
+          <TopConnector 
+            className="connector-dot"
+            data-connector="top" 
+            data-nodeid={node.getID()}
+            data-portid={topPort.getID()}
+            onClick={preventPropagation}
+            onMouseDown={preventPropagation}
+          />
+        </PortWidget>
       )}
       {rightPort && (
-        <RightConnector 
-          className="connector-dot"
-          data-connector="right" 
-          data-nodeid={node.getID()}
-          data-portid={rightPort.getID()}
-          onClick={preventPropagation}
-          onMouseDown={preventPropagation}
-        />
+        <PortWidget port={rightPort} engine={engine}>
+          <RightConnector 
+            className="connector-dot"
+            data-connector="right" 
+            data-nodeid={node.getID()}
+            data-portid={rightPort.getID()}
+            onClick={preventPropagation}
+            onMouseDown={preventPropagation}
+          />
+        </PortWidget>
       )}
       {bottomPort && (
-        <BottomConnector 
-          className="connector-dot"
-          data-connector="bottom" 
-          data-nodeid={node.getID()}
-          data-portid={bottomPort.getID()}
-          onClick={preventPropagation}
-          onMouseDown={preventPropagation}
-        />
+        <PortWidget port={bottomPort} engine={engine}>
+          <BottomConnector 
+            className="connector-dot"
+            data-connector="bottom" 
+            data-nodeid={node.getID()}
+            data-portid={bottomPort.getID()}
+            onClick={preventPropagation}
+            onMouseDown={preventPropagation}
+          />
+        </PortWidget>
       )}
       {leftPort && (
-        <LeftConnector 
-          className="connector-dot"
-          data-connector="left" 
-          data-nodeid={node.getID()}
-          data-portid={leftPort.getID()}
-          onClick={preventPropagation}
-          onMouseDown={preventPropagation}
-        />
+        <PortWidget port={leftPort} engine={engine}>
+          <LeftConnector 
+            className="connector-dot"
+            data-connector="left" 
+            data-nodeid={node.getID()}
+            data-portid={leftPort.getID()}
+            onClick={preventPropagation}
+            onMouseDown={preventPropagation}
+          />
+        </PortWidget>
       )}
     </NodeContainer>
   );

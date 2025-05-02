@@ -631,16 +631,10 @@ const Canvas: React.FC = () => {
     });
     // --- DEBUG: log before links ---
     console.log('Links before:', Object.values(engine.getModel().getLinks()).length);
-    // --- DEBUG: skip duplicate check for тесту ---
     // Створюємо лінк через SysMLLinkModel
     const link = new SysMLLinkModel();
     link.setSourcePort(sourcePort);
     link.setTargetPort(targetPort);
-    // Додаємо точки вручну для рендера
-    if (typeof sourcePort.getPosition === 'function' && typeof targetPort.getPosition === 'function') {
-      link.addPoint(new PointModel({ link, position: sourcePort.getPosition() }));
-      link.addPoint(new PointModel({ link, position: targetPort.getPosition() }));
-    }
     link.setData({
       sourceNodeId,
       sourcePosition: sourceConnector,
