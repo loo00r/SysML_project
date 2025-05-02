@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkModel } from '@projectstorm/react-diagrams';
+import { DiagramEngine } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -44,102 +44,27 @@ const NodeDescription = styled.div`
   background: rgba(255, 255, 255, 0.5);
 `;
 
-const PortContainer = styled.div<{ $position: 'left' | 'right' }>`
-  width: 16px;
-  height: 16px;
-  position: absolute;
-  top: 50%;
-  ${props => props.$position}: -8px;
-  transform: translateY(-50%);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1;
-`;
-
-const PortWidget = styled.div<{ $isConnectable?: boolean }>`
-  width: 12px;
-  height: 12px;
-  background: white;
-  border: 2px solid ${props => props.$isConnectable ? '#0073e6' : '#666'};
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: #e6f3ff;
-    border-color: #1890ff;
-    transform: scale(1.2);
-    box-shadow: 0 0 0 4px rgba(24,144,255,0.2);
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    background: transparent;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-  }
-`;
+// Create a simple context to access the engine
+const DiagramContext = React.createContext<{engine: DiagramEngine | null}>({engine: null});
 
 interface SysMLWidgetProps {
   node: SysMLBlockModel | SysMLActivityModel;
   engine: DiagramEngine;
 }
 
-const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
-  const startDragging = (
-    event: React.MouseEvent,
-    port: any,
-    connectionType: 'source' | 'target'
-  ) => {
-    const link = new DefaultLinkModel();
-    if (connectionType === 'source') {
-      link.setSourcePort(port);
-    } else {
-      link.setTargetPort(port);
-    }
-
-    const point = engine.getRelativeMousePoint(event);
-    link.getFirstPoint().setPosition(point);
-    link.getLastPoint().setPosition(point);
-
-    engine.getModel().addLink(link);
-    return link;
-  };
-
-  const handlePortMouseDown = (event: React.MouseEvent, port: any) => {
-    if (event.button === 0) {
-      event.stopPropagation();
-      startDragging(event, port, 'source');
-    }
-  };
-
+// Simplified widget without ports
+const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node }) => {
   return (
     <NodeContainer $type={node.getOptions().type || 'sysml-block'}>
       <NodeTitle>{node.getOptions().name}</NodeTitle>
-      {node.getDescription() && (
+      {node.getDescription && node.getDescription() && (
         <NodeDescription>{node.getDescription()}</NodeDescription>
       )}
-      {Object.values(node.getPorts()).map((port: any) => (
-        <PortContainer
-          key={port.getID()}
-          $position={port.getOptions().alignment === 'left' ? 'left' : 'right'}
-        >
-          <PortWidget
-            onMouseDown={(e) => handlePortMouseDown(e, port)}
-            $isConnectable={true}
-          />
-        </PortContainer>
-      ))}
     </NodeContainer>
   );
 };
 
+// Wrap the factory's generateReactWidget to provide the engine via context
 export class SysMLBlockFactory extends AbstractReactFactory<SysMLBlockModel, DiagramEngine> {
   constructor() {
     super('sysml-block');
@@ -153,7 +78,11 @@ export class SysMLBlockFactory extends AbstractReactFactory<SysMLBlockModel, Dia
   }
 
   generateReactWidget(event: { model: SysMLBlockModel; engine: DiagramEngine }): JSX.Element {
-    return <SysMLWidget node={event.model} engine={event.engine} />;
+    return (
+      <DiagramContext.Provider value={{engine: this.engine}}>
+        <SysMLWidget node={event.model} engine={this.engine} />
+      </DiagramContext.Provider>
+    );
   }
 }
 
@@ -170,6 +99,10 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
   }
 
   generateReactWidget(event: { model: SysMLActivityModel; engine: DiagramEngine }): JSX.Element {
-    return <SysMLWidget node={event.model} engine={event.engine} />;
+    return (
+      <DiagramContext.Provider value={{engine: this.engine}}>
+        <SysMLWidget node={event.model} engine={this.engine} />
+      </DiagramContext.Provider>
+    );
   }
 }

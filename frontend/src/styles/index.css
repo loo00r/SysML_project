@@ -420,3 +420,37 @@ body {
 .iterate-button:hover {
   background-color: #45a049;
 }
+
+/* Arrow Link styles */
+.sysml-link {
+  pointer-events: all;
+}
+
+.sysml-link path {
+  stroke: #0073e6;
+  stroke-width: 2;
+  fill: none;
+  pointer-events: stroke;
+  transition: stroke-width 0.2s, stroke 0.2s;
+}
+
+.sysml-link.selected path,
+.sysml-link:hover path {
+  stroke: #1890ff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 3px rgba(24,144,255,0.3));
+}
+
+.sysml-port-top {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.sysml-port-bottom {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+}

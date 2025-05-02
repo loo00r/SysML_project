@@ -1,4 +1,4 @@
-import { DefaultNodeModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { DefaultNodeModel } from '@projectstorm/react-diagrams';
 import EditableText from '../components/custom/EditableText';
 import React from 'react';
 import styled from 'styled-components';
@@ -48,21 +48,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
     this.size = options.size || { width: 200, height: 150 };
     this.description = options.description || '';
 
-    // Initialize ports
-    this.addPort(
-      new DefaultPortModel({
-        in: true,
-        name: 'in',
-        alignment: PortModelAlignment.LEFT
-      })
-    );
-    this.addPort(
-      new DefaultPortModel({
-        in: false,
-        name: 'out',
-        alignment: PortModelAlignment.RIGHT
-      })
-    );
+    // No ports are added - removed port initialization
 
     // Override the default widget after ensuring super() is called
     this.registerListener({
@@ -92,7 +78,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
                   placeholder="Enter description"
                 />
               </NodeDescription>
-              {widget.generatePorts()}
+              {/* No ports rendered */}
             </NodeContainer>
           );
         }
@@ -109,7 +95,6 @@ export class SysMLBlockModel extends DefaultNodeModel {
       width: Math.max(100, width),
       height: Math.max(80, height)
     };
-    this.updatePortPositions();
   }
 
   getDescription(): string {
@@ -128,17 +113,6 @@ export class SysMLBlockModel extends DefaultNodeModel {
     return this.resizing;
   }
 
-  private updatePortPositions() {
-    const ports = this.getPorts();
-    Object.values(ports).forEach(port => {
-      if (port.getOptions().alignment === 'left') {
-        port.setPosition(0, this.size.height / 2);
-      } else if (port.getOptions().alignment === 'right') {
-        port.setPosition(this.size.width, this.size.height / 2);
-      }
-    });
-  }
-
   serialize() {
     return {
       ...super.serialize(),
@@ -151,7 +125,6 @@ export class SysMLBlockModel extends DefaultNodeModel {
     super.deserialize(event);
     this.size = event.size || { width: 200, height: 150 };
     this.description = event.description || '';
-    this.updatePortPositions();
   }
 }
 
@@ -169,21 +142,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
     this.size = options.size || { width: 180, height: 100 };
     this.description = options.description || '';
 
-    // Initialize ports
-    this.addPort(
-      new DefaultPortModel({
-        in: true,
-        name: 'in',
-        alignment: PortModelAlignment.LEFT
-      })
-    );
-    this.addPort(
-      new DefaultPortModel({
-        in: false,
-        name: 'out',
-        alignment: PortModelAlignment.RIGHT
-      })
-    );
+    // No ports are added - removed port initialization
 
     // Override the default widget
     this.registerListener({
@@ -213,7 +172,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
                   placeholder="Enter description"
                 />
               </NodeDescription>
-              {widget.generatePorts()}
+              {/* No ports rendered */}
             </NodeContainer>
           );
         }
@@ -230,7 +189,6 @@ export class SysMLActivityModel extends DefaultNodeModel {
       width: Math.max(100, width),
       height: Math.max(80, height)
     };
-    this.updatePortPositions();
   }
 
   getDescription(): string {
@@ -248,18 +206,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
   isResizing(): boolean {
     return this.resizing;
   }
-
-  private updatePortPositions() {
-    const ports = this.getPorts();
-    Object.values(ports).forEach(port => {
-      if (port.getOptions().alignment === 'left') {
-        port.setPosition(0, this.size.height / 2);
-      } else if (port.getOptions().alignment === 'right') {
-        port.setPosition(this.size.width, this.size.height / 2);
-      }
-    });
-  }
-
+  
   serialize() {
     return {
       ...super.serialize(),
@@ -272,17 +219,5 @@ export class SysMLActivityModel extends DefaultNodeModel {
     super.deserialize(event);
     this.size = event.size || { width: 180, height: 100 };
     this.description = event.description || '';
-    this.updatePortPositions();
-  }
-}
-
-export class SysMLFlowPortModel extends DefaultPortModel {
-  constructor(isInput: boolean) {
-    super({
-      in: isInput,
-      name: isInput ? 'in' : 'out',
-      label: isInput ? 'Input' : 'Output',
-      alignment: isInput ? PortModelAlignment.LEFT : PortModelAlignment.RIGHT
-    });
   }
 }

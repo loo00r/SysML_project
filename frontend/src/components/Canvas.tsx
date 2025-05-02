@@ -5,15 +5,12 @@ import KeyboardShortcutsPanel from './custom/KeyboardShortcutsPanel';
 import { CSSTransition } from 'react-transition-group';
 import createEngine, { 
   DiagramModel, 
-  DefaultLinkModel,
-  DefaultPortModel,
-  PortModelAlignment,
   NodeModel,
   BasePositionModelOptions
 } from '@projectstorm/react-diagrams';
 import { CanvasWidget } from '@projectstorm/react-canvas-core';
 import { SysMLBlockModel, SysMLActivityModel } from '../models/SysMLNodeModels';
-import { NODE_TYPES, validateConnection } from '../utils/sysmlUtils';
+import { NODE_TYPES } from '../utils/sysmlUtils';
 import { validateDiagram, ValidationError, validateNodePosition } from '../utils/validationUtils';
 import Toolbar from './Toolbar';
 import DiagramGenerator from './DiagramGenerator';
@@ -23,7 +20,6 @@ import { parseText, generateNodesFromParsedData } from '../utils/diagramGenerato
 import {
   configureEngineForPerformance,
   optimizeDiagramForLargeGraphs,
-  setupSmartRouting,
   setupDiagramInteractions
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
@@ -67,77 +63,10 @@ const CanvasContainer = styled.div<{ isResizing?: boolean }>`
     overflow: visible;
   }
 
-  .srd-default-link {
-    path {
-      stroke: #0073e6;
-      stroke-width: 2;
-      pointer-events: all;
-
-      &.selected {
-        stroke: #1890ff;
-        stroke-width: 3;
-      }
-    }
-
-    &:hover {
-      path {
-        stroke: #1890ff;
-        stroke-width: 3;
-        filter: drop-shadow(0 0 3px rgba(24,144,255,0.3));
-      }
-    }
-  }
-
-  .srd-default-link-point {
-    fill: #0073e6;
-    stroke: none;
-    
-    &:hover {
-      fill: #1890ff;
-      r: 6;
-    }
-  }
-
-  .srd-default-link-label {
-    background: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    user-select: none;
-    cursor: pointer;
-    pointer-events: all;
-    
-    &:hover {
-      background: #f0f0f0;
-    }
-  }
-
   .node {
     transition: box-shadow 0.3s ease;
     &:hover {
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    }
-  }
-  
-  .port {
-    width: 12px;
-    height: 12px;
-    background: #fff;
-    border: 2px solid #666;
-    border-radius: 50%;
-    cursor: pointer;
-    &:hover {
-      background: #ddd;
-    }
-  }
-  
-  .link-path {
-    stroke: #666;
-    stroke-width: 2px;
-    pointer-events: all;
-    &:hover {
-      stroke: #0073e6;
-      stroke-width: 3px;
     }
   }
   
@@ -192,7 +121,7 @@ const ValidationMessage = styled.div<{ type: 'error' | 'warning' }>`
 interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
-  node: ExtendedNodeModel | null;  // Update to use ExtendedNodeModel
+  node: ExtendedNodeModel | null;
 }
 
 interface DiagramState {
@@ -213,7 +142,9 @@ interface ExtendedNodeModel extends NodeModel {
 const Canvas: React.FC = () => {
   const DEFAULT_GRID_SIZE = 15;
   const [engine] = React.useState(() => {
-    const engine = createEngine();
+    const engine = createEngine({
+      registerDefaultDeleteItemsAction: true
+    });
     const model = new DiagramModel();
 
     // Register custom factories
@@ -227,7 +158,6 @@ const Canvas: React.FC = () => {
     // Configure engine with optimizations
     configureEngineForPerformance(engine);
     optimizeDiagramForLargeGraphs(engine);
-    setupSmartRouting(engine);
     setupDiagramInteractions(engine);
 
     return engine;
@@ -248,7 +178,6 @@ const Canvas: React.FC = () => {
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Move checkDiagramValidity up before it's used
   const checkDiagramValidity = useCallback(() => {
     const model = engine.getModel();
     const { errors } = validateDiagram(model);
@@ -263,7 +192,6 @@ const Canvas: React.FC = () => {
   }, [engine]);
 
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in input fields
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
@@ -295,7 +223,6 @@ const Canvas: React.FC = () => {
       }
     }
 
-    // Delete key for selected nodes
     if (e.key === 'Delete' || e.key === 'Backspace') {
       const selectedNodes = engine.getModel().getSelectedEntities();
       if (selectedNodes.length > 0) {
@@ -312,13 +239,11 @@ const Canvas: React.FC = () => {
     }
   }, [engine, history, saveState, checkDiagramValidity]);
 
-  // Set up keyboard shortcuts
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [handleKeyPress]);
   
-  // Load saved state on mount
   useEffect(() => {
     const savedState = localStorage.getItem('diagram-state');
     if (savedState) {
@@ -362,35 +287,19 @@ const Canvas: React.FC = () => {
           return;
       }
 
-      // Add ports after node creation
-      node.addPort(new DefaultPortModel({
-        in: true,
-        name: 'in',
-        alignment: PortModelAlignment.LEFT
-      }));
-      node.addPort(new DefaultPortModel({
-        in: false,
-        name: 'out',
-        alignment: PortModelAlignment.RIGHT
-      }));
-
-      // Set position
       const gridSize = DEFAULT_GRID_SIZE;
       const snappedX = Math.round(x / gridSize) * gridSize;
       const snappedY = Math.round(y / gridSize) * gridSize;
       node.setPosition(snappedX, snappedY);
 
-      // Add node to model
       model.addNode(node);
 
-      // Trigger repaint and animation
       engine.repaintCanvas();
       const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
       if (nodeElement) {
         nodeElement.classList.add('node-appear');
       }
 
-      // Save state and validate
       history.saveState();
       checkDiagramValidity();
     } catch (error) {
@@ -402,7 +311,6 @@ const Canvas: React.FC = () => {
     event.preventDefault();
   }, []);
 
-  // Add history save points on important actions
   useEffect(() => {
     const model = engine.getModel();
     model.registerListener({
@@ -430,7 +338,7 @@ const Canvas: React.FC = () => {
       model.removeLink(link);
     });
     engine.repaintCanvas();
-    history.clear(); // Clear history when diagram is cleared
+    history.clear();
   }, [engine, history]);
 
   useEffect(() => {
@@ -445,26 +353,9 @@ const Canvas: React.FC = () => {
           node.setPosition(x, y);
         });
         checkDiagramValidity();
-      },
-      linksUpdated: (event: any) => {
-        if (!event?.links) return;
-        event.links.forEach((link: DefaultLinkModel) => {
-          if (!link) return;
-          const sourcePort = link.getSourcePort();
-          const targetPort = link.getTargetPort();
-          if (sourcePort && targetPort) {
-            const isValid = validateConnection(sourcePort, targetPort);
-            if (!isValid) {
-              model.removeLink(link);
-              engine.repaintCanvas();
-            }
-          }
-        });
-        checkDiagramValidity();
       }
     });
 
-    // Add context menu handler to engine
     const handleNodeContextMenu = (e: React.MouseEvent, node: NodeModel) => {
       e.preventDefault();
       e.stopPropagation();
@@ -479,7 +370,6 @@ const Canvas: React.FC = () => {
     });
 
     return () => {
-      // Cleanup listeners
       engine.getModel().getNodes().forEach(node => {
         const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
         if (element) {
@@ -487,7 +377,7 @@ const Canvas: React.FC = () => {
         }
       });
     };
-  }, [engine]);
+  }, [engine, checkDiagramValidity]);
 
   const handleContextMenu = (event: React.MouseEvent, node: NodeModel) => {
     event.preventDefault();
@@ -513,15 +403,6 @@ const Canvas: React.FC = () => {
       ? new SysMLBlockModel({ name: `${options.name} (copy)`, color: options.style?.color })
       : new SysMLActivityModel({ name: `${options.name} (copy)`, color: options.style?.color });
 
-    // Clone ports
-    Object.values(node.getPorts()).forEach(port => {
-      newNode.addPort(new DefaultPortModel({
-        name: port.getOptions().name,
-        alignment: port.getOptions().alignment,
-      }));
-    });
-
-    // Position slightly offset from original
     const { x, y } = node.getPosition();
     newNode.setPosition(x + 50, y + 50);
 
@@ -551,7 +432,6 @@ const Canvas: React.FC = () => {
   const handleValidationMessageClick = (error: ValidationError) => {
     if (error.nodes) {
       error.nodes.forEach(node => {
-        // Add temporary highlight effect
         const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
         if (nodeElement) {
           nodeElement.classList.add('highlight-error');
@@ -563,7 +443,6 @@ const Canvas: React.FC = () => {
     }
     if (error.links) {
       error.links.forEach(link => {
-        // Add temporary highlight effect
         const linkElement = document.querySelector(`[data-linkid="${link.getID()}"]`);
         if (linkElement) {
           linkElement.classList.add('highlight-error');
@@ -583,7 +462,6 @@ const Canvas: React.FC = () => {
       const model = engine.getModel();
       
       await generateNodesFromParsedData(parsedNodes, model, (node) => {
-        // Add animation class to newly created nodes
         setTimeout(() => {
           const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
           if (nodeElement) {
@@ -603,6 +481,23 @@ const Canvas: React.FC = () => {
 
   return (
     <CanvasWrapper>
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+          <marker
+            id="arrowhead"
+            markerWidth="10"
+            markerHeight="7"
+            refX="9"
+            refY="3.5"
+            orient="auto"
+          >
+            <polygon
+              points="0 0, 10 3.5, 0 7"
+              fill="#0073e6"
+            />
+          </marker>
+        </defs>
+      </svg>
       <Toolbar engine={engine} />
       <CanvasContainer
         onDrop={onDrop}

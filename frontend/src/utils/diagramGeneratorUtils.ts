@@ -8,7 +8,7 @@ interface ParsedNode {
   type: string;
   name: string;
   description?: string;
-  connections: string[];
+  connections: string[]; // Keep track of connections for future implementation
 }
 
 interface ParsePattern {
@@ -113,7 +113,6 @@ export const parseText = (text: string): ParsedNode[] => {
 };
 
 const extractMainNoun = (sentence: string): string => {
-  // Simple noun extraction - can be enhanced with NLP
   const words = sentence.split(' ');
   const commonNouns = ['system', 'component', 'sensor', 'module', 'processor', 'device'];
   for (let i = 0; i < words.length; i++) {
@@ -125,7 +124,6 @@ const extractMainNoun = (sentence: string): string => {
 };
 
 const extractVerb = (sentence: string): string => {
-  // Simple verb extraction - can be enhanced with NLP
   const words = sentence.split(' ');
   const actionVerbs = ['process', 'analyze', 'detect', 'transmit', 'receive', 'scan'];
   for (let i = 0; i < words.length; i++) {
@@ -144,7 +142,7 @@ export const generateNodesFromParsedData = async (
   const nodeMap = new Map<string, NodeModel>();
   const allNodes: NodeModel[] = [];
 
-  // First pass: Create all nodes with temporary positions
+  // Create all nodes with temporary positions
   for (const nodeData of parsedNodes) {
     const options: SysMLNodeOptions = {
       name: nodeData.name,
@@ -156,34 +154,13 @@ export const generateNodesFromParsedData = async (
       ? new SysMLBlockModel(options)
       : new SysMLActivityModel(options);
 
-    // Set temporary position (will be updated by layout engine)
     node.setPosition(0, 0);
     model.addNode(node);
     nodeMap.set(nodeData.name, node);
     allNodes.push(node);
   }
 
-  // Second pass: Create connections
-  const createdLinks: any[] = [];
-  for (const nodeData of parsedNodes) {
-    const sourceNode = nodeMap.get(nodeData.name);
-    if (sourceNode) {
-      for (const targetName of nodeData.connections) {
-        const targetNode = Array.from(nodeMap.values()).find(node => 
-          node.getOptions().name.toLowerCase().includes(targetName.toLowerCase())
-        );
-        if (targetNode) {
-          const sourcePort = sourceNode.getPort('out');
-          const targetPort = targetNode.getPort('in');
-          if (sourcePort && targetPort) {
-            const link = sourcePort.link(targetPort);
-            model.addLink(link);
-            createdLinks.push(link);
-          }
-        }
-      }
-    }
-  }
+  // No longer creating links between nodes - links removed
 
   // Apply initial layout
   LayoutEngine.optimizeLayout(model);
@@ -197,14 +174,6 @@ export const generateNodesFromParsedData = async (
         easing: 'spring',
         stagger: 100
       });
-    }
-  }
-
-  // Animate links appearing
-  for (const link of createdLinks) {
-    const linkElement = document.querySelector(`[data-linkid="${link.getID()}"]`);
-    if (linkElement) {
-      linkElement.classList.add('link-appear');
     }
   }
 

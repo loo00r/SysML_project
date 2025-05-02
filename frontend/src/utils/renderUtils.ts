@@ -72,31 +72,22 @@ export const optimizeDiagramForLargeGraphs = (engine: DiagramEngine) => {
   return engine;
 };
 
-export const setupSmartRouting = (engine: DiagramEngine) => {
-  const model = engine.getModel();
-  if (!model) {
-    return engine;
+export const setupSmartRouting = (engine: any) => {
+  // Wrap in a try-catch to prevent errors if the canvas is not yet available
+  try {
+    engine.setMaxNumberPointsPerLink(10);
+    
+    // Ensure canvas exists before configuring routing
+    setTimeout(() => {
+      const canvas = document.querySelector('.srd-canvas');
+      if (canvas) {
+        // Configure link routing only after canvas is available
+        engine.getLinkFactories().getFactory('default').setupDefaultInteractions();
+      }
+    }, 500);
+  } catch (error) {
+    console.warn('Cannot setup smart routing yet, canvas not available:', error);
   }
-
-  engine.setMaxNumberPointsPerLink(10);
-  model.setLocked(false);
-  
-  // Simplify links by removing intermediate points
-  model.registerListener({
-    linksUpdated: () => {
-      model.getLinks().forEach(link => {
-        if (link.getSourcePort() && link.getTargetPort()) {
-          const points = link.getPoints();
-          while (points.length > 2) {
-            points.splice(1, 1);
-          }
-        }
-      });
-      engine.repaintCanvas();
-    }
-  });
-
-  return engine;
 };
 
 export const setupDiagramInteractions = (engine: DiagramEngine) => {
