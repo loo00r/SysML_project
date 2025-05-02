@@ -112,6 +112,12 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     e.stopPropagation();
   };
 
+  // Отримуємо порти для кожної позиції
+  const topPort = node.getPort('top');
+  const rightPort = node.getPort('right');
+  const bottomPort = node.getPort('bottom');
+  const leftPort = node.getPort('left');
+
   return (
     <NodeContainer $type={node.getOptions().type || 'sysml-block'}>
       <NodeTitle>{node.getOptions().name}</NodeTitle>
@@ -120,34 +126,46 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
       )}
       
       {/* Connection points with propagation prevention */}
-      <TopConnector 
-        className="connector-dot"
-        data-connector="top" 
-        data-nodeid={node.getID()}
-        onClick={preventPropagation}
-        onMouseDown={preventPropagation}
-      />
-      <RightConnector 
-        className="connector-dot"
-        data-connector="right" 
-        data-nodeid={node.getID()}
-        onClick={preventPropagation}
-        onMouseDown={preventPropagation}
-      />
-      <BottomConnector 
-        className="connector-dot"
-        data-connector="bottom" 
-        data-nodeid={node.getID()}
-        onClick={preventPropagation}
-        onMouseDown={preventPropagation}
-      />
-      <LeftConnector 
-        className="connector-dot"
-        data-connector="left" 
-        data-nodeid={node.getID()}
-        onClick={preventPropagation}
-        onMouseDown={preventPropagation}
-      />
+      {topPort && (
+        <TopConnector 
+          className="connector-dot"
+          data-connector="top" 
+          data-nodeid={node.getID()}
+          data-portid={topPort.getID()}
+          onClick={preventPropagation}
+          onMouseDown={preventPropagation}
+        />
+      )}
+      {rightPort && (
+        <RightConnector 
+          className="connector-dot"
+          data-connector="right" 
+          data-nodeid={node.getID()}
+          data-portid={rightPort.getID()}
+          onClick={preventPropagation}
+          onMouseDown={preventPropagation}
+        />
+      )}
+      {bottomPort && (
+        <BottomConnector 
+          className="connector-dot"
+          data-connector="bottom" 
+          data-nodeid={node.getID()}
+          data-portid={bottomPort.getID()}
+          onClick={preventPropagation}
+          onMouseDown={preventPropagation}
+        />
+      )}
+      {leftPort && (
+        <LeftConnector 
+          className="connector-dot"
+          data-connector="left" 
+          data-nodeid={node.getID()}
+          data-portid={leftPort.getID()}
+          onClick={preventPropagation}
+          onMouseDown={preventPropagation}
+        />
+      )}
     </NodeContainer>
   );
 };

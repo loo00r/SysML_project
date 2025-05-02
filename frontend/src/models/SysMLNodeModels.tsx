@@ -1,4 +1,4 @@
-import { DefaultNodeModel, DefaultLinkModel } from '@projectstorm/react-diagrams';
+import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
 import EditableText from '../components/custom/EditableText';
 import React from 'react';
 import styled from 'styled-components';
@@ -48,7 +48,11 @@ export class SysMLBlockModel extends DefaultNodeModel {
     this.size = options.size || { width: 200, height: 150 };
     this.description = options.description || '';
 
-    // No ports are added - removed port initialization
+    // Додаємо порти: top/left — in: true, right/bottom — in: false
+    this.addPort(new DefaultPortModel({ in: true, name: 'top', alignment: PortModelAlignment.TOP }));
+    this.addPort(new DefaultPortModel({ in: false, name: 'right', alignment: PortModelAlignment.RIGHT }));
+    this.addPort(new DefaultPortModel({ in: false, name: 'bottom', alignment: PortModelAlignment.BOTTOM }));
+    this.addPort(new DefaultPortModel({ in: true, name: 'left', alignment: PortModelAlignment.LEFT }));
 
     // Override the default widget after ensuring super() is called
     this.registerListener({
@@ -142,7 +146,11 @@ export class SysMLActivityModel extends DefaultNodeModel {
     this.size = options.size || { width: 180, height: 100 };
     this.description = options.description || '';
 
-    // No ports are added - removed port initialization
+    // Додаємо порти: top/left — in: true, right/bottom — in: false
+    this.addPort(new DefaultPortModel({ in: true, name: 'top', alignment: PortModelAlignment.TOP }));
+    this.addPort(new DefaultPortModel({ in: false, name: 'right', alignment: PortModelAlignment.RIGHT }));
+    this.addPort(new DefaultPortModel({ in: false, name: 'bottom', alignment: PortModelAlignment.BOTTOM }));
+    this.addPort(new DefaultPortModel({ in: true, name: 'left', alignment: PortModelAlignment.LEFT }));
 
     // Override the default widget
     this.registerListener({
@@ -223,6 +231,13 @@ export class SysMLActivityModel extends DefaultNodeModel {
 }
 
 export class SysMLLinkModel extends DefaultLinkModel {
+  private _sysmlData?: {
+    sourceNodeId: string;
+    sourcePosition: string;
+    targetNodeId: string;
+    targetPosition: string;
+  };
+
   constructor(options: any = {}) {
     super({
       type: 'sysml-link',
@@ -240,32 +255,27 @@ export class SysMLLinkModel extends DefaultLinkModel {
     targetNodeId: string;
     targetPosition: string;
   }) {
-    this.getOptions().data = data;
+    this._sysmlData = data;
   }
 
   // Get data about the connector
-  getData(): {
-    sourceNodeId: string;
-    sourcePosition: string;
-    targetNodeId: string;
-    targetPosition: string;
-  } | undefined {
-    return this.getOptions().data;
+  getData() {
+    return this._sysmlData;
   }
 
   // Override serialize to include our connector data
   serialize() {
     return {
       ...super.serialize(),
-      data: this.getOptions().data
+      sysmlData: this._sysmlData
     };
   }
 
   // Override deserialize to handle connector data
   deserialize(event: any): void {
     super.deserialize(event);
-    if (event.data) {
-      this.setData(event.data);
+    if (event.sysmlData) {
+      this.setData(event.sysmlData);
     }
   }
 }

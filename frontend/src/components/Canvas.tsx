@@ -561,23 +561,33 @@ const Canvas: React.FC = () => {
       // Only handle if we have a valid drag
       if (linkDragging.isDragging && linkDragging.isValidDrag) {
         const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
-        
         if (elemUnder && elemUnder.classList.contains('connector-dot')) {
           const targetNodeId = elemUnder.getAttribute('data-nodeid');
           const targetConnector = elemUnder.getAttribute('data-connector');
-          
-          if (targetNodeId && 
-              targetConnector && 
-              targetNodeId !== linkDragging.sourceNode) {
+          console.log('MouseUp on connector-dot:', {
+            sourceNode: linkDragging.sourceNode,
+            sourceConnector: linkDragging.sourceConnector,
+            targetNodeId,
+            targetConnector
+          });
+          if (
+            targetNodeId &&
+            targetConnector &&
+            targetNodeId !== linkDragging.sourceNode &&
+            targetConnector !== linkDragging.sourceConnector
+          ) {
             createLink(
               linkDragging.sourceNode!,
               linkDragging.sourceConnector!,
               targetNodeId,
               targetConnector
             );
+          } else {
+            console.log('Not creating link: same node or same connector');
           }
+        } else {
+          console.log('MouseUp NOT on connector-dot:', elemUnder);
         }
-        
         // Reset dragging state
         setLinkDragging({
           isDragging: false,
@@ -604,42 +614,43 @@ const Canvas: React.FC = () => {
   const createLink = (sourceNodeId: string, sourceConnector: string, targetNodeId: string, targetConnector: string) => {
     const sourceNode = engine.getModel().getNode(sourceNodeId);
     const targetNode = engine.getModel().getNode(targetNodeId);
-    
-    if (!sourceNode || !targetNode) return;
-    
+    if (!sourceNode || !targetNode) {
+      console.log('createLink: source or target node not found', { sourceNodeId, targetNodeId });
+      return;
+    }
+    const sourcePort = sourceNode.getPort(sourceConnector);
+    const targetPort = targetNode.getPort(targetConnector);
+    if (!sourcePort || !targetPort) {
+      console.log('createLink: source or target port not found', { sourceConnector, targetConnector });
+      return;
+    }
+    // --- DEBUG: log port directions ---
+    console.log('createLink: port directions', {
+      sourcePortIn: sourcePort.getOptions().in,
+      targetPortIn: targetPort.getOptions().in
+    });
+    // --- DEBUG: log before links ---
+    console.log('Links before:', Object.values(engine.getModel().getLinks()).length);
+    // --- DEBUG: skip duplicate check for тесту ---
+    // Створюємо лінк через SysMLLinkModel
     const link = new SysMLLinkModel();
-    
+    link.setSourcePort(sourcePort);
+    link.setTargetPort(targetPort);
+    // Додаємо точки вручну для рендера
+    if (typeof sourcePort.getPosition === 'function' && typeof targetPort.getPosition === 'function') {
+      link.addPoint(new PointModel({ link, position: sourcePort.getPosition() }));
+      link.addPoint(new PointModel({ link, position: targetPort.getPosition() }));
+    }
     link.setData({
       sourceNodeId,
       sourcePosition: sourceConnector,
       targetNodeId,
       targetPosition: targetConnector
     });
-    
-    const sourceConnectorElem = document.querySelector(
-      `[data-nodeid="${sourceNodeId}"][data-connector="${sourceConnector}"]`
-    );
-    const targetConnectorElem = document.querySelector(
-      `[data-nodeid="${targetNodeId}"][data-connector="${targetConnector}"]`
-    );
-    
-    if (!sourceConnectorElem || !targetConnectorElem || !canvasRef.current) return;
-    
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const sourceRect = sourceConnectorElem.getBoundingClientRect();
-    const targetRect = targetConnectorElem.getBoundingClientRect();
-    
-    const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left;
-    const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top;
-    const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left;
-    const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top;
-    
-    link.addPoint(new PointModel({ link, position: { x: sourceX, y: sourceY } }));
-    link.addPoint(new PointModel({ link, position: { x: targetX, y: targetY } }));
-    
     engine.getModel().addLink(link);
+    // --- DEBUG: log after links ---
+    console.log('Links after:', Object.values(engine.getModel().getLinks()).length);
     engine.repaintCanvas();
-    
     history.saveState();
   };
 
