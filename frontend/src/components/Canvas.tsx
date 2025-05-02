@@ -308,7 +308,7 @@ const Canvas: React.FC = () => {
       const nodeOptions = {
         name: data.label,
         color:
-          data.label === 'System Block' ? 'linear-gradient(to bottom, #e6ffe6, #fff)' :
+          data.label === 'System Block' ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
           data.label === 'Sensor' ? 'linear-gradient(to bottom, #ffe6e6, #fff)' :
           data.label === 'Processor' ? 'linear-gradient(to bottom, #fffbe6, #fff)' :
           data.type === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :

@@ -144,31 +144,33 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
 
   // Визначаємо кольори для System Block, Sensor, Processor — як у тулбарі
   const name = node.getOptions().name;
+  const type = node.getOptions().type || NODE_TYPES.BLOCK;
   let color = node.getOptions().color || '#fff';
   let borderColor;
   let dotColor;
-  if (name === 'System Block') {
-    borderColor = '#00b300';
-    dotColor = '#00b300';
-  } else if (name === 'Sensor') {
+  if (type === NODE_TYPES.BLOCK && name === 'Sensor') {
     borderColor = '#e53935';
     dotColor = '#e53935';
-  } else if (name === 'Processor') {
+    color = 'linear-gradient(to bottom, #ffb3b3, #ffe6e6)'; // much more red
+  } else if (type === NODE_TYPES.BLOCK && name === 'Processor') {
     borderColor = '#ffd600';
     dotColor = '#ffd600';
-  } else if ((node.getOptions().type || 'sysml-block') === NODE_TYPES.BLOCK) {
+    color = 'linear-gradient(to bottom, #fff176, #fffbe6)'; // more yellow
+  } else if (type === NODE_TYPES.BLOCK) {
     borderColor = '#0073e6';
     dotColor = '#0073e6';
-  } else if ((node.getOptions().type || 'sysml-block') === NODE_TYPES.ACTIVITY) {
+    color = 'linear-gradient(to bottom, #90c8f6, #e6f3ff)'; // more blue
+  } else if (type === NODE_TYPES.ACTIVITY) {
     borderColor = '#00b300';
     dotColor = '#00b300';
+    color = 'linear-gradient(to bottom, #7fffd4, #e6ffe6)'; // more green
   } else {
     borderColor = '#666';
     dotColor = '#666';
   }
 
   return (
-    <NodeContainer $type={node.getOptions().type || 'sysml-block'} $color={color} $borderColor={borderColor}>
+    <NodeContainer $type={type} $color={color} $borderColor={borderColor}>
       <NodeTitle>
         {editingTitle ? (
           <input
