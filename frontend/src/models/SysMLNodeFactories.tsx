@@ -113,6 +113,29 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     e.stopPropagation();
   };
 
+  const [editingTitle, setEditingTitle] = React.useState(false);
+  const [editingDesc, setEditingDesc] = React.useState(false);
+  const [title, setTitle] = React.useState(node.getOptions().name);
+  const [desc, setDesc] = React.useState(node.getDescription ? node.getDescription() : '');
+
+  React.useEffect(() => {
+    setTitle(node.getOptions().name);
+  }, [node.getOptions().name]);
+  React.useEffect(() => {
+    setDesc(node.getDescription ? node.getDescription() : '');
+  }, [node.getDescription ? node.getDescription() : '']);
+
+  const saveTitle = () => {
+    node.getOptions().name = title;
+    setEditingTitle(false);
+    if (engine) engine.repaintCanvas();
+  };
+  const saveDesc = () => {
+    if (node.setDescription) node.setDescription(desc);
+    setEditingDesc(false);
+    if (engine) engine.repaintCanvas();
+  };
+
   // Отримуємо порти для кожної позиції
   const topPort = node.getPort('top');
   const rightPort = node.getPort('right');
@@ -140,10 +163,36 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
 
   return (
     <NodeContainer $type={node.getOptions().type || 'sysml-block'} $color={color} $borderColor={borderColor}>
-      <NodeTitle>{node.getOptions().name}</NodeTitle>
-      {node.getDescription && node.getDescription() && (
-        <NodeDescription>{node.getDescription()}</NodeDescription>
-      )}
+      <NodeTitle>
+        {editingTitle ? (
+          <input
+            type="text"
+            value={title}
+            autoFocus
+            onChange={e => setTitle(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={e => { if (e.key === 'Enter') saveTitle(); }}
+            style={{ width: '100%', fontWeight: 600, fontSize: 16, border: '1px solid #ccc', borderRadius: 3 }}
+          />
+        ) : (
+          <span onClick={() => setEditingTitle(true)} style={{ cursor: 'pointer' }}>{title || 'Назва блоку'}</span>
+        )}
+      </NodeTitle>
+      <NodeDescription>
+        {editingDesc ? (
+          <textarea
+            value={desc}
+            autoFocus
+            onChange={e => setDesc(e.target.value)}
+            onBlur={saveDesc}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc(); } }}
+            style={{ width: '100%', fontSize: 13, border: '1px solid #ccc', borderRadius: 3, resize: 'none' }}
+            rows={2}
+          />
+        ) : (
+          <span onClick={() => setEditingDesc(true)} style={{ cursor: 'pointer', whiteSpace: 'pre-line' }}>{desc || 'Опис...'}</span>
+        )}
+      </NodeDescription>
       
       {/* Connection points with propagation prevention */}
       {topPort && (
