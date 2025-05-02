@@ -524,23 +524,17 @@ const Canvas: React.FC = () => {
 
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      
-      // Only handle mouse down for connector dots
       if (target.classList.contains('connector-dot')) {
         const nodeId = target.getAttribute('data-nodeid');
         const connectorType = target.getAttribute('data-connector');
-        
         if (nodeId && connectorType) {
           e.stopPropagation();
           e.preventDefault();
-          
           const rect = target.getBoundingClientRect();
           const canvasRect = canvasRef.current?.getBoundingClientRect();
-          
           if (canvasRect) {
             const x1 = rect.left + rect.width / 2 - canvasRect.left;
             const y1 = rect.top + rect.height / 2 - canvasRect.top;
-            
             setLinkDragging({
               isDragging: true,
               sourceNode: nodeId,
@@ -552,96 +546,98 @@ const Canvas: React.FC = () => {
         }
       }
     };
-    
+
     const handleMouseMove = (e: MouseEvent) => {
-      // Only update if we have a valid drag from a connector dot
-      if (linkDragging.isDragging && linkDragging.isValidDrag && linkDragging.tempLink && canvasRef.current) {
-        const canvasRect = canvasRef.current.getBoundingClientRect();
-        const x2 = e.clientX - canvasRect.left;
-        const y2 = e.clientY - canvasRect.top;
-        
-        setLinkDragging(prev => ({
-          ...prev,
-          tempLink: { ...prev.tempLink!, x2, y2 }
-        }));
-      }
-    };
-    
-    const handleMouseUp = (e: MouseEvent) => {
-      // Only handle if we have a valid drag
-      if (linkDragging.isDragging && linkDragging.isValidDrag) {
-        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
-        if (elemUnder && elemUnder.classList.contains('connector-dot')) {
-          const targetNodeId = elemUnder.getAttribute('data-nodeid');
-          const targetConnector = elemUnder.getAttribute('data-connector');
-          console.log('MouseUp on connector-dot:', {
-            sourceNode: linkDragging.sourceNode,
-            sourceConnector: linkDragging.sourceConnector,
-            targetNodeId,
-            targetConnector
-          });
-          if (
-            targetNodeId &&
-            targetConnector &&
-            targetNodeId !== linkDragging.sourceNode &&
-            targetConnector !== linkDragging.sourceConnector
-          ) {
-            createLink(
-              linkDragging.sourceNode!,
-              linkDragging.sourceConnector!,
-              targetNodeId,
-              targetConnector
-            );
-          } else {
-            console.log('Not creating link: same node or same connector');
-          }
-        } else {
-          console.log('MouseUp NOT on connector-dot:', elemUnder);
-        }
-        // Reset dragging state
-        setLinkDragging({
-          isDragging: false,
-          sourceNode: null,
-          sourceConnector: null,
-          tempLink: null,
-          isValidDrag: false
-        });
-      }
+      if (!linkDragging.isDragging || !linkDragging.isValidDrag || !linkDragging.tempLink || !canvasRef.current) return;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const x2 = e.clientX - canvasRect.left;
+      const y2 = e.clientY - canvasRect.top;
+      setLinkDragging(prev => ({
+        ...prev,
+        tempLink: { ...prev.tempLink!, x2, y2 }
+      }));
     };
 
-    // Add event listeners to document - only stop propagation for the connector dots themselves
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!linkDragging.isDragging || !linkDragging.isValidDrag) return;
+      const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+      if (elemUnder && elemUnder.classList.contains('connector-dot')) {
+        const targetNodeId = elemUnder.getAttribute('data-nodeid');
+        const targetConnector = elemUnder.getAttribute('data-connector');
+        if (
+          targetNodeId &&
+          targetConnector &&
+          targetNodeId !== linkDragging.sourceNode &&
+          targetConnector !== linkDragging.sourceConnector
+        ) {
+          createLink(
+            linkDragging.sourceNode!,
+            linkDragging.sourceConnector!,
+            targetNodeId,
+            targetConnector
+          );
+        }
+      }
+      setLinkDragging({
+        isDragging: false,
+        sourceNode: null,
+        sourceConnector: null,
+        tempLink: null,
+        isValidDrag: false
+      });
+    };
+
     document.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    
+
+    const canvasEl = canvasRef.current;
+    const resetDragging = () => setLinkDragging({
+      isDragging: false,
+      sourceNode: null,
+      sourceConnector: null,
+      tempLink: null,
+      isValidDrag: false
+    });
+    if (canvasEl) {
+      canvasEl.addEventListener('mouseleave', resetDragging);
+    }
+    document.addEventListener('mouseleave', resetDragging);
+
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      if (canvasEl) {
+        canvasEl.removeEventListener('mouseleave', resetDragging);
+      }
+      document.removeEventListener('mouseleave', resetDragging);
     };
   }, [linkDragging, canvasRef]);
   
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (linkDragging.isDragging && !(e.target as HTMLElement).classList.contains('connector-dot')) {
+      setLinkDragging({
+        isDragging: false,
+        sourceNode: null,
+        sourceConnector: null,
+        tempLink: null,
+        isValidDrag: false
+      });
+    }
+  };
+
   const createLink = (sourceNodeId: string, sourceConnector: string, targetNodeId: string, targetConnector: string) => {
     const sourceNode = engine.getModel().getNode(sourceNodeId);
     const targetNode = engine.getModel().getNode(targetNodeId);
     if (!sourceNode || !targetNode) {
-      console.log('createLink: source or target node not found', { sourceNodeId, targetNodeId });
       return;
     }
     const sourcePort = sourceNode.getPort(sourceConnector);
     const targetPort = targetNode.getPort(targetConnector);
     if (!sourcePort || !targetPort) {
-      console.log('createLink: source or target port not found', { sourceConnector, targetConnector });
       return;
     }
-    // --- DEBUG: log port directions ---
-    console.log('createLink: port directions', {
-      sourcePortIn: sourcePort.getOptions().in,
-      targetPortIn: targetPort.getOptions().in
-    });
-    // --- DEBUG: log before links ---
-    console.log('Links before:', Object.values(engine.getModel().getLinks()).length);
-    // Створюємо лінк через SysMLLinkModel
     const link = new SysMLLinkModel();
     link.setSourcePort(sourcePort);
     link.setTargetPort(targetPort);
@@ -652,10 +648,8 @@ const Canvas: React.FC = () => {
       targetPosition: targetConnector
     });
     engine.getModel().addLink(link);
-    // --- DEBUG: log after links ---
-    console.log('Links after:', Object.values(engine.getModel().getLinks()).length);
     engine.repaintCanvas();
-    updateLinkPositions(); // Додаємо одразу після repaintCanvas для коректної позиції стрілки
+    updateLinkPositions();
     history.saveState();
   };
 
@@ -700,8 +694,12 @@ const Canvas: React.FC = () => {
         </defs>
       </svg>
       <Toolbar engine={engine} />
-      <CanvasContainer ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
-        {/* Only render the temporary link when we have a valid drag */}
+      <CanvasContainer
+        ref={canvasRef}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onMouseDown={handleCanvasMouseDown}
+      >
         {linkDragging.isDragging && linkDragging.isValidDrag && linkDragging.tempLink && (
           <svg
             style={{
