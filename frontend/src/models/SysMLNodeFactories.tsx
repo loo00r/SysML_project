@@ -105,9 +105,13 @@ interface SysMLWidgetProps {
   engine: DiagramEngine;
 }
 
-// Simplified widget with connection dots
+// Simplified widget with connection dots that stop propagation
 const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
-  // Use simple connector data attributes
+  // Prevent the click event from reaching the block and moving it
+  const preventPropagation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <NodeContainer $type={node.getOptions().type || 'sysml-block'}>
       <NodeTitle>{node.getOptions().name}</NodeTitle>
@@ -115,26 +119,34 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
         <NodeDescription>{node.getDescription()}</NodeDescription>
       )}
       
-      {/* Connection points with simple attributes */}
+      {/* Connection points with propagation prevention */}
       <TopConnector 
         className="connector-dot"
         data-connector="top" 
         data-nodeid={node.getID()}
+        onClick={preventPropagation}
+        onMouseDown={preventPropagation}
       />
       <RightConnector 
         className="connector-dot"
         data-connector="right" 
         data-nodeid={node.getID()}
+        onClick={preventPropagation}
+        onMouseDown={preventPropagation}
       />
       <BottomConnector 
         className="connector-dot"
         data-connector="bottom" 
         data-nodeid={node.getID()}
+        onClick={preventPropagation}
+        onMouseDown={preventPropagation}
       />
       <LeftConnector 
         className="connector-dot"
         data-connector="left" 
         data-nodeid={node.getID()}
+        onClick={preventPropagation}
+        onMouseDown={preventPropagation}
       />
     </NodeContainer>
   );

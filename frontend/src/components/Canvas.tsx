@@ -201,7 +201,8 @@ const Canvas: React.FC = () => {
     isDragging: false,
     sourceNode: null as string | null, 
     sourceConnector: null as string | null,
-    tempLink: null as {x1: number, y1: number, x2: number, y2: number} | null
+    tempLink: null as {x1: number, y1: number, x2: number, y2: number} | null,
+    isValidDrag: false // Track if this is a valid connector drag
   });
   
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -514,6 +515,7 @@ const Canvas: React.FC = () => {
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
+      // Only handle mouse down for connector dots
       if (target.classList.contains('connector-dot')) {
         const nodeId = target.getAttribute('data-nodeid');
         const connectorType = target.getAttribute('data-connector');
@@ -533,7 +535,8 @@ const Canvas: React.FC = () => {
               isDragging: true,
               sourceNode: nodeId,
               sourceConnector: connectorType,
-              tempLink: { x1, y1, x2: x1, y2: y1 }
+              tempLink: { x1, y1, x2: x1, y2: y1 },
+              isValidDrag: true
             });
           }
         }
@@ -541,7 +544,8 @@ const Canvas: React.FC = () => {
     };
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (linkDragging.isDragging && linkDragging.tempLink && canvasRef.current) {
+      // Only update if we have a valid drag from a connector dot
+      if (linkDragging.isDragging && linkDragging.isValidDrag && linkDragging.tempLink && canvasRef.current) {
         const canvasRect = canvasRef.current.getBoundingClientRect();
         const x2 = e.clientX - canvasRect.left;
         const y2 = e.clientY - canvasRect.top;
@@ -554,7 +558,8 @@ const Canvas: React.FC = () => {
     };
     
     const handleMouseUp = (e: MouseEvent) => {
-      if (linkDragging.isDragging) {
+      // Only handle if we have a valid drag
+      if (linkDragging.isDragging && linkDragging.isValidDrag) {
         const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
         
         if (elemUnder && elemUnder.classList.contains('connector-dot')) {
@@ -573,21 +578,24 @@ const Canvas: React.FC = () => {
           }
         }
         
+        // Reset dragging state
         setLinkDragging({
           isDragging: false,
           sourceNode: null,
           sourceConnector: null,
-          tempLink: null
+          tempLink: null,
+          isValidDrag: false
         });
       }
     };
 
-    document.addEventListener('mousedown', handleMouseDown);
+    // Add event listeners to document - only stop propagation for the connector dots themselves
+    document.addEventListener('mousedown', handleMouseDown, true);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousedown', handleMouseDown, true);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -670,7 +678,8 @@ const Canvas: React.FC = () => {
       </svg>
       <Toolbar engine={engine} />
       <CanvasContainer ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
-        {linkDragging.isDragging && linkDragging.tempLink && (
+        {/* Only render the temporary link when we have a valid drag */}
+        {linkDragging.isDragging && linkDragging.isValidDrag && linkDragging.tempLink && (
           <svg
             style={{
               position: 'absolute',
