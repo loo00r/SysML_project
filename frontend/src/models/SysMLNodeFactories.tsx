@@ -62,39 +62,27 @@ const ConnectorDot = styled.div`
 `;
 
 const TopConnector = styled(ConnectorDot)`
-  top: -5px;
+  top: 0;
   left: 50%;
-  transform: translateX(-50%);
-  &:hover {
-    transform: translateX(-50%) scale(1.2);
-  }
+  transform: translate(-50%, -50%);
 `;
 
 const RightConnector = styled(ConnectorDot)`
   top: 50%;
-  right: -5px;
-  transform: translateY(-50%);
-  &:hover {
-    transform: translateY(-50%) scale(1.2);
-  }
+  right: 0;
+  transform: translate(50%, -50%);
 `;
 
 const BottomConnector = styled(ConnectorDot)`
-  bottom: -5px;
+  bottom: 0;
   left: 50%;
-  transform: translateX(-50%);
-  &:hover {
-    transform: translateX(-50%) scale(1.2);
-  }
+  transform: translate(-50%, 50%);
 `;
 
 const LeftConnector = styled(ConnectorDot)`
   top: 50%;
-  left: -5px;
-  transform: translateY(-50%);
-  &:hover {
-    transform: translateY(-50%) scale(1.2);
-  }
+  left: 0;
+  transform: translate(-50%, -50%);
 `;
 
 // Create a simple context to access the engine

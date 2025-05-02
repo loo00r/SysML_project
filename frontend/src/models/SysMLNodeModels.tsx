@@ -55,6 +55,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
     this.addPort(new DefaultPortModel({ in: true, name: 'left', alignment: PortModelAlignment.LEFT }));
 
     // Override the default widget after ensuring super() is called
+    // Tesst
     this.registerListener({
       widgetGenerated: (event: any) => {
         const widget = event.widget;
