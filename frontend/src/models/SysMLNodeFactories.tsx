@@ -44,6 +44,59 @@ const NodeDescription = styled.div`
   background: rgba(255, 255, 255, 0.5);
 `;
 
+const ConnectorDot = styled.div`
+  width: 10px;
+  height: 10px;
+  background: #0073e6;
+  border: 2px solid white;
+  border-radius: 50%;
+  position: absolute;
+  cursor: pointer;
+  z-index: 10;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: scale(1.2);
+    background: #1890ff;
+  }
+`;
+
+const TopConnector = styled(ConnectorDot)`
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  &:hover {
+    transform: translateX(-50%) scale(1.2);
+  }
+`;
+
+const RightConnector = styled(ConnectorDot)`
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  &:hover {
+    transform: translateY(-50%) scale(1.2);
+  }
+`;
+
+const BottomConnector = styled(ConnectorDot)`
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  &:hover {
+    transform: translateX(-50%) scale(1.2);
+  }
+`;
+
+const LeftConnector = styled(ConnectorDot)`
+  top: 50%;
+  left: -5px;
+  transform: translateY(-50%);
+  &:hover {
+    transform: translateY(-50%) scale(1.2);
+  }
+`;
+
 // Create a simple context to access the engine
 const DiagramContext = React.createContext<{engine: DiagramEngine | null}>({engine: null});
 
@@ -52,14 +105,37 @@ interface SysMLWidgetProps {
   engine: DiagramEngine;
 }
 
-// Simplified widget without ports
-const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node }) => {
+// Simplified widget with connection dots
+const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
+  // Use simple connector data attributes
   return (
     <NodeContainer $type={node.getOptions().type || 'sysml-block'}>
       <NodeTitle>{node.getOptions().name}</NodeTitle>
       {node.getDescription && node.getDescription() && (
         <NodeDescription>{node.getDescription()}</NodeDescription>
       )}
+      
+      {/* Connection points with simple attributes */}
+      <TopConnector 
+        className="connector-dot"
+        data-connector="top" 
+        data-nodeid={node.getID()}
+      />
+      <RightConnector 
+        className="connector-dot"
+        data-connector="right" 
+        data-nodeid={node.getID()}
+      />
+      <BottomConnector 
+        className="connector-dot"
+        data-connector="bottom" 
+        data-nodeid={node.getID()}
+      />
+      <LeftConnector 
+        className="connector-dot"
+        data-connector="left" 
+        data-nodeid={node.getID()}
+      />
     </NodeContainer>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AutosaveIndicator } from '../components/custom/AutosaveIndicator';
 import styled from 'styled-components';
 import KeyboardShortcutsPanel from './custom/KeyboardShortcutsPanel';
@@ -140,10 +140,21 @@ interface ExtendedNodeModel extends NodeModel {
   getOptions(): ExtendedNodeModelOptions;
 }
 
-interface LinkState {
-  sourceNode: NodeModel | null;
-  targetNode: NodeModel | null;
-  isCreatingLink: boolean;
+// Simple class for DiagramModelListener to fix errors
+class DiagramModelListener {
+  updateLinkPositions: () => void;
+
+  constructor(updateFn: () => void) {
+    this.updateLinkPositions = updateFn;
+  }
+
+  nodesUpdated() {
+    this.updateLinkPositions();
+  }
+  
+  deregister() {
+    // Cleanup method needed by StormDiagrams
+  }
 }
 
 const Canvas: React.FC = () => {
@@ -185,12 +196,16 @@ const Canvas: React.FC = () => {
   const [history] = useState(() => new DiagramHistory(engine.getModel()));
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [linkState, setLinkState] = useState<LinkState>({
-    sourceNode: null,
-    targetNode: null,
-    isCreatingLink: false
+  
+  const [linkDragging, setLinkDragging] = useState({
+    isDragging: false,
+    sourceNode: null as string | null, 
+    sourceConnector: null as string | null,
+    tempLink: null as {x1: number, y1: number, x2: number, y2: number} | null
   });
-  const [isLinkingMode, setIsLinkingMode] = useState(false);
+  
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const listenerRef = useRef<DiagramModelListener | null>(null);
 
   const checkDiagramValidity = useCallback(() => {
     const model = engine.getModel();
@@ -355,44 +370,6 @@ const Canvas: React.FC = () => {
     history.clear();
   }, [engine, history]);
 
-  useEffect(() => {
-    const model = engine.getModel();
-    model.registerListener({
-      nodesUpdated: (event: any) => {
-        if (!event?.nodes) return;
-        event.nodes.forEach((node: NodeModel) => {
-          if (!node) return;
-          node.setLocked(false);
-          const { x, y } = validateNodePosition(node, model);
-          node.setPosition(x, y);
-        });
-        checkDiagramValidity();
-      }
-    });
-
-    const handleNodeContextMenu = (e: React.MouseEvent, node: NodeModel) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleContextMenu(e, node);
-    };
-
-    engine.getModel().getNodes().forEach(node => {
-      const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
-      if (element) {
-        element.addEventListener('contextmenu', (e: any) => handleNodeContextMenu(e, node));
-      }
-    });
-
-    return () => {
-      engine.getModel().getNodes().forEach(node => {
-        const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
-        if (element) {
-          element.removeEventListener('contextmenu', (e: any) => handleNodeContextMenu(e, node));
-        }
-      });
-    };
-  }, [engine, checkDiagramValidity]);
-
   const handleContextMenu = (event: React.MouseEvent, node: NodeModel) => {
     event.preventDefault();
     setContextMenu({
@@ -493,96 +470,184 @@ const Canvas: React.FC = () => {
     }
   };
 
-  const handleNodeClick = (node: NodeModel) => {
-    if (!isLinkingMode) return;
+  const updateLinkPositions = useCallback(() => {
+    engine.getModel().getLinks().forEach(link => {
+      if (link instanceof SysMLLinkModel) {
+        const data = link.getData();
+        if (!data) return;
+        
+        const { sourceNodeId, sourcePosition, targetNodeId, targetPosition } = data;
+        
+        const sourceConnector = document.querySelector(
+          `[data-nodeid="${sourceNodeId}"][data-connector="${sourcePosition}"]`
+        );
+        const targetConnector = document.querySelector(
+          `[data-nodeid="${targetNodeId}"][data-connector="${targetPosition}"]`
+        );
+        
+        if (!sourceConnector || !targetConnector) return;
+        
+        const canvasRect = canvasRef.current?.getBoundingClientRect();
+        if (!canvasRect) return;
+        
+        const sourceRect = sourceConnector.getBoundingClientRect();
+        const targetRect = targetConnector.getBoundingClientRect();
+        
+        const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left;
+        const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top;
+        const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left;
+        const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top;
+        
+        if (link.getPoints().length >= 2) {
+          link.getPoints()[0].setPosition(sourceX, sourceY);
+          link.getPoints()[link.getPoints().length - 1].setPosition(targetX, targetY);
+        }
+      }
+    });
     
-    if (!linkState.isCreatingLink) {
-      setLinkState({
-        sourceNode: node,
-        targetNode: null,
-        isCreatingLink: true
-      });
-    } else {
-      if (linkState.sourceNode && linkState.sourceNode.getID() !== node.getID()) {
-        createLinkBetweenNodes(linkState.sourceNode, node);
-        setLinkState({
+    engine.repaintCanvas();
+  }, [engine, canvasRef]);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      if (target.classList.contains('connector-dot')) {
+        const nodeId = target.getAttribute('data-nodeid');
+        const connectorType = target.getAttribute('data-connector');
+        
+        if (nodeId && connectorType) {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          const rect = target.getBoundingClientRect();
+          const canvasRect = canvasRef.current?.getBoundingClientRect();
+          
+          if (canvasRect) {
+            const x1 = rect.left + rect.width / 2 - canvasRect.left;
+            const y1 = rect.top + rect.height / 2 - canvasRect.top;
+            
+            setLinkDragging({
+              isDragging: true,
+              sourceNode: nodeId,
+              sourceConnector: connectorType,
+              tempLink: { x1, y1, x2: x1, y2: y1 }
+            });
+          }
+        }
+      }
+    };
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (linkDragging.isDragging && linkDragging.tempLink && canvasRef.current) {
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const x2 = e.clientX - canvasRect.left;
+        const y2 = e.clientY - canvasRect.top;
+        
+        setLinkDragging(prev => ({
+          ...prev,
+          tempLink: { ...prev.tempLink!, x2, y2 }
+        }));
+      }
+    };
+    
+    const handleMouseUp = (e: MouseEvent) => {
+      if (linkDragging.isDragging) {
+        const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+        
+        if (elemUnder && elemUnder.classList.contains('connector-dot')) {
+          const targetNodeId = elemUnder.getAttribute('data-nodeid');
+          const targetConnector = elemUnder.getAttribute('data-connector');
+          
+          if (targetNodeId && 
+              targetConnector && 
+              targetNodeId !== linkDragging.sourceNode) {
+            createLink(
+              linkDragging.sourceNode!,
+              linkDragging.sourceConnector!,
+              targetNodeId,
+              targetConnector
+            );
+          }
+        }
+        
+        setLinkDragging({
+          isDragging: false,
           sourceNode: null,
-          targetNode: null,
-          isCreatingLink: false
+          sourceConnector: null,
+          tempLink: null
         });
       }
-    }
-  };
+    };
 
-  const createLinkBetweenNodes = (sourceNode: NodeModel, targetNode: NodeModel) => {
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [linkDragging, canvasRef]);
+  
+  const createLink = (sourceNodeId: string, sourceConnector: string, targetNodeId: string, targetConnector: string) => {
+    const sourceNode = engine.getModel().getNode(sourceNodeId);
+    const targetNode = engine.getModel().getNode(targetNodeId);
+    
+    if (!sourceNode || !targetNode) return;
+    
     const link = new SysMLLinkModel();
-    const sourcePosition = sourceNode.getPosition();
-    const targetPosition = targetNode.getPosition();
     
-    const sourcePoint = new PointModel({
-      link,
-      position: {
-        x: sourcePosition.x + (sourceNode as any).getSize().width / 2,
-        y: sourcePosition.y + (sourceNode as any).getSize().height / 2
-      }
+    link.setData({
+      sourceNodeId,
+      sourcePosition: sourceConnector,
+      targetNodeId,
+      targetPosition: targetConnector
     });
     
-    const targetPoint = new PointModel({
-      link,
-      position: {
-        x: targetPosition.x + (targetNode as any).getSize().width / 2,
-        y: targetPosition.y + (targetNode as any).getSize().height / 2
-      }
-    });
+    const sourceConnectorElem = document.querySelector(
+      `[data-nodeid="${sourceNodeId}"][data-connector="${sourceConnector}"]`
+    );
+    const targetConnectorElem = document.querySelector(
+      `[data-nodeid="${targetNodeId}"][data-connector="${targetConnector}"]`
+    );
     
-    link.addPoint(sourcePoint);
-    link.addPoint(targetPoint);
+    if (!sourceConnectorElem || !targetConnectorElem || !canvasRef.current) return;
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const sourceRect = sourceConnectorElem.getBoundingClientRect();
+    const targetRect = targetConnectorElem.getBoundingClientRect();
+    
+    const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left;
+    const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top;
+    const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left;
+    const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top;
+    
+    link.addPoint(new PointModel({ link, position: { x: sourceX, y: sourceY } }));
+    link.addPoint(new PointModel({ link, position: { x: targetX, y: targetY } }));
     
     engine.getModel().addLink(link);
     engine.repaintCanvas();
+    
     history.saveState();
-    checkDiagramValidity();
-  };
-
-  const toggleLinkingMode = () => {
-    setIsLinkingMode(!isLinkingMode);
-    setLinkState({
-      sourceNode: null,
-      targetNode: null,
-      isCreatingLink: false
-    });
   };
 
   useEffect(() => {
-    const attachNodeClickEvents = () => {
-      engine.getModel().getNodes().forEach(node => {
-        const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
-        if (element) {
-          element.removeEventListener('click', () => handleNodeClick(node));
-          element.addEventListener('click', (e) => {
-            if ((e as MouseEvent).button !== 2) {
-              handleNodeClick(node);
-            }
-          });
-        }
-      });
-    };
+    if (!listenerRef.current) {
+      listenerRef.current = new DiagramModelListener(updateLinkPositions);
+    }
     
-    engine.getModel().registerListener({
-      nodesUpdated: attachNodeClickEvents
-    });
-    
-    attachNodeClickEvents();
+    engine.getModel().registerListener(listenerRef.current);
     
     return () => {
-      engine.getModel().getNodes().forEach(node => {
-        const element = document.querySelector(`[data-nodeid="${node.getID()}"]`);
-        if (element) {
-          element.removeEventListener('click', () => handleNodeClick(node));
-        }
-      });
+      if (listenerRef.current) {
+        engine.getModel().deregisterListener(listenerRef.current);
+      }
     };
-  }, [engine, isLinkingMode, linkState]);
+  }, [engine, updateLinkPositions]);
 
   return (
     <CanvasWrapper>
@@ -603,29 +668,28 @@ const Canvas: React.FC = () => {
           </marker>
         </defs>
       </svg>
-      <Toolbar engine={engine} onToggleLink={toggleLinkingMode} isLinkingMode={isLinkingMode} />
-      <CanvasContainer
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        style={isLinkingMode ? { cursor: 'crosshair' } : {}}
-      >
-        {isLinkingMode && linkState.sourceNode && (
-          <div 
+      <Toolbar engine={engine} />
+      <CanvasContainer ref={canvasRef} onDrop={onDrop} onDragOver={onDragOver}>
+        {linkDragging.isDragging && linkDragging.tempLink && (
+          <svg
             style={{
               position: 'absolute',
-              top: '10px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              padding: '8px 16px',
-              background: 'rgba(0, 115, 230, 0.8)',
-              color: 'white',
-              borderRadius: '4px',
-              zIndex: 100,
-              fontSize: '14px'
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 1000
             }}
           >
-            Select target node to create a link
-          </div>
+            <path
+              d={`M ${linkDragging.tempLink.x1} ${linkDragging.tempLink.y1} L ${linkDragging.tempLink.x2} ${linkDragging.tempLink.y2}`}
+              stroke="#0073e6"
+              strokeWidth="2"
+              fill="none"
+              markerEnd="url(#arrowhead)"
+            />
+          </svg>
         )}
         <CanvasWidget engine={engine} />
         {contextMenu.isOpen && (

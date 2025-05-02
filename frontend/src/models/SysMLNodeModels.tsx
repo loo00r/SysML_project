@@ -232,4 +232,40 @@ export class SysMLLinkModel extends DefaultLinkModel {
       ...options
     });
   }
+
+  // Add data to store connector information
+  setData(data: {
+    sourceNodeId: string;
+    sourcePosition: string;
+    targetNodeId: string;
+    targetPosition: string;
+  }) {
+    this.getOptions().data = data;
+  }
+
+  // Get data about the connector
+  getData(): {
+    sourceNodeId: string;
+    sourcePosition: string;
+    targetNodeId: string;
+    targetPosition: string;
+  } | undefined {
+    return this.getOptions().data;
+  }
+
+  // Override serialize to include our connector data
+  serialize() {
+    return {
+      ...super.serialize(),
+      data: this.getOptions().data
+    };
+  }
+
+  // Override deserialize to handle connector data
+  deserialize(event: any): void {
+    super.deserialize(event);
+    if (event.data) {
+      this.setData(event.data);
+    }
+  }
 }
