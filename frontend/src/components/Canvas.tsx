@@ -302,7 +302,12 @@ const Canvas: React.FC = () => {
       let node;
       const nodeOptions = {
         name: data.label,
-        color: data.type === NODE_TYPES.BLOCK ? 'rgb(0,192,255)' : 'rgb(192,255,0)',
+        color:
+          data.label === 'System Block' ? 'rgb(0,192,255)' :
+          data.label === 'Sensor' ? 'rgb(229,57,53)' :
+          data.label === 'Processor' ? 'rgb(255,214,0)' :
+          data.type === NODE_TYPES.BLOCK ? 'rgb(0,192,255)' :
+          'rgb(192,255,0)',
         description: data.description
       };
 
@@ -676,7 +681,7 @@ const Canvas: React.FC = () => {
           >
             <polygon
               points="0 0, 10 3.5, 0 7"
-              fill="#0073e6"
+              fill="#111" // чорний
             />
           </marker>
         </defs>

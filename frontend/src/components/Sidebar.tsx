@@ -32,20 +32,24 @@ const CategoryTitle = styled.h3`
 `;
 
 const BlockItem = styled.div.withConfig({
-  shouldForwardProp: (prop): boolean => !['blockType'].includes(prop as string)
-})<{ blockType: string }>`
+  shouldForwardProp: (prop): boolean => !['blockType', 'blockLabel'].includes(prop as string)
+})<{ blockType: string, blockLabel?: string }>`
   padding: 15px;
   margin: 8px 0;
-  background: ${props => 
-    props.blockType === NODE_TYPES.BLOCK ? 
-    'linear-gradient(to bottom, #e6f3ff, #ffffff)' :
-    props.blockType === NODE_TYPES.ACTIVITY ? 
-    'linear-gradient(to bottom, #e6ffe6, #ffffff)' : '#ffffff'
-  };
-  border: 2px solid ${props =>
-    props.blockType === NODE_TYPES.BLOCK ? '#0073e6' :
-    props.blockType === NODE_TYPES.ACTIVITY ? '#00b300' : '#666'
-  };
+  background: ${props => {
+    if (props.blockLabel === 'Sensor') return 'linear-gradient(to bottom, #ffe6e6, #fff)';
+    if (props.blockLabel === 'Processor') return 'linear-gradient(to bottom, #fffbe6, #fff)';
+    if (props.blockLabel === 'System Block') return 'linear-gradient(to bottom, #e6f3ff, #fff)';
+    return props.blockType === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
+      props.blockType === NODE_TYPES.ACTIVITY ? 'linear-gradient(to bottom, #e6ffe6, #fff)' : '#fff';
+  }};
+  border: 2px solid ${props => {
+    if (props.blockLabel === 'Sensor') return '#e53935';
+    if (props.blockLabel === 'Processor') return '#ffd600';
+    if (props.blockLabel === 'System Block') return '#0073e6';
+    return props.blockType === NODE_TYPES.BLOCK ? '#0073e6' :
+      props.blockType === NODE_TYPES.ACTIVITY ? '#00b300' : '#666';
+  }};
   border-radius: ${props => props.blockType === NODE_TYPES.ACTIVITY ? '10px' : '6px'};
   cursor: grab;
   user-select: none;
@@ -53,16 +57,13 @@ const BlockItem = styled.div.withConfig({
   transition: all 0.2s ease;
   z-index: 100;
   pointer-events: all;
-  
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
-
   &:active {
     cursor: grabbing;
   }
-
   &::before {
     content: ${props => 
       props.blockType === NODE_TYPES.BLOCK ? '"⬛"' :
@@ -70,7 +71,6 @@ const BlockItem = styled.div.withConfig({
     };
     margin-right: 8px;
   }
-
   &::after {
     content: 'Drag to canvas';
     position: absolute;
@@ -81,7 +81,6 @@ const BlockItem = styled.div.withConfig({
     opacity: 0;
     transition: opacity 0.2s ease;
   }
-
   &:hover::after {
     opacity: 1;
   }
@@ -176,6 +175,7 @@ const Sidebar: React.FC = () => {
           key={block.id}
           draggable
           blockType={block.type}
+          blockLabel={block.label}
           onDragStart={(e) => onDragStart(e, block)}
         >
           {block.label}

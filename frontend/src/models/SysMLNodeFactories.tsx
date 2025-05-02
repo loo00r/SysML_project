@@ -5,23 +5,24 @@ import React from 'react';
 import styled from 'styled-components';
 import { NODE_TYPES } from '../utils/sysmlUtils';
 
-const NodeContainer = styled.div<{ $type: string }>`
+const NodeContainer = styled.div<{ $type: string; $color?: string; $borderColor?: string }>`
   padding: 15px;
   border-radius: ${props => props.$type === NODE_TYPES.ACTIVITY ? '10px' : '6px'};
-  background: ${props => 
-    props.$type === NODE_TYPES.BLOCK ? 
+  background: ${props => props.$color || 
+    (props.$type === NODE_TYPES.BLOCK ? 
     'linear-gradient(135deg, #e6f3ff 0%, #ffffff 100%)' : 
-    'linear-gradient(135deg, #e6ffe6 0%, #ffffff 100%)'};
-  border: 2px solid ${props =>
-    props.$type === NODE_TYPES.BLOCK ? '#0073e6' : '#00b300'};
+    'linear-gradient(135deg, #e6ffe6 0%, #ffffff 100%)')};
+  border: 2px solid ${props => props.$borderColor || 
+    (props.$type === NODE_TYPES.BLOCK ? '#0073e6' : '#00b300')};
   min-width: 150px;
   min-height: 80px;
   position: relative;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 
+  /* Прибираємо box-shadow при hover */
   &:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     transform: translateY(-1px);
   }
 `;
@@ -44,10 +45,10 @@ const NodeDescription = styled.div`
   background: rgba(255, 255, 255, 0.5);
 `;
 
-const ConnectorDot = styled.div`
+const ConnectorDot = styled.div<{ $dotColor?: string }>`
   width: 10px;
   height: 10px;
-  background: #0073e6;
+  background: ${props => props.$dotColor || '#111'};
   border: 2px solid white;
   border-radius: 50%;
   position: absolute;
@@ -57,32 +58,44 @@ const ConnectorDot = styled.div`
 
   &:hover {
     transform: scale(1.2);
-    background: #1890ff;
+    background: ${props => props.$dotColor || '#222'};
   }
 `;
 
 const TopConnector = styled(ConnectorDot)`
-  top: 0;
+  top: -5px;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
+  &:hover {
+    transform: translateX(-50%) scale(1.2);
+  }
 `;
 
 const RightConnector = styled(ConnectorDot)`
   top: 50%;
-  right: 0;
-  transform: translate(50%, -50%);
+  right: -5px;
+  transform: translateY(-50%);
+  &:hover {
+    transform: translateY(-50%) scale(1.2);
+  }
 `;
 
 const BottomConnector = styled(ConnectorDot)`
-  bottom: 0;
+  bottom: -5px;
   left: 50%;
-  transform: translate(-50%, 50%);
+  transform: translateX(-50%);
+  &:hover {
+    transform: translateX(-50%) scale(1.2);
+  }
 `;
 
 const LeftConnector = styled(ConnectorDot)`
   top: 50%;
-  left: 0;
-  transform: translate(-50%, -50%);
+  left: -5px;
+  transform: translateY(-50%);
+  &:hover {
+    transform: translateY(-50%) scale(1.2);
+  }
 `;
 
 // Create a simple context to access the engine
@@ -106,8 +119,27 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
   const bottomPort = node.getPort('bottom');
   const leftPort = node.getPort('left');
 
+  // Визначаємо кольори для Sensor/Processor/System Block
+  const name = node.getOptions().name;
+  let color = node.getOptions().color;
+  let borderColor = undefined;
+  let dotColor = '#111';
+  if (name === 'Sensor') {
+    color = 'linear-gradient(135deg, #ffe6e6 0%, #fff 100%)';
+    borderColor = '#e53935';
+    dotColor = '#e53935';
+  } else if (name === 'Processor') {
+    color = 'linear-gradient(135deg, #fffbe6 0%, #fff 100%)';
+    borderColor = '#ffd600';
+    dotColor = '#ffd600';
+  } else if (name === 'System Block') {
+    color = 'linear-gradient(135deg, #e6f3ff 0%, #fff 100%)';
+    borderColor = '#0073e6';
+    dotColor = '#0073e6';
+  }
+
   return (
-    <NodeContainer $type={node.getOptions().type || 'sysml-block'}>
+    <NodeContainer $type={node.getOptions().type || 'sysml-block'} $color={color} $borderColor={borderColor}>
       <NodeTitle>{node.getOptions().name}</NodeTitle>
       {node.getDescription && node.getDescription() && (
         <NodeDescription>{node.getDescription()}</NodeDescription>
@@ -121,6 +153,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             data-connector="top" 
             data-nodeid={node.getID()}
             data-portid={topPort.getID()}
+            $dotColor={dotColor}
             onClick={preventPropagation}
             onMouseDown={preventPropagation}
           />
@@ -133,6 +166,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             data-connector="right" 
             data-nodeid={node.getID()}
             data-portid={rightPort.getID()}
+            $dotColor={dotColor}
             onClick={preventPropagation}
             onMouseDown={preventPropagation}
           />
@@ -145,6 +179,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             data-connector="bottom" 
             data-nodeid={node.getID()}
             data-portid={bottomPort.getID()}
+            $dotColor={dotColor}
             onClick={preventPropagation}
             onMouseDown={preventPropagation}
           />
@@ -157,6 +192,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             data-connector="left" 
             data-nodeid={node.getID()}
             data-portid={leftPort.getID()}
+            $dotColor={dotColor}
             onClick={preventPropagation}
             onMouseDown={preventPropagation}
           />
