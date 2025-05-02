@@ -142,23 +142,28 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
   const bottomPort = node.getPort('bottom');
   const leftPort = node.getPort('left');
 
-  // Визначаємо кольори для Sensor/Processor/System Block
+  // Визначаємо кольори для System Block, Sensor, Processor — як у тулбарі
   const name = node.getOptions().name;
-  let color = node.getOptions().color;
+  let color = undefined;
   let borderColor = undefined;
   let dotColor = '#111';
-  if (name === 'Sensor') {
-    color = 'linear-gradient(135deg, #ffe6e6 0%, #fff 100%)';
+  if (name === 'System Block') {
+    color = '#e6ffe6';
+    borderColor = '#00b300';
+    dotColor = '#00b300';
+  } else if (name === 'Sensor') {
+    color = '#ffe6e6';
     borderColor = '#e53935';
     dotColor = '#e53935';
   } else if (name === 'Processor') {
-    color = 'linear-gradient(135deg, #fffbe6 0%, #fff 100%)';
+    color = '#fffbe6';
     borderColor = '#ffd600';
     dotColor = '#ffd600';
-  } else if (name === 'System Block') {
-    color = 'linear-gradient(135deg, #e6ffe6 0%, #fff 100%)';
-    borderColor = '#00b300';
-    dotColor = '#00b300';
+  } else {
+    // fallback: якщо є color в options — використовуємо, інакше білий
+    color = node.getOptions().color || '#fff';
+    borderColor = '#0073e6';
+    dotColor = '#111';
   }
 
   return (
@@ -171,7 +176,11 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             autoFocus
             onChange={e => setTitle(e.target.value)}
             onBlur={saveTitle}
-            onKeyDown={e => { if (e.key === 'Enter') saveTitle(); }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveTitle();
+              else if (e.key === 'Escape') { setTitle(node.getOptions().name); setEditingTitle(false); }
+              else e.stopPropagation();
+            }}
             style={{ width: '100%', fontWeight: 600, fontSize: 16, border: '1px solid #ccc', borderRadius: 3 }}
           />
         ) : (
@@ -185,7 +194,11 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             autoFocus
             onChange={e => setDesc(e.target.value)}
             onBlur={saveDesc}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc(); } }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc(); }
+              else if (e.key === 'Escape') { setDesc(node.getDescription ? node.getDescription() : ''); setEditingDesc(false); }
+              else e.stopPropagation();
+            }}
             style={{ width: '100%', fontSize: 13, border: '1px solid #ccc', borderRadius: 3, resize: 'none' }}
             rows={2}
           />
