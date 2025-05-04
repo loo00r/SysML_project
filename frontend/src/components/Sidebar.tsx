@@ -178,7 +178,7 @@ const Sidebar: React.FC = () => {
       {renderBlocksByType(NODE_TYPES.BLOCK)}
       
       <InfoBlock>
-        <b>Підказка:</b> Перетягніть блок на поле, щоб створити діаграму. Або скористайтесь генератором знизу для автоматичного створення!
+        <b>Hint:</b> Drag a block onto the canvas to create a diagram. Or use the generator below for automatic creation!
       </InfoBlock>
     </SidebarContainer>
   );

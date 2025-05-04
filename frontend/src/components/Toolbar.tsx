@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { DiagramEngine } from '@projectstorm/react-diagrams';
 import { downloadDiagram } from '../utils/diagramUtils';
+import { exportDiagramAsXMI } from '../utils/xmiExportUtils';
 
 const ToolbarContainer = styled.div`
   height: 50px;
@@ -108,7 +109,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
     }
   };
 
-  const handleExport = (format: 'json' | 'png' | 'svg') => {
+  const handleExport = (format: 'json' | 'png' | 'svg' | 'xmi') => {
     switch (format) {
       case 'json':
         downloadDiagram(engine.getModel(), 'diagram.json');
@@ -118,6 +119,16 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
         break;
       case 'svg':
         exportAsSvg();
+        break;
+      case 'xmi':
+        const xmi = exportDiagramAsXMI(engine.getModel());
+        const blob = new Blob([xmi], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = 'diagram.xmi';
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
         break;
     }
     setExportMenuOpen(false);
@@ -189,6 +200,9 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
             </MenuItem>
             <MenuItem onClick={() => handleExport('svg')}>
               📊 Export as SVG
+            </MenuItem>
+            <MenuItem onClick={() => handleExport('xmi')}>
+              🗂️ Export as XMI
             </MenuItem>
           </DropdownMenu>
         </DropdownButton>

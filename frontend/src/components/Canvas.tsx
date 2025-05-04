@@ -663,12 +663,13 @@ const Canvas: React.FC = () => {
 
   useEffect(() => {
     if (!listenerRef.current) {
-      listenerRef.current = createDiagramListener(updateLinkPositions);
+      // Register and store the listener handle (with .deregister method)
+      listenerRef.current = engine.getModel().registerListener(createDiagramListener(updateLinkPositions));
     }
-    engine.getModel().registerListener(listenerRef.current);
     return () => {
-      if (listenerRef.current) {
-        engine.getModel().deregisterListener(listenerRef.current);
+      if (listenerRef.current && typeof listenerRef.current.deregister === 'function') {
+        listenerRef.current.deregister();
+        listenerRef.current = null;
       }
     };
   }, [engine, updateLinkPositions]);
