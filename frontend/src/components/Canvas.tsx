@@ -286,6 +286,11 @@ const Canvas: React.FC = () => {
         const model = engine.getModel();
         model.deserializeModel(JSON.parse(savedState), engine);
         engine.repaintCanvas();
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            updateLinkPositions();
+          });
+        });
         checkDiagramValidity();
       } catch (error) {
         console.error('Error loading saved state:', error);
@@ -335,6 +340,11 @@ const Canvas: React.FC = () => {
       model.addNode(node);
 
       engine.repaintCanvas();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          updateLinkPositions();
+        });
+      });
       const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
       if (nodeElement) {
         nodeElement.classList.add('node-appear');
@@ -378,6 +388,11 @@ const Canvas: React.FC = () => {
       model.removeLink(link);
     });
     engine.repaintCanvas();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateLinkPositions();
+      });
+    });
     history.clear();
   }, [engine, history]);
 
@@ -394,6 +409,11 @@ const Canvas: React.FC = () => {
     const model = engine.getModel();
     model.removeNode(node);
     engine.repaintCanvas();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateLinkPositions();
+      });
+    });
     setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, node: null });
     checkDiagramValidity();
   };
@@ -410,6 +430,11 @@ const Canvas: React.FC = () => {
 
     model.addNode(newNode);
     engine.repaintCanvas();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateLinkPositions();
+      });
+    });
     setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, node: null });
   };
 
@@ -427,6 +452,11 @@ const Canvas: React.FC = () => {
     options.name = data.name;
     options.description = data.description;
     engine.repaintCanvas();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateLinkPositions();
+      });
+    });
     setEditModal({ isOpen: false, node: null });
     checkDiagramValidity();
   };
@@ -473,6 +503,11 @@ const Canvas: React.FC = () => {
       });
 
       engine.repaintCanvas();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          updateLinkPositions();
+        });
+      });
       checkDiagramValidity();
       
     } catch (error) {
@@ -486,28 +521,20 @@ const Canvas: React.FC = () => {
       if (link instanceof SysMLLinkModel) {
         const data = link.getData();
         if (!data) return;
-        
         const { sourceNodeId, sourcePosition, targetNodeId, targetPosition } = data;
-        
         const sourceConnector = document.querySelector(
           `[data-nodeid="${sourceNodeId}"][data-connector="${sourcePosition}"]`
         );
         const targetConnector = document.querySelector(
           `[data-nodeid="${targetNodeId}"][data-connector="${targetPosition}"]`
         );
-        
         if (!sourceConnector || !targetConnector) return;
-        
         const canvasRect = canvasRef.current?.getBoundingClientRect();
         if (!canvasRect) return;
-        
         const sourceRect = sourceConnector.getBoundingClientRect();
         const targetRect = targetConnector.getBoundingClientRect();
-        
-        // Calculate offset for better arrow visibility
-        const OFFSET = 4; // px, reduced for closer connection
+        const OFFSET = 4;
         let sourceOffsetX = 0, sourceOffsetY = 0, targetOffsetX = 0, targetOffsetY = 0;
-        // Offset based on connector position
         switch (sourcePosition) {
           case 'top': sourceOffsetY = -OFFSET; break;
           case 'bottom': sourceOffsetY = OFFSET; break;
@@ -520,18 +547,17 @@ const Canvas: React.FC = () => {
           case 'left': targetOffsetX = -OFFSET; break;
           case 'right': targetOffsetX = OFFSET; break;
         }
+        // Повертаємо просту формулу без zoom/offset
         const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left + sourceOffsetX;
         const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top + sourceOffsetY;
         const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left + targetOffsetX;
         const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top + targetOffsetY;
-        
         if (link.getPoints().length >= 2) {
           link.getPoints()[0].setPosition(sourceX, sourceY);
           link.getPoints()[link.getPoints().length - 1].setPosition(targetX, targetY);
         }
       }
     });
-    
     engine.repaintCanvas();
   }, [engine, canvasRef]);
 
@@ -665,7 +691,11 @@ const Canvas: React.FC = () => {
     });
     engine.getModel().addLink(link);
     engine.repaintCanvas();
-    updateLinkPositions();
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        updateLinkPositions();
+      });
+    });
     history.saveState();
   };
 

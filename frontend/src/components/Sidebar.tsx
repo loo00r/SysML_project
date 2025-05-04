@@ -26,8 +26,7 @@ const CategoryTitle = styled.h3`
   gap: 8px;
 
   &::before {
-    content: ${props => props.children === 'Blocks' ? '"⬛"' : 
-              props.children === 'Activities' ? '"⚡"' : '"↔️"'};
+    content: ${props => props.children === 'Blocks' ? '"⬛"' : '"↔️"'};
   }
 `;
 
@@ -40,15 +39,13 @@ const BlockItem = styled.div.withConfig({
     if (props.blockLabel === 'System Block') return 'linear-gradient(to bottom, #e6f3ff, #fff)';
     if (props.blockLabel === 'Sensor') return 'linear-gradient(to bottom, #ffe6e6, #fff)';
     if (props.blockLabel === 'Processor') return 'linear-gradient(to bottom, #fffbe6, #fff)';
-    return props.blockType === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
-      props.blockType === NODE_TYPES.ACTIVITY ? 'linear-gradient(to bottom, #e6ffe6, #fff)' : '#fff';
+    return props.blockType === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' : '#fff';
   }};
   border: 2px solid ${props => {
     if (props.blockLabel === 'System Block') return '#0073e6';
     if (props.blockLabel === 'Sensor') return '#e53935';
     if (props.blockLabel === 'Processor') return '#ffd600';
-    return props.blockType === NODE_TYPES.BLOCK ? '#0073e6' :
-      props.blockType === NODE_TYPES.ACTIVITY ? '#00b300' : '#666';
+    return props.blockType === NODE_TYPES.BLOCK ? '#0073e6' : '#666';
   }};
   border-radius: ${props => props.blockType === NODE_TYPES.ACTIVITY ? '10px' : '6px'};
   cursor: grab;
@@ -66,8 +63,7 @@ const BlockItem = styled.div.withConfig({
   }
   &::before {
     content: ${props => 
-      props.blockType === NODE_TYPES.BLOCK ? '"⬛"' :
-      props.blockType === NODE_TYPES.ACTIVITY ? '"⚡"' : '"↔️"'
+      props.blockType === NODE_TYPES.BLOCK ? '"⬛"' : '"↔️"'
     };
     margin-right: 8px;
   }
@@ -92,6 +88,16 @@ const Description = styled.p`
   margin-top: 5px;
 `;
 
+const InfoBlock = styled.div`
+  padding: 15px;
+  margin: 15px 0;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #2c3e50;
+`;
+
 const blocks = [
   { 
     id: 'system-block', 
@@ -110,24 +116,6 @@ const blocks = [
     type: NODE_TYPES.BLOCK, 
     label: 'Processor',
     description: 'Data processing unit'
-  },
-  { 
-    id: 'scan-activity', 
-    type: NODE_TYPES.ACTIVITY, 
-    label: 'Scan Activity',
-    description: 'Data scanning process'
-  },
-  { 
-    id: 'process-activity', 
-    type: NODE_TYPES.ACTIVITY, 
-    label: 'Process Activity',
-    description: 'Data analysis and processing'
-  },
-  { 
-    id: 'transmit-activity', 
-    type: NODE_TYPES.ACTIVITY, 
-    label: 'Transmit Activity',
-    description: 'Data transmission process'
   }
 ];
 
@@ -189,8 +177,9 @@ const Sidebar: React.FC = () => {
       <CategoryTitle>Blocks</CategoryTitle>
       {renderBlocksByType(NODE_TYPES.BLOCK)}
       
-      <CategoryTitle>Activities</CategoryTitle>
-      {renderBlocksByType(NODE_TYPES.ACTIVITY)}
+      <InfoBlock>
+        <b>Підказка:</b> Перетягніть блок на поле, щоб створити діаграму. Або скористайтесь генератором знизу для автоматичного створення!
+      </InfoBlock>
     </SidebarContainer>
   );
 };
