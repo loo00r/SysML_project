@@ -218,15 +218,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine, onToggleLink, isLinkingMode =
         <Button onClick={handleZoomOut}>🔍- Zoom Out</Button>
         <Button onClick={handleFitView}>🔲 Fit View</Button>
       </ButtonGroup>
-      <ButtonGroup>
-        <LinkButton 
-          onClick={onToggleLink} 
-          $active={isLinkingMode}
-          title={isLinkingMode ? "Exit Link Mode" : "Enter Link Mode"}
-        >
-          {isLinkingMode ? "✓ Link Mode" : "🔗 Create Link"}
-        </LinkButton>
-      </ButtonGroup>
     </ToolbarContainer>
   );
 };
