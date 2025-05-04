@@ -5,14 +5,12 @@ import KeyboardShortcutsPanel from './custom/KeyboardShortcutsPanel';
 import { CSSTransition } from 'react-transition-group';
 import createEngine, { 
   DiagramModel, 
-  NodeModel,
-  BasePositionModelOptions,
-  PointModel
+  NodeModel
 } from '@projectstorm/react-diagrams';
 import { CanvasWidget } from '@projectstorm/react-canvas-core';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from '../models/SysMLNodeModels';
 import { NODE_TYPES } from '../utils/sysmlUtils';
-import { validateDiagram, ValidationError, validateNodePosition } from '../utils/validationUtils';
+import { validateDiagram, ValidationError } from '../utils/validationUtils';
 import Toolbar from './Toolbar';
 import DiagramGenerator from './DiagramGenerator';
 import ContextMenu from './custom/ContextMenu';
@@ -122,40 +120,13 @@ const ValidationMessage = styled.div<{ type: 'error' | 'warning' }>`
 interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
-  node: ExtendedNodeModel | null;
+  node: NodeModel | null;
 }
 
-interface DiagramState {
-  model: DiagramModel;
-  timestamp: number;
-}
-
-interface ExtendedNodeModelOptions extends BasePositionModelOptions {
-  name: string;
-  description?: string;
-  style?: any;
-}
-
-interface ExtendedNodeModel extends NodeModel {
-  getOptions(): ExtendedNodeModelOptions;
-}
-
-// Simple class for DiagramModelListener to fix errors
-class DiagramModelListener {
-  updateLinkPositions: () => void;
-
-  constructor(updateFn: () => void) {
-    this.updateLinkPositions = updateFn;
-  }
-
-  nodesUpdated() {
-    this.updateLinkPositions();
-  }
-  
-  deregister() {
-    // Cleanup method needed by StormDiagrams
-  }
-}
+// Simple object for DiagramListener to fix errors
+const createDiagramListener = (updateLinkPositions: () => void) => ({
+  nodesUpdated: updateLinkPositions
+});
 
 const Canvas: React.FC = () => {
   const DEFAULT_GRID_SIZE = 15;
@@ -191,9 +162,9 @@ const Canvas: React.FC = () => {
   });
   const [editModal, setEditModal] = useState({
     isOpen: false,
-    node: null as ExtendedNodeModel | null,
+    node: null as NodeModel | null,
   });
-  const [history] = useState(() => new DiagramHistory(engine.getModel()));
+  const [history] = useState(() => new DiagramHistory(engine.getModel(), engine));
   const [isAutosaving, setIsAutosaving] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   
@@ -206,7 +177,7 @@ const Canvas: React.FC = () => {
   });
   
   const canvasRef = useRef<HTMLDivElement>(null);
-  const listenerRef = useRef<DiagramModelListener | null>(null);
+  const listenerRef = useRef<any | null>(null);
 
   const checkDiagramValidity = useCallback(() => {
     const model = engine.getModel();
@@ -396,15 +367,6 @@ const Canvas: React.FC = () => {
     history.clear();
   }, [engine, history]);
 
-  const handleContextMenu = (event: React.MouseEvent, node: NodeModel) => {
-    event.preventDefault();
-    setContextMenu({
-      isOpen: true,
-      position: { x: event.clientX, y: event.clientY },
-      node: node as ExtendedNodeModel,
-    });
-  };
-
   const handleDeleteNode = (node: NodeModel) => {
     const model = engine.getModel();
     model.removeNode(node);
@@ -418,9 +380,9 @@ const Canvas: React.FC = () => {
     checkDiagramValidity();
   };
 
-  const handleDuplicateNode = (node: ExtendedNodeModel) => {
+  const handleDuplicateNode = (node: NodeModel) => {
     const model = engine.getModel();
-    const options = node.getOptions();
+    const options = node.getOptions() as any;
     const newNode = node instanceof SysMLBlockModel 
       ? new SysMLBlockModel({ name: `${options.name} (copy)`, color: options.style?.color })
       : new SysMLActivityModel({ name: `${options.name} (copy)`, color: options.style?.color });
@@ -441,14 +403,14 @@ const Canvas: React.FC = () => {
   const handleEditNode = (node: NodeModel) => {
     setEditModal({
       isOpen: true,
-      node: node as ExtendedNodeModel,
+      node: node,
     });
     setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, node: null });
   };
 
   const handleSaveNodeEdit = (data: { name: string; description: string }) => {
     if (!editModal.node) return;
-    const options = (editModal.node as ExtendedNodeModel).getOptions();
+    const options = editModal.node ? (editModal.node.getOptions() as any) : {};
     options.name = data.name;
     options.description = data.description;
     engine.repaintCanvas();
@@ -463,7 +425,7 @@ const Canvas: React.FC = () => {
 
   const handleValidationMessageClick = (error: ValidationError) => {
     if (error.nodes) {
-      error.nodes.forEach(node => {
+      error.nodes.forEach((node: NodeModel) => {
         const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
         if (nodeElement) {
           nodeElement.classList.add('highlight-error');
@@ -493,7 +455,7 @@ const Canvas: React.FC = () => {
       const parsedNodes = parseText(text);
       const model = engine.getModel();
       
-      await generateNodesFromParsedData(parsedNodes, model, (node) => {
+      await generateNodesFromParsedData(parsedNodes, model, engine, (node: NodeModel) => {
         setTimeout(() => {
           const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
           if (nodeElement) {
@@ -701,11 +663,9 @@ const Canvas: React.FC = () => {
 
   useEffect(() => {
     if (!listenerRef.current) {
-      listenerRef.current = new DiagramModelListener(updateLinkPositions);
+      listenerRef.current = createDiagramListener(updateLinkPositions);
     }
-    
     engine.getModel().registerListener(listenerRef.current);
-    
     return () => {
       if (listenerRef.current) {
         engine.getModel().deregisterListener(listenerRef.current);
@@ -777,7 +737,7 @@ const Canvas: React.FC = () => {
             position={contextMenu.position}
             onClose={() => setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, node: null })}
             onDelete={() => contextMenu.node && handleDeleteNode(contextMenu.node)}
-            onDuplicate={() => contextMenu.node && handleDuplicateNode(contextMenu.node as ExtendedNodeModel)}
+            onDuplicate={() => contextMenu.node && handleDuplicateNode(contextMenu.node)}
             onEdit={() => contextMenu.node && handleEditNode(contextMenu.node)}
           />
         )}
@@ -825,8 +785,8 @@ const Canvas: React.FC = () => {
           onClose={() => setEditModal({ isOpen: false, node: null })}
           onSave={handleSaveNodeEdit}
           initialData={{
-            name: (editModal.node?.getOptions() as ExtendedNodeModelOptions)?.name || '',
-            description: (editModal.node?.getOptions() as ExtendedNodeModelOptions)?.description || '',
+            name: (editModal.node && (editModal.node.getOptions() as any).name) || '',
+            description: (editModal.node && (editModal.node.getOptions() as any).description) || '',
           }}
         />
       </CanvasContainer>

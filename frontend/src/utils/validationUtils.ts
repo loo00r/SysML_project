@@ -1,5 +1,5 @@
 import { DiagramModel, NodeModel, LinkModel } from '@projectstorm/react-diagrams';
-import { SysMLBlockModel, SysMLActivityModel } from '../models/SysMLNodeModels';
+import { SysMLActivityModel } from '../models/SysMLNodeModels';
 import { validateConnection } from './sysmlUtils';
 
 export interface ValidationError {
@@ -21,7 +21,7 @@ export const validateDiagram = (model: DiagramModel): ValidationResult => {
 
   // Validate node names and descriptions
   nodes.forEach(node => {
-    const name = node.getOptions().name;
+    const name = (node.getOptions() as any).name;
     const description = (node as any).getDescription?.();
 
     if (!name || name.trim().length === 0) {
@@ -50,11 +50,11 @@ export const validateDiagram = (model: DiagramModel): ValidationResult => {
   // Validate duplicate node names
   const nodeNames = new Map<string, NodeModel>();
   nodes.forEach(node => {
-    const name = node.getOptions().name.toLowerCase();
+    const name = (node.getOptions() as any).name.toLowerCase();
     if (nodeNames.has(name)) {
       errors.push({
         type: 'warning',
-        message: `Duplicate node name: ${node.getOptions().name}`,
+        message: `Duplicate node name: ${(node.getOptions() as any).name}`,
         nodes: [node, nodeNames.get(name)!],
       });
     } else {
@@ -76,7 +76,7 @@ export const validateDiagram = (model: DiagramModel): ValidationResult => {
       return;
     }
 
-    if (!validateConnection(sourcePort, targetPort)) {
+    if ((sourcePort as any).link && (targetPort as any).link && !validateConnection(sourcePort as any, targetPort as any)) {
       errors.push({
         type: 'error',
         message: 'Invalid connection: incompatible ports',
@@ -114,7 +114,7 @@ export const validateDiagram = (model: DiagramModel): ValidationResult => {
       if (!hasConnections) {
         errors.push({
           type: 'warning',
-          message: `Isolated node: ${node.getOptions().name}`,
+          message: `Isolated node: ${(node.getOptions() as any).name}`,
           nodes: [node],
         });
       }
@@ -172,7 +172,7 @@ export const validateDiagram = (model: DiagramModel): ValidationResult => {
 
 export const validateNodePosition = (node: NodeModel, model: DiagramModel) => {
   const { x, y } = node.getPosition();
-  const gridSize = model.getGridSize();
+  const gridSize = 15; // або отримати з моделі, якщо є
   
   // Snap to grid
   const snappedX = Math.round(x / gridSize) * gridSize;

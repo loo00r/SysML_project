@@ -137,6 +137,7 @@ const extractVerb = (sentence: string): string => {
 export const generateNodesFromParsedData = async (
   parsedNodes: ParsedNode[],
   model: DiagramModel,
+  engine: any,
   onNodeAdded?: (node: NodeModel) => void
 ): Promise<void> => {
   const nodeMap = new Map<string, NodeModel>();
@@ -176,17 +177,15 @@ export const generateNodesFromParsedData = async (
   for (const node of allNodes) {
     if (onNodeAdded) {
       onNodeAdded(node);
-      await AnimationController.animateNodeCreation(node, model.getEngine(), {
+      await AnimationController.animateNodeCreation(node, {
         duration: 500,
-        easing: 'spring',
         stagger: 100
       });
     }
   }
 
   // Final layout refinement with animation
-  await AnimationController.animateLayout(model.getEngine(), {
-    duration: 800,
-    easing: 'easeInOut'
+  await AnimationController.animateLayout(engine, {
+    duration: 800
   });
 };

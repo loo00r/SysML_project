@@ -11,7 +11,7 @@ export class DiagramHistory {
   private current: DiagramState | null = null;
   private maxHistorySize = 50;
 
-  constructor(private model: DiagramModel) {
+  constructor(private model: DiagramModel, private engine: any) {
     this.saveState();
   }
 
@@ -60,8 +60,8 @@ export class DiagramHistory {
   }
 
   private applyState(state: DiagramState) {
-    this.model.deserializeModel(state.model, this.model.getEngine());
-    this.model.getEngine().repaintCanvas();
+    this.model.deserializeModel(state.model, this.engine);
+    this.engine.repaintCanvas();
   }
 
   canUndo(): boolean {

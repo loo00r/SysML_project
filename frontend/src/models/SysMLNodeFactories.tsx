@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkFactory, PortWidget, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -122,8 +122,8 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     setTitle(node.getOptions().name);
   }, [node.getOptions().name]);
   React.useEffect(() => {
-    setDesc(node.getDescription ? node.getDescription() : '');
-  }, [node.getDescription ? node.getDescription() : '']);
+    setDesc(typeof node.getDescription === 'function' ? node.getDescription() : '');
+  }, [node]);
 
   const saveTitle = () => {
     node.getOptions().name = title;
@@ -131,7 +131,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     if (engine) engine.repaintCanvas();
   };
   const saveDesc = () => {
-    if (node.setDescription) node.setDescription(desc);
+    if (typeof node.setDescription === 'function') node.setDescription(desc);
     setEditingDesc(false);
     if (engine) engine.repaintCanvas();
   };
@@ -199,7 +199,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             onBlur={saveDesc}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc(); }
-              else if (e.key === 'Escape') { setDesc(node.getDescription ? node.getDescription() : ''); setEditingDesc(false); }
+              else if (e.key === 'Escape') { setDesc(typeof node.getDescription === 'function' ? node.getDescription() : ''); setEditingDesc(false); }
               else e.stopPropagation();
             }}
             style={{ width: '100%', fontSize: 13, border: '1px solid #ccc', borderRadius: 3, resize: 'none' }}
@@ -312,8 +312,7 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
 
 // Кастомний LinkWidget для умовної стрілки
 const SysMLLinkWidget = (props: any) => {
-  const { link, diagramEngine } = props;
-  const sourcePort = link.getSourcePort();
+  const { link } = props;
   const targetPort = link.getTargetPort();
   // Стрілка тільки якщо лінк завершений (є targetPort)
   const markerEnd = targetPort ? 'url(#arrowhead)' : undefined;

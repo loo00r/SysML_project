@@ -1,33 +1,35 @@
+version: '3.8'
+
 services:
-  fastapi:
-    container_name: fastapi
+  backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+    container_name: sysml_backend
     ports:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
+      - "8000:8000"
     volumes:
-      - ./backend:/sysml-backend
-    environment:
-      - PYTHONPATH=/sysml-backend
-    restart: unless-stopped
+      - ./backend:/app
+    command: bash launch.sh
     env_file:
       - .env
+    environment:
+      - PYTHONUNBUFFERED=1
 
   frontend:
-    container_name: frontend
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+    container_name: sysml_frontend
     ports:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+      - "3000:80"
     depends_on:
-      - fastapi
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    restart: unless-stopped
+      - backend
     env_file:
       - .env
+    environment:
+      - VITE_API_URL=http://backend:8000/api
 
-  
+networks:
+  default:
+    driver: bridge
+
+

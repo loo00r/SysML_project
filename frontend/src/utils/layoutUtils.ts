@@ -1,5 +1,4 @@
 import { DiagramModel, NodeModel } from '@projectstorm/react-diagrams';
-import { NODE_TYPES } from './sysmlUtils';
 
 interface Point {
   x: number;

@@ -1,6 +1,5 @@
 import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
 import EditableText from '../components/custom/EditableText';
-import React from 'react';
 import styled from 'styled-components';
 
 const NodeContainer = styled.div`
