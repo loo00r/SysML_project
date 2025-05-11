@@ -1,0 +1,85 @@
+/* Custom styles for diagram components */
+
+/* Styling for link paths - make them more visible and straight */
+.srd-default-link path {
+  stroke-width: 2px !important;
+  stroke: #0073e6 !important;
+}
+
+/* Link joints & points styling */
+.srd-default-link__point {
+  fill: #0073e6 !important;
+  stroke: white !important;
+  stroke-width: 1px !important;
+}
+
+/* Port styling for clearer connection points */
+.srd-port {
+  width: 12px !important;
+  height: 12px !important;
+  margin: -6px !important;
+  background: white !important;
+  border: 2px solid #0073e6 !important;
+  border-radius: 50% !important;
+  cursor: crosshair !important;
+}
+
+/* Port hover effect */
+.srd-port:hover {
+  background: #0073e6 !important;
+}
+
+/* Selected link styling */
+.srd-default-link--selected path {
+  stroke: #00cc00 !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: none !important;
+}
+
+/* Link labels */
+.srd-default-link__label {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 3px !important;
+  padding: 3px 5px !important;
+  font-size: 12px !important;
+}
+
+/* Port alignment indicators - only show on hover */
+.srd-node:hover .port-indicator {
+  display: block !important;
+}
+
+.port-indicator {
+  display: none;
+  position: absolute;
+  background: rgba(0, 115, 230, 0.2);
+  pointer-events: none;
+}
+
+.port-indicator-top {
+  height: 8px;
+  width: 20px;
+  top: -4px;
+  left: calc(50% - 10px);
+}
+
+.port-indicator-right {
+  width: 8px;
+  height: 20px;
+  right: -4px;
+  top: calc(50% - 10px);
+}
+
+.port-indicator-bottom {
+  height: 8px;
+  width: 20px;
+  bottom: -4px;
+  left: calc(50% - 10px);
+}
+
+.port-indicator-left {
+  width: 8px;
+  height: 20px;
+  left: -4px;
+  top: calc(50% - 10px);
+}

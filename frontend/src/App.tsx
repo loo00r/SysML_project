@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import styled from 'styled-components';
 import Sidebar from './components/Sidebar';
 import Canvas from './components/Canvas';
+import './styles/diagrams.css'; // Import custom diagram styles
 
 const AppContainer = styled.div`
   display: flex;

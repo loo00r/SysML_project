@@ -1,4 +1,5 @@
 import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { enhanceLinkRouting } from '../utils/linkOptimizer';
 import EditableText from '../components/custom/EditableText';
 import styled from 'styled-components';
 
@@ -251,13 +252,16 @@ export class SysMLLinkModel extends DefaultLinkModel {
     relationName?: string;
     relationType?: string;
   };
-
   constructor(options: any = {}) {
     super({
       type: 'sysml-link',
       width: 2,
-      color: '#0073e6', // синій лінк
-      selectedColor: '#0073e6',
+      color: '#0073e6', // Blue link
+      selectedColor: '#00cc00', // Green when selected
+      orthogonal: true, // Use orthogonal routing for straight edges
+      curvyness: 0,     // No curvy segments for straighter lines
+      stepOffset: 50,   // Large step offset for very clean orthogonal lines
+      router: 'manhattan', // Force manhattan routing for perfectly straight segments
       ...options
     });
   }
@@ -293,5 +297,9 @@ export class SysMLLinkModel extends DefaultLinkModel {
     if (event.sysmlData) {
       this.setData(event.sysmlData);
     }
-  }
+  }  // Override to ensure perfectly straight lines between nodes
+  calculatePath(): void {
+    // Use our helper function to ensure perfect orthogonal routing
+    enhanceLinkRouting(this);
+  }// Method removed - link optimization now handled in linkOptimizer.ts
 }
