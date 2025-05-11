@@ -2,10 +2,9 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
 from pgvector.sqlalchemy import Vector
 
-Base = declarative_base()
+from app.db.base import Base
 
 # SQLAlchemy Database Models
 class DiagramEmbedding(Base):

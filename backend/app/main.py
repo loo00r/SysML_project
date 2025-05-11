@@ -2,9 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.api.api_v1 import router
+from app.db.session import engine
+from app.db.base import Base
 
-
-app = FastAPI()
+app = FastAPI(
+    title="SysML API",
+    description="API for SysML diagram generation and management",
+    version="1.0.0",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,6 +18,20 @@ app.add_middleware(
     allow_methods=["*"],  
     allow_headers=["*"],  
 )
+
+@app.on_event("startup")
+async def startup():
+    # Create tables if they don't exist
+    # In production, you'd use Alembic migrations instead
+    async with engine.begin() as conn:
+        # Uncomment the following line to automatically create tables on startup
+        # await conn.run_sync(Base.metadata.create_all)
+        pass
+
+@app.on_event("shutdown")
+async def shutdown():
+    # Close the database connection pool
+    await engine.dispose()
 
 app.include_router(router)
 

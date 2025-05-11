@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any
 import json
 
-from app.database.db import get_db
+from app.db.dependencies import get_db
 from app.database.models import (
     DiagramEmbeddingCreate, 
     DiagramEmbeddingResponse, 
@@ -24,12 +24,12 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 @router.post("/diagrams/", response_model=DiagramEmbeddingResponse)
 async def create_diagram_embedding(
     diagram: DiagramEmbeddingCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Store a new diagram with its embedding in the database
     """
-    db_diagram = store_diagram_with_embedding(
+    db_diagram = await store_diagram_with_embedding(
         db=db,
         name=diagram.name,
         description=diagram.description or "",
@@ -42,12 +42,12 @@ async def create_diagram_embedding(
 @router.post("/similar-diagrams/", response_model=List[DiagramEmbeddingResponse])
 async def find_similar_diagrams_endpoint(
     request: SimilarDiagramRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Find similar diagrams based on text query
     """
-    similar_diagrams = find_similar_diagrams(
+    similar_diagrams = await find_similar_diagrams(
         db=db,
         query_text=request.query_text,
         limit=request.limit,
@@ -58,23 +58,23 @@ async def find_similar_diagrams_endpoint(
 @router.get("/templates/{template_type}", response_model=List[TemplateResponse])
 async def get_templates(
     template_type: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get all templates for a specific diagram type
     """
-    templates = get_template_by_type(db, template_type)
+    templates = await get_template_by_type(db, template_type)
     return templates
 
 @router.get("/components/{component_type}", response_model=List[ComponentResponse])
 async def get_components(
     component_type: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get all UAV components of a specific type
     """
-    components = get_components_by_type(db, component_type)
+    components = await get_components_by_type(db, component_type)
     return components
 
 @router.post("/generate-diagram-with-context/")
@@ -82,7 +82,7 @@ async def generate_diagram_with_context(
     text: str = Body(..., embed=True),
     diagram_type: str = Body("block", embed=True),
     use_rag: bool = Body(True, embed=True),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Generate a diagram using context from the database if use_rag is True
@@ -91,7 +91,7 @@ async def generate_diagram_with_context(
     
     if use_rag:
         # Find similar diagrams for context
-        similar_diagrams = find_similar_diagrams(
+        similar_diagrams = await find_similar_diagrams(
             db=db, 
             query_text=text, 
             limit=3, 
@@ -99,7 +99,7 @@ async def generate_diagram_with_context(
         )
         
         # Get relevant templates
-        templates = get_template_by_type(db, diagram_type)
+        templates = await get_template_by_type(db, diagram_type)
         
         # Build context from similar diagrams and templates
         context += "Here are some example diagrams similar to what you might want to create:\n\n"
@@ -131,7 +131,7 @@ async def generate_diagram_with_context(
     # Store the generated diagram in the database
     if "diagram" in result and "error" not in result:
         try:
-            store_diagram_with_embedding(
+            await store_diagram_with_embedding(
                 db=db,
                 name=f"Generated {diagram_type.capitalize()} Diagram",
                 description=text[:100] + "...",

@@ -130,7 +130,7 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useRAG, setUseRAG] = useState(true);
+  const [useRAG, setUseRAG] = useState(false);
   const [diagramType, setDiagramType] = useState('block');
   const [templates, setTemplates] = useState<any[]>([]);
   const [steps, setSteps] = useState<GenerationStep[]>([
@@ -151,25 +151,28 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
     setSteps(steps.map(step => ({ ...step, status: 'pending' })));
   };
 
-  // Fetch templates when component mounts
+  // Disabled template fetching since RAG endpoints are unavailable
   useEffect(() => {
     const fetchTemplates = async () => {
+      // Disabled template fetching because RAG endpoint is unavailable
+      /* 
       try {
         const response = await fetch(`/api/v1/rag/templates/${diagramType}`);
         if (response.ok) {
           const data = await response.json();
           setTemplates(data);
+{{ ... }}
+          setTemplates(data);
         }
       } catch (err) {
         console.error('Failed to fetch templates:', err);
       }
+      */
+      setTemplates([]); // Set empty templates since endpoint is unavailable
     };
     
-    // Only try to fetch if the component is expanded
-    if (isExpanded) {
-      fetchTemplates();
-    }
-  }, [diagramType, isExpanded]);
+    fetchTemplates();
+  }, [diagramType]);
 
   const handleGenerate = async () => {
     if (!text.trim()) {
@@ -285,11 +288,11 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
                 id="useRAG"
                 checked={useRAG}
                 onChange={() => setUseRAG(!useRAG)}
-                disabled={isGenerating}
+                disabled={true}
                 style={{ marginRight: '5px' }}
               />
-              <label htmlFor="useRAG" style={{ fontSize: '14px' }}>
-                Use context from similar diagrams (RAG)
+              <label htmlFor="useRAG" style={{ fontSize: '14px', color: '#999' }}>
+                Use context from similar diagrams (RAG) (Currently unavailable)
               </label>
             </div>
           </div>
@@ -374,7 +377,7 @@ The UAV system consists of a thermal sensor for detecting survivors and a data p
             <ProcessingIndicator>
               <span>Generating...</span>
             </ProcessingIndicator>
-          ) : useRAG ? 'Generate Enhanced Diagram' : 'Generate Diagram'}
+          ) : 'Generate Diagram'}
         </Button>
         <Button onClick={handleClear} disabled={isGenerating}>
           Clear All
