@@ -6,7 +6,9 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
     OPENAI_GENERATIVE_MODEL: str
-
+    
+    # Database settings
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/postgres"
 
     class Config:
         env_file = ".env"
@@ -14,5 +16,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-#sg dgs

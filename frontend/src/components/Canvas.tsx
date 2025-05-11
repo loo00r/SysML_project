@@ -20,8 +20,7 @@ import {
   configureEngineForPerformance,
   optimizeDiagramForLargeGraphs,
   setupDiagramInteractions,
-  screenToModelPosition,
-  modelToScreenPosition
+  screenToModelPosition
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
 import { SysMLBlockFactory, SysMLActivityFactory, SysMLLinkFactory } from '../models/SysMLNodeFactories';
@@ -441,34 +440,150 @@ const Canvas: React.FC = () => {
     }
   };
 
-  const handleTextGeneration = async (text: string) => {
+  const handleTextGeneration = async (diagramData: any) => {
     try {
       clearDiagram();
-      
-      const parsedNodes = parseText(text);
       const model = engine.getModel();
       
-      await generateNodesFromParsedData(parsedNodes, model, engine, (node: NodeModel) => {
-        setTimeout(() => {
-          const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
-          if (nodeElement) {
-            nodeElement.classList.add('node-appear');
+      // Check if we're receiving raw text or structured data from API
+      if (typeof diagramData === 'string') {
+        // Legacy text-based processing
+        const parsedNodes = parseText(diagramData);
+        await generateNodesFromParsedData(parsedNodes, model, engine, (node: NodeModel) => {
+          setTimeout(() => {
+            const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
+            if (nodeElement) {
+              nodeElement.classList.add('node-appear');
+            }
+          }, 0);
+        });
+      } else {
+        // Process structured diagram data from AI backend
+        console.log('Received structured diagram data:', diagramData);
+        
+        // Extract diagram structure from the response
+        const diagramStructure = diagramData.diagram || {};
+        const elements = diagramStructure.elements || [];
+        const relationships = diagramStructure.relationships || [];
+        
+        // Track created nodes by their element IDs
+        const nodeMap = new Map();
+        
+        // Step 1: Create all nodes first
+        for (const element of elements) {
+          // Create appropriate node based on element type
+          let node;
+          if (element.type === 'block' || element.type === 'system') {
+            node = new SysMLBlockModel({
+              name: element.name,
+              description: element.description || '',
+              type: NODE_TYPES.BLOCK,
+              color: getNodeColor(element)
+            });
+          } else if (element.type === 'activity' || element.type === 'action') {
+            node = new SysMLActivityModel({
+              name: element.name,
+              description: element.description || '',
+              type: NODE_TYPES.ACTIVITY,
+              color: getNodeColor(element)
+            });
+          } else {
+            // Default to block for unknown types
+            node = new SysMLBlockModel({
+              name: element.name,
+              description: element.description || '',
+              type: NODE_TYPES.BLOCK,
+              color: getNodeColor(element)
+            });
           }
-        }, 0);
-      });
-
+          
+          // Position nodes in a grid layout
+          const index = elements.indexOf(element);
+          const rowSize = Math.ceil(Math.sqrt(elements.length));
+          const x = 100 + (index % rowSize) * 200;
+          const y = 100 + Math.floor(index / rowSize) * 150;
+          node.setPosition(x, y);
+          
+          // Add node to model and tracking map
+          model.addNode(node);
+          nodeMap.set(element.id, node);
+          
+          // Add animation class
+          setTimeout(() => {
+            const nodeElement = document.querySelector(`[data-nodeid="${node.getID()}"]`);
+            if (nodeElement) {
+              nodeElement.classList.add('node-appear');
+            }
+          }, 0);
+        }
+        
+        // Step 2: Create all links between nodes
+        for (const rel of relationships) {
+          const sourceNode = nodeMap.get(rel.source_id);
+          const targetNode = nodeMap.get(rel.target_id);
+          
+          if (sourceNode && targetNode) {
+            // Get ports for connection (default to first available port for now)
+            const sourcePort = sourceNode.getPort('right') || sourceNode.getPorts()[0];
+            const targetPort = targetNode.getPort('left') || targetNode.getPorts()[0];
+            
+            if (sourcePort && targetPort) {
+              // Create link
+              const link = new SysMLLinkModel();
+              link.setSourcePort(sourcePort);
+              link.setTargetPort(targetPort);
+              
+              // Store relationship data
+              link.setData({
+                sourceNodeId: sourceNode.getID(),
+                sourcePosition: sourcePort.getName(),
+                targetNodeId: targetNode.getID(),
+                targetPosition: targetPort.getName(),
+                relationName: rel.name || '',
+                relationType: rel.type || 'dependency'
+              });
+              
+              model.addLink(link);
+            }
+          }
+        }
+      }
+      
+      // Fit the diagram to view all elements and update links
+      engine.zoomToFit();
       engine.repaintCanvas();
+      
+      // Ensure links are properly positioned
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           updateLinkPositions();
         });
       });
+      
+      // Check for any validation issues
       checkDiagramValidity();
       
     } catch (error) {
       console.error('Error generating diagram:', error);
       throw error;
     }
+  };
+  
+  // Helper function to determine node color based on element type
+  const getNodeColor = (element: any) => {
+    const elementType = element.name?.toLowerCase() || '';
+    
+    if (elementType.includes('sensor')) {
+      return '#ffe6e6';
+    } else if (elementType.includes('processor') || elementType.includes('controller')) {
+      return '#fffbe6';
+    } else if (elementType.includes('system')) {
+      return '#e6ffe6';
+    } else if (elementType.includes('data') || elementType.includes('storage')) {
+      return '#e6f3ff';
+    }
+    
+    return '#ffffff';
   };
 
   const updateLinkPositions = useCallback(() => {

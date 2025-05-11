@@ -5,6 +5,7 @@ import styled from 'styled-components';
 const NodeContainer = styled.div`
   padding: 10px;
   border-radius: 5px;
+  border: 1px solid black;
   user-select: none;
 `;
 
@@ -236,6 +237,8 @@ export class SysMLLinkModel extends DefaultLinkModel {
     sourcePosition: string;
     targetNodeId: string;
     targetPosition: string;
+    relationName?: string;
+    relationType?: string;
   };
 
   constructor(options: any = {}) {
@@ -254,6 +257,8 @@ export class SysMLLinkModel extends DefaultLinkModel {
     sourcePosition: string;
     targetNodeId: string;
     targetPosition: string;
+    relationName?: string;
+    relationType?: string;
   }) {
     this._sysmlData = data;
   }

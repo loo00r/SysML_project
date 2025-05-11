@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 
 const GeneratorContainer = styled.div<{ $isExpanded: boolean }>`
@@ -130,6 +130,9 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
   const [text, setText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useRAG, setUseRAG] = useState(true);
+  const [diagramType, setDiagramType] = useState('block');
+  const [templates, setTemplates] = useState<any[]>([]);
   const [steps, setSteps] = useState<GenerationStep[]>([
     { id: 'parse', label: 'Parsing text', status: 'pending' },
     { id: 'analyze', label: 'Analyzing components', status: 'pending' },
@@ -148,6 +151,26 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
     setSteps(steps.map(step => ({ ...step, status: 'pending' })));
   };
 
+  // Fetch templates when component mounts
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch(`/api/v1/rag/templates/${diagramType}`);
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch templates:', err);
+      }
+    };
+    
+    // Only try to fetch if the component is expanded
+    if (isExpanded) {
+      fetchTemplates();
+    }
+  }, [diagramType, isExpanded]);
+
   const handleGenerate = async () => {
     if (!text.trim()) {
       setError('Please enter a system description');
@@ -159,19 +182,49 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
       setError(null);
       resetSteps();
 
-      // Simulate parsing step
+      // Real parsing step - Send to backend
       updateStep('parse', 'active');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      updateStep('parse', 'completed');
-
-      // Simulate analysis step
+      
+      // Determine which API endpoint to use
+      const apiUrl = useRAG 
+        ? '/api/v1/rag/generate-diagram-with-context/'
+        : '/api/v1/create-diagram/';
+      
+      // Prepare the request payload
+      const requestData = useRAG 
+        ? {
+            text: text,
+            diagram_type: diagramType,
+            use_rag: true
+          }
+        : {
+            text: text,
+            diagram_type: diagramType
+          };
+      
+      // Make the actual API call
       updateStep('analyze', 'active');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+      
+      updateStep('parse', 'completed');
       updateStep('analyze', 'completed');
-
-      // Generate diagram
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      // Process the response
       updateStep('generate', 'active');
-      await onGenerate(text);
+      const diagramData = await response.json();
+      
+      // Pass the diagram data to the parent component
+      await onGenerate(diagramData);
       updateStep('generate', 'completed');
 
     } catch (err) {
@@ -195,6 +248,54 @@ const DiagramGenerator: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear
       <ToggleButton onClick={() => setIsExpanded(!isExpanded)}>
         {isExpanded ? '▼ Hide Generator' : '▲ Show Generator'}
       </ToggleButton>
+      
+      {isExpanded && (
+        <div style={{ marginBottom: '10px', display: 'flex', gap: '15px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>
+              Diagram Type
+            </label>
+            <select 
+              value={diagramType}
+              onChange={(e) => setDiagramType(e.target.value)}
+              style={{ 
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ddd'
+              }}
+              disabled={isGenerating}
+            >
+              <option value="block">Block Diagram</option>
+              <option value="activity">Activity Diagram</option>
+              <option value="use_case">Use Case Diagram</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '5px', 
+              fontSize: '14px'
+            }}>
+              AI Enhancement
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                id="useRAG"
+                checked={useRAG}
+                onChange={() => setUseRAG(!useRAG)}
+                disabled={isGenerating}
+                style={{ marginRight: '5px' }}
+              />
+              <label htmlFor="useRAG" style={{ fontSize: '14px' }}>
+                Use context from similar diagrams (RAG)
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <TextArea
         value={text}
         onChange={(e) => {
@@ -206,6 +307,45 @@ Example:
 The UAV system consists of a thermal sensor for detecting survivors and a data processor for analyzing the thermal images. The system transmits processed data to the ground station..."
         disabled={isGenerating}
       />
+      
+      {templates.length > 0 && isExpanded && (
+        <div style={{ marginTop: '10px', fontSize: '14px' }}>
+          <div style={{ marginBottom: '5px', fontWeight: 'bold' }}>
+            Available Templates:
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px', 
+            overflowX: 'auto', 
+            padding: '5px 0'
+          }}>
+            {templates.map((template) => (
+              <div 
+                key={template.id}
+                style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px',
+                  padding: '8px',
+                  minWidth: '200px',
+                  cursor: 'pointer',
+                  backgroundColor: '#f9f9f9'
+                }}
+                onClick={() => {
+                  if (!isGenerating) {
+                    setText(`Generate a diagram like the "${template.template_name}" template: ${template.template_description || ''}`);
+                  }
+                }}
+              >
+                <div style={{ fontWeight: 'bold' }}>{template.template_name}</div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  {template.template_description || 'No description'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {isGenerating && (
         <StepIndicator>
           {steps.map(step => (
@@ -217,11 +357,13 @@ The UAV system consists of a thermal sensor for detecting survivors and a data p
           ))}
         </StepIndicator>
       )}
+      
       {error && (
         <div style={{ color: 'red', fontSize: '14px', marginTop: '5px' }}>
           {error}
         </div>
       )}
+      
       <ButtonGroup>
         <Button 
           $variant="primary" 
@@ -232,7 +374,7 @@ The UAV system consists of a thermal sensor for detecting survivors and a data p
             <ProcessingIndicator>
               <span>Generating...</span>
             </ProcessingIndicator>
-          ) : 'Generate Diagram'}
+          ) : useRAG ? 'Generate Enhanced Diagram' : 'Generate Diagram'}
         </Button>
         <Button onClick={handleClear} disabled={isGenerating}>
           Clear All

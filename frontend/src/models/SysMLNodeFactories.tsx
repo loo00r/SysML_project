@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkFactory, PortWidget, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -307,8 +307,7 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
 
 // Кастомний LinkWidget для умовної стрілки
 const SysMLLinkWidget = (props: any) => {
-  const { link, diagramEngine } = props;
-  const sourcePort = link.getSourcePort();
+  const { link } = props;
   const targetPort = link.getTargetPort();
   // Стрілка тільки якщо лінк завершений (є targetPort)
   const markerEnd = targetPort ? 'url(#arrowhead)' : undefined;
