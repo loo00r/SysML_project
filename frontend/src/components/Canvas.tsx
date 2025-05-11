@@ -22,6 +22,7 @@ import {
   setupDiagramInteractions,
   screenToModelPosition
 } from '../utils/renderUtils';
+import { LayoutEngine } from '../utils/layoutUtils';
 import { DiagramHistory } from '../utils/historyUtils';
 import { SysMLBlockFactory, SysMLActivityFactory, SysMLLinkFactory } from '../models/SysMLNodeFactories';
 
@@ -548,6 +549,9 @@ const Canvas: React.FC = () => {
           }
         }
       }
+      
+      // Apply the layout optimization using LayoutEngine
+      LayoutEngine.optimizeLayout(model);
       
       // Fit the diagram to view all elements and update links
       engine.zoomToFit();

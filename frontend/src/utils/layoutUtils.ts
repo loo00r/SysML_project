@@ -10,6 +10,7 @@ interface LayoutOptions {
   levelSeparation?: number;
   nodeSeparation?: number;
   direction?: 'LR' | 'TB';
+  verticalGrowth?: boolean; // Add option to prioritize vertical growth
 }
 
 export class LayoutEngine {
@@ -56,7 +57,8 @@ export class LayoutEngine {
       padding = 50,
       levelSeparation = 200,
       nodeSeparation = 150,
-      direction = 'LR'
+      direction = 'LR',
+      verticalGrowth = true // Default to vertical growth
     } = options;
 
     const levels = this.calculateNodeLevels(model);
@@ -81,14 +83,28 @@ export class LayoutEngine {
 
     levelGroups.forEach((nodes, level) => {
       nodes.forEach((node, index) => {
-        const x = direction === 'LR' 
+        // If verticalGrowth is true, use TB-like layout even in LR direction
+        // This prioritizes stacking nodes vertically
+        const x = verticalGrowth
+          ? padding + index * nodeSeparation 
+          : (direction === 'LR' ? padding + level * levelSeparation : padding + index * nodeSeparation);
+        const y = verticalGrowth
           ? padding + level * levelSeparation
-          : padding + index * nodeSeparation;
-        const y = direction === 'LR'
-          ? padding + index * nodeSeparation
-          : padding + level * levelSeparation;
+          : (direction === 'LR' ? padding + index * nodeSeparation : padding + level * levelSeparation);
         
         node.setPosition(x, y);
+        
+        // Adjust node size to favor vertical growth
+        const nodeSize = this.getNodeSize(node);
+        if (nodeSize && verticalGrowth) {
+          // If the node is a SysML node, it might have a description
+          const nodeOptions = node.getOptions() as any;
+          if (nodeOptions && nodeOptions.description) {
+            const textLength = nodeOptions.description?.length || 0;
+            const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+            this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
+          }
+        }
       });
     });
 
@@ -106,9 +122,11 @@ export class LayoutEngine {
     const nodes = model.getNodes();
     const links = model.getLinks();
     
-    const repulsionForce = 1000;
-    const attractionForce = 0.1;
-    const damping = 0.9;
+    // Forces tuned to favor vertical arrangement
+    const repulsionForce = 3500;   // Higher repulsion
+    const attractionForce = 0.25;  // Slightly higher attraction 
+    const damping = 0.85; 
+    const minDistance = 180;       // Base distance for node separation
     
     // Initialize velocities
     const velocities = new Map<string, Point>();
@@ -130,7 +148,14 @@ export class LayoutEngine {
             const distance = Math.sqrt(dx * dx + dy * dy);
             
             if (distance > 0) {
-              const force = repulsionForce / (distance * distance);
+              // Apply stronger repulsion when nodes are too close
+              let force = repulsionForce / (distance * distance);
+              
+              // Extra repulsion if nodes are closer than minimum distance
+              if (distance < minDistance) {
+                force = force * (1 + (minDistance - distance) / minDistance * 2);
+              }
+              
               vel1.x += (dx / distance) * force;
               vel1.y += (dy / distance) * force;
             }
@@ -198,9 +223,31 @@ export class LayoutEngine {
     });
   }
 
+  // Helper method to get node size
+  private static getNodeSize(node: NodeModel): {width: number, height: number} | null {
+    // Try to access the size property through common methods
+    if (typeof (node as any).getSize === 'function') {
+      return (node as any).getSize();
+    }
+    
+    // Default fallback size
+    return { width: 200, height: 150 };
+  }
+  
+  // Helper method to set node size
+  private static setNodeSize(node: NodeModel, width: number, height: number): void {
+    // Try to access the setSize method
+    if (typeof (node as any).setSize === 'function') {
+      (node as any).setSize(width, height);
+    }
+  }
+  
   static optimizeLayout(model: DiagramModel) {
     const nodes = model.getNodes();
     if (nodes.length === 0) return;
+
+    // Apply initial grid layout for better starting positions
+    this.applyInitialGridLayout(model);
 
     // Decide which layout to use based on the diagram structure
     const hasHierarchy = nodes.some(node => {
@@ -209,9 +256,124 @@ export class LayoutEngine {
     });
 
     if (hasHierarchy) {
+      // First apply hierarchical layout
       this.applyHierarchicalLayout(model);
+      
+      // Then fine-tune with force-directed layout with fewer iterations
+      this.applyForceDirectedLayout(model, 50);
     } else {
-      this.applyForceDirectedLayout(model);
+      // Apply more iterations for non-hierarchical layouts
+      this.applyForceDirectedLayout(model, 150);
+    }
+    
+    // Final pass to resolve any remaining overlaps
+    this.resolveOverlaps(model);
+  }
+  
+  // Initial grid layout to give nodes better starting positions
+  private static applyInitialGridLayout(model: DiagramModel) {
+    const nodes = model.getNodes();
+    const numNodes = nodes.length;
+    if (numNodes === 0) return;
+    
+    // Calculate grid dimensions - prioritize vertical arrangement
+    // Use fewer columns and more rows for vertical growth
+    const columnsCount = Math.ceil(Math.sqrt(numNodes / 2)); // Fewer columns
+    const rowsCount = Math.ceil(numNodes / columnsCount); // More rows
+    
+    const horizontalSpacing = 250; // More horizontal space between columns
+    const verticalSpacing = 180;   // Less vertical space between rows
+    const startX = 100;
+    const startY = 100;
+    
+    // Position nodes in a grid that emphasizes vertical growth
+    nodes.forEach((node, index) => {
+      const col = Math.floor(index / rowsCount); // Column first to fill vertically
+      const row = index % rowsCount;            // Then progress horizontally
+      
+      node.setPosition(
+        startX + col * horizontalSpacing, 
+        startY + row * verticalSpacing
+      );
+      
+      // Adjust node size for vertical growth
+      const nodeSize = this.getNodeSize(node);
+      if (nodeSize) {
+        // If the node is a SysML node, it might have a description
+        const nodeOptions = node.getOptions() as any;
+        if (nodeOptions && nodeOptions.description) {
+          const textLength = nodeOptions.description?.length || 0;
+          const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+          this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
+        }
+      }
+    });
+  }
+  
+  // Resolve any remaining overlaps between nodes
+  private static resolveOverlaps(model: DiagramModel) {
+    const nodes = model.getNodes();
+    const numNodes = nodes.length;
+    if (numNodes <= 1) return;
+    
+    // Use larger horizontal minimum distance to favor vertical layout
+    let hasOverlap = true;
+    const maxIterations = 20;
+    let iteration = 0;
+    
+    while (hasOverlap && iteration < maxIterations) {
+      hasOverlap = false;
+      iteration++;
+      
+      // Check each pair of nodes for overlap
+      for (let i = 0; i < numNodes; i++) {
+        const node1 = nodes[i];
+        const pos1 = node1.getPosition();
+        const size1 = this.getNodeSize(node1) || { width: 200, height: 150 };
+        
+        for (let j = i + 1; j < numNodes; j++) {
+          const node2 = nodes[j];
+          const pos2 = node2.getPosition();
+          const size2 = this.getNodeSize(node2) || { width: 200, height: 150 };
+          
+          // Calculate center points
+          const center1 = { x: pos1.x + size1.width/2, y: pos1.y + size1.height/2 };
+          const center2 = { x: pos2.x + size2.width/2, y: pos2.y + size2.height/2 };
+          
+          const dx = center2.x - center1.x;
+          const dy = center2.y - center1.y;
+          // We don't use the distance directly, but calculate separate requirements for X and Y
+          
+          // Calculate minimum required distance based on node sizes and minimum spacing
+          // Use larger distance horizontally to promote vertical stacking
+          const requiredX = (size1.width + size2.width)/2 + 220; // Horizontal distance
+          const requiredY = (size1.height + size2.height)/2 + 120; // Vertical distance
+          
+          // If nodes are too close horizontally or vertically
+          if (Math.abs(dx) < requiredX && Math.abs(dy) < requiredY) {
+            hasOverlap = true;
+            
+            // Prefer moving vertically over horizontally
+            let moveX = 0;
+            let moveY = 0;
+            
+            // If nodes are more aligned horizontally than vertically
+            if (Math.abs(dx) / requiredX < Math.abs(dy) / requiredY) {
+              // Move primarily vertically
+              moveY = (dy === 0) ? 1 : dy / Math.abs(dy);
+              moveY *= (requiredY - Math.abs(dy)) / 2;
+            } else {
+              // Move horizontally if necessary
+              moveX = (dx === 0) ? 1 : dx / Math.abs(dx);
+              moveX *= (requiredX - Math.abs(dx)) / 2;
+            }
+            
+            // Apply the movement
+            node1.setPosition(pos1.x - moveX, pos1.y - moveY);
+            node2.setPosition(pos2.x + moveX, pos2.y + moveY);
+          }
+        }
+      }
     }
   }
 }
