@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { DiagramEngine } from '@projectstorm/react-diagrams';
 import { downloadDiagram } from '../utils/diagramUtils';
 import { exportDiagramAsXMI } from '../utils/xmiExportUtils';
+import { syncZoomState } from '../utils/renderUtils';
 
 const ToolbarContainer = styled.div`
   height: 50px;
@@ -171,16 +172,27 @@ const Toolbar: React.FC<ToolbarProps> = ({ engine }) => {
     const model = engine.getModel();
     model.setZoomLevel(model.getZoomLevel() + 10);
     engine.repaintCanvas();
+    
+    // Sync zoom state and trigger event for link updates
+    syncZoomState(engine);
   };
 
   const handleZoomOut = () => {
     const model = engine.getModel();
     model.setZoomLevel(model.getZoomLevel() - 10);
     engine.repaintCanvas();
+    
+    // Sync zoom state and trigger event for link updates
+    syncZoomState(engine);
   };
 
   const handleFitView = () => {
     engine.zoomToFit();
+    
+    // Also sync zoom state after fit view
+    setTimeout(() => {
+      syncZoomState(engine);
+    }, 50); // Small delay to ensure the fit view has completed
   };
 
   return (

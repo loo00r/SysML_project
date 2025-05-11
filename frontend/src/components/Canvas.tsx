@@ -194,6 +194,8 @@ const Canvas: React.FC = () => {
     setTimeout(() => setIsAutosaving(false), 1000);
   }, [engine]);
 
+  // These functions have been integrated into the model listener below
+
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
     // Не видаляти вузол, якщо фокус у input, textarea або contentEditable
     const active = document.activeElement;
@@ -339,23 +341,7 @@ const Canvas: React.FC = () => {
     event.preventDefault();
   }, []);
 
-  useEffect(() => {
-    const model = engine.getModel();
-    model.registerListener({
-      nodesUpdated: () => {
-        history.saveState();
-      },
-      linksUpdated: () => {
-        history.saveState();
-      },
-      labelChanged: () => {
-        history.saveState();
-      },
-      descriptionChanged: () => {
-        history.saveState();
-      }
-    });
-  }, [engine, history]);
+  // This useEffect has been moved after updateLinkPositions is defined - see below
 
   const clearDiagram = useCallback(() => {
     const model = engine.getModel();
@@ -582,6 +568,36 @@ const Canvas: React.FC = () => {
       document.removeEventListener('diagram-zoom-changed', handleZoomChange);
     };
   }, [handleZoomChange]);
+  
+  // Add model listener to fix link positions after block text is edited
+  useEffect(() => {
+    const model = engine.getModel();
+    model.registerListener({
+      nodesUpdated: () => {
+        history.saveState();
+      },
+      linksUpdated: () => {
+        history.saveState();
+      },
+      labelChanged: () => {
+        // When a label changes, update all link positions after a short delay
+        // This ensures links stay connected to the block borders instead of jumping to center
+        setTimeout(() => {
+          updateLinkPositions();
+          engine.repaintCanvas();
+        }, 50);
+        history.saveState();
+      },
+      descriptionChanged: () => {
+        // Also update links after description changes, as this may affect block dimensions
+        setTimeout(() => {
+          updateLinkPositions();
+          engine.repaintCanvas();
+        }, 50);
+        history.saveState();
+      }
+    });
+  }, [engine, history, updateLinkPositions]);
 
   useEffect(() => {
     if (!canvasRef.current) return;

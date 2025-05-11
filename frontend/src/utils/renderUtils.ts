@@ -109,6 +109,26 @@ let currentZoomState = {
   offsetY: 0,
 };
 
+// Ensure zoom state is always in sync with model
+export const syncZoomState = (engine: DiagramEngine) => {
+  const model = engine.getModel();
+  if (!model) return;
+  
+  // Update our global zoom tracker
+  currentZoomState.level = model.getZoomLevel();
+  currentZoomState.offsetX = model.getOffsetX();
+  currentZoomState.offsetY = model.getOffsetY();
+  
+  // Dispatch zoom change event to notify components
+  document.dispatchEvent(new CustomEvent('diagram-zoom-changed', {
+    detail: {
+      zoom: currentZoomState.level,
+      offsetX: currentZoomState.offsetX,
+      offsetY: currentZoomState.offsetY
+    }
+  }));
+};
+
 export const setupDiagramInteractions = (engine: DiagramEngine) => {
   // Enable touch interactions
   const canvas = document.querySelector('.srd-demo-canvas') as HTMLElement;
@@ -260,20 +280,114 @@ export const progressiveRender = (engine: DiagramEngine) => {
                 
                 if (sourceNode && firstPoint) {
                   const nodePos = sourceNode.getPosition();
-                  // Update first point with source port position relative to node
-                  firstPoint.setPosition(
-                    nodePos.x + sourcePos.x,
-                    nodePos.y + sourcePos.y
-                  );
+                  
+                  // Get node dimensions to calculate border points
+                  const nodeElement = document.querySelector(`[data-nodeid="${sourceNode.getID()}"]`) as HTMLElement;
+                  if (nodeElement) {
+                    const nodeRect = nodeElement.getBoundingClientRect();
+                    const nodeWidth = nodeRect.width / (model.getZoomLevel() / 100);
+                    const nodeHeight = nodeRect.height / (model.getZoomLevel() / 100);
+                    
+                    // Calculate port position relative to node center
+                    const portRelX = sourcePos.x - nodeWidth/2;
+                    const portRelY = sourcePos.y - nodeHeight/2;
+                    
+                    // Determine which edge the port is closest to (right, bottom, left, top)
+                    const distToRight = Math.abs(portRelX - nodeWidth/2);
+                    const distToBottom = Math.abs(portRelY - nodeHeight/2);
+                    const distToLeft = Math.abs(portRelX + nodeWidth/2);
+                    const distToTop = Math.abs(portRelY + nodeHeight/2);
+                    
+                    const minDist = Math.min(distToRight, distToBottom, distToLeft, distToTop);
+                    
+                    let borderX = sourcePos.x;
+                    let borderY = sourcePos.y;
+                    
+                    // Snap to the closest border
+                    if (minDist === distToRight) {
+                      borderX = nodeWidth/2;
+                      // Clamp Y position to stay within node height
+                      borderY = Math.max(-nodeHeight/2, Math.min(nodeHeight/2, portRelY));
+                    } else if (minDist === distToBottom) {
+                      borderY = nodeHeight/2;
+                      // Clamp X position to stay within node width
+                      borderX = Math.max(-nodeWidth/2, Math.min(nodeWidth/2, portRelX));
+                    } else if (minDist === distToLeft) {
+                      borderX = -nodeWidth/2;
+                      // Clamp Y position to stay within node height
+                      borderY = Math.max(-nodeHeight/2, Math.min(nodeHeight/2, portRelY));
+                    } else { // distToTop
+                      borderY = -nodeHeight/2;
+                      // Clamp X position to stay within node width
+                      borderX = Math.max(-nodeWidth/2, Math.min(nodeWidth/2, portRelX));
+                    }
+                    
+                    // Set point at border position
+                    firstPoint.setPosition(
+                      nodePos.x + nodeWidth/2 + borderX,
+                      nodePos.y + nodeHeight/2 + borderY
+                    );
+                  } else {
+                    // Fallback to original position if node element not found
+                    firstPoint.setPosition(
+                      nodePos.x + sourcePos.x,
+                      nodePos.y + sourcePos.y
+                    );
+                  }
                 }
                 
                 if (targetNode && lastPoint) {
                   const nodePos = targetNode.getPosition();
-                  // Update last point with target port position relative to node
-                  lastPoint.setPosition(
-                    nodePos.x + targetPos.x,
-                    nodePos.y + targetPos.y
-                  );
+                  
+                  // Get node dimensions to calculate border points
+                  const nodeElement = document.querySelector(`[data-nodeid="${targetNode.getID()}"]`) as HTMLElement;
+                  if (nodeElement) {
+                    const nodeRect = nodeElement.getBoundingClientRect();
+                    const nodeWidth = nodeRect.width / (model.getZoomLevel() / 100);
+                    const nodeHeight = nodeRect.height / (model.getZoomLevel() / 100);
+                    
+                    // Calculate port position relative to node center
+                    const portRelX = targetPos.x - nodeWidth/2;
+                    const portRelY = targetPos.y - nodeHeight/2;
+                    
+                    // Determine which edge the port is closest to (right, bottom, left, top)
+                    const distToRight = Math.abs(portRelX - nodeWidth/2);
+                    const distToBottom = Math.abs(portRelY - nodeHeight/2);
+                    const distToLeft = Math.abs(portRelX + nodeWidth/2);
+                    const distToTop = Math.abs(portRelY + nodeHeight/2);
+                    
+                    const minDist = Math.min(distToRight, distToBottom, distToLeft, distToTop);
+                    
+                    let borderX = targetPos.x;
+                    let borderY = targetPos.y;
+                    
+                    // Snap to the closest border
+                    if (minDist === distToRight) {
+                      borderX = nodeWidth/2;
+                      borderY = Math.max(-nodeHeight/2, Math.min(nodeHeight/2, portRelY));
+                    } else if (minDist === distToBottom) {
+                      borderY = nodeHeight/2;
+                      borderX = Math.max(-nodeWidth/2, Math.min(nodeWidth/2, portRelX));
+                    } else if (minDist === distToLeft) {
+                      borderX = -nodeWidth/2;
+                      borderY = Math.max(-nodeHeight/2, Math.min(nodeHeight/2, portRelY));
+                    } else { // distToTop
+                      borderY = -nodeHeight/2;
+                      borderX = Math.max(-nodeWidth/2, Math.min(nodeWidth/2, portRelX));
+                    }
+                    
+                    // Set point at border position
+                    lastPoint.setPosition(
+                      nodePos.x + nodeWidth/2 + borderX,
+                      nodePos.y + nodeHeight/2 + borderY
+                    );
+                  } else {
+                    // Fallback to original position if node element not found
+                    lastPoint.setPosition(
+                      nodePos.x + targetPos.x,
+                      nodePos.y + targetPos.y
+                    );
+                  }
                 }
                 
                 // Force link to recalculate its path
