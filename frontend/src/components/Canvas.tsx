@@ -19,7 +19,9 @@ import { parseText, generateNodesFromParsedData } from '../utils/diagramGenerato
 import {
   configureEngineForPerformance,
   optimizeDiagramForLargeGraphs,
-  setupDiagramInteractions
+  setupDiagramInteractions,
+  screenToModelPosition,
+  modelToScreenPosition
 } from '../utils/renderUtils';
 import { DiagramHistory } from '../utils/historyUtils';
 import { SysMLBlockFactory, SysMLActivityFactory, SysMLLinkFactory } from '../models/SysMLNodeFactories';
@@ -274,24 +276,26 @@ const Canvas: React.FC = () => {
     try {
       const data = JSON.parse(event.dataTransfer.getData('application/json'));
       
+      // Get canvas bounds
       const rect = event.currentTarget.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-
+      
+      // Use the imported utility function to get accurate model coordinates
+      // This ensures consistent coordinate transformation regardless of zoom level
       const model = engine.getModel();
+      const modelPosition = screenToModelPosition(event.clientX, event.clientY, rect);
 
-      let node;
+      // Define node options with proper coloring based on node type
       const nodeOptions = {
-        name: data.label,
-        color:
-          data.label === 'System Block' ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
-          data.label === 'Sensor' ? 'linear-gradient(to bottom, #ffe6e6, #fff)' :
-          data.label === 'Processor' ? 'linear-gradient(to bottom, #fffbe6, #fff)' :
-          data.type === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' :
-          'linear-gradient(to bottom, #e6ffe6, #fff)',
-        description: data.description
+        name: data.label || '',
+        description: data.description || '',
+        color: data.label === 'System Block' ? '#e6f3ff' :
+              data.label === 'Sensor' ? '#ffe6e6' :
+              data.label === 'Processor' ? '#fffbe6' :
+              '#e6f3ff'
       };
 
+      // Create appropriate node based on type
+      let node;
       switch (data.type) {
         case NODE_TYPES.BLOCK:
           node = new SysMLBlockModel(nodeOptions);
@@ -303,9 +307,12 @@ const Canvas: React.FC = () => {
           return;
       }
 
+      // Snap to grid in model coordinates
       const gridSize = DEFAULT_GRID_SIZE;
-      const snappedX = Math.round(x / gridSize) * gridSize;
-      const snappedY = Math.round(y / gridSize) * gridSize;
+      const snappedX = Math.round(modelPosition.x / gridSize) * gridSize;
+      const snappedY = Math.round(modelPosition.y / gridSize) * gridSize;
+      
+      // Set the position in model coordinates
       node.setPosition(snappedX, snappedY);
 
       model.addNode(node);
@@ -479,49 +486,102 @@ const Canvas: React.FC = () => {
   };
 
   const updateLinkPositions = useCallback(() => {
+    const model = engine.getModel();
+    
     engine.getModel().getLinks().forEach(link => {
       if (link instanceof SysMLLinkModel) {
         const data = link.getData();
         if (!data) return;
+        
         const { sourceNodeId, sourcePosition, targetNodeId, targetPosition } = data;
+        
+        // Find the actual DOM elements for the connectors
         const sourceConnector = document.querySelector(
           `[data-nodeid="${sourceNodeId}"][data-connector="${sourcePosition}"]`
         );
         const targetConnector = document.querySelector(
           `[data-nodeid="${targetNodeId}"][data-connector="${targetPosition}"]`
         );
+        
         if (!sourceConnector || !targetConnector) return;
+        
         const canvasRect = canvasRef.current?.getBoundingClientRect();
         if (!canvasRect) return;
+        
+        // Get DOM element positions
         const sourceRect = sourceConnector.getBoundingClientRect();
         const targetRect = targetConnector.getBoundingClientRect();
-        const OFFSET = 4;
-        let sourceOffsetX = 0, sourceOffsetY = 0, targetOffsetX = 0, targetOffsetY = 0;
-        switch (sourcePosition) {
-          case 'top': sourceOffsetY = -OFFSET; break;
-          case 'bottom': sourceOffsetY = OFFSET; break;
-          case 'left': sourceOffsetX = -OFFSET; break;
-          case 'right': sourceOffsetX = OFFSET; break;
-        }
-        switch (targetPosition) {
-          case 'top': targetOffsetY = -OFFSET; break;
-          case 'bottom': targetOffsetY = OFFSET; break;
-          case 'left': targetOffsetX = -OFFSET; break;
-          case 'right': targetOffsetX = OFFSET; break;
-        }
-        // Повертаємо просту формулу без zoom/offset
-        const sourceX = sourceRect.left + sourceRect.width / 2 - canvasRect.left + sourceOffsetX;
-        const sourceY = sourceRect.top + sourceRect.height / 2 - canvasRect.top + sourceOffsetY;
-        const targetX = targetRect.left + targetRect.width / 2 - canvasRect.left + targetOffsetX;
-        const targetY = targetRect.top + targetRect.height / 2 - canvasRect.top + targetOffsetY;
+        
+        // Calculate the zoom level and offset
+        const zoomLevel = model.getZoomLevel() / 100;
+        const offsetX = model.getOffsetX();
+        const offsetY = model.getOffsetY();
+        
+        // Calculate the center of each connector
+        const sourceCenterX = sourceRect.left + sourceRect.width / 2;
+        const sourceCenterY = sourceRect.top + sourceRect.height / 2;
+        const targetCenterX = targetRect.left + targetRect.width / 2;
+        const targetCenterY = targetRect.top + targetRect.height / 2;
+        
+        // Calculate relative positions to the canvas
+        const sourceRelativeX = sourceCenterX - canvasRect.left;
+        const sourceRelativeY = sourceCenterY - canvasRect.top;
+        const targetRelativeX = targetCenterX - canvasRect.left;
+        const targetRelativeY = targetCenterY - canvasRect.top;
+        
+        // Convert to model coordinates
+        const sourceModelX = sourceRelativeX / zoomLevel - offsetX;
+        const sourceModelY = sourceRelativeY / zoomLevel - offsetY;
+        const targetModelX = targetRelativeX / zoomLevel - offsetX;
+        const targetModelY = targetRelativeY / zoomLevel - offsetY;
+        
+        // Set the link points
         if (link.getPoints().length >= 2) {
-          link.getPoints()[0].setPosition(sourceX, sourceY);
-          link.getPoints()[link.getPoints().length - 1].setPosition(targetX, targetY);
+          // Source point
+          link.getPoints()[0].setPosition(sourceModelX, sourceModelY);
+          
+          // Target point
+          link.getPoints()[link.getPoints().length - 1].setPosition(targetModelX, targetModelY);
         }
       }
     });
+    
+    // Repaint the canvas
     engine.repaintCanvas();
   }, [engine, canvasRef]);
+
+  // Enhanced function for handling zoom changes that ensures links render correctly
+  const handleZoomChange = useCallback(() => {
+    try {
+      // First update all link positions
+      updateLinkPositions();
+      
+      // Force a re-render of the diagram
+      engine.repaintCanvas();
+      
+      // Schedule a secondary update for links to ensure they're properly rendered
+      // This helps fix connection rendering issues after zoom operations
+      setTimeout(() => {
+        // Force another update of link positions
+        updateLinkPositions();
+        
+        // And repaint one more time
+        engine.repaintCanvas();
+      }, 50);
+    } catch (err) {
+      console.warn('Error handling zoom change:', err);
+    }
+  }, [engine, updateLinkPositions]);
+
+  // Add a handler for zoom changes to update all links
+  useEffect(() => {
+    // Listen for our custom zoom event
+    document.addEventListener('diagram-zoom-changed', handleZoomChange);
+    
+    return () => {
+      document.removeEventListener('diagram-zoom-changed', handleZoomChange);
+    };
+  }, [handleZoomChange]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -534,11 +594,17 @@ const Canvas: React.FC = () => {
         if (nodeId && connectorType) {
           e.stopPropagation();
           e.preventDefault();
+          
+          // Get the canvas and connector positions
           const rect = target.getBoundingClientRect();
           const canvasRect = canvasRef.current?.getBoundingClientRect();
           if (canvasRect) {
+            // Calculate the initial position for the temporary link
+            // These are screen coordinates relative to the canvas
             const x1 = rect.left + rect.width / 2 - canvasRect.left;
             const y1 = rect.top + rect.height / 2 - canvasRect.top;
+            
+            // Start dragging a new link
             setLinkDragging({
               isDragging: true,
               sourceNode: nodeId,
@@ -546,6 +612,9 @@ const Canvas: React.FC = () => {
               tempLink: { x1, y1, x2: x1, y2: y1 },
               isValidDrag: true
             });
+            
+            // Set the cursor to indicate link creation
+            document.body.style.cursor = 'crosshair';
           }
         }
       }
@@ -553,35 +622,65 @@ const Canvas: React.FC = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!linkDragging.isDragging || !linkDragging.isValidDrag || !linkDragging.tempLink || !canvasRef.current) return;
+      
+      // Get canvas position
       const canvasRect = canvasRef.current.getBoundingClientRect();
+      
+      // Calculate the current mouse position relative to canvas
       const x2 = e.clientX - canvasRect.left;
       const y2 = e.clientY - canvasRect.top;
+      
+      // Update the temporary link end position
       setLinkDragging(prev => ({
         ...prev,
         tempLink: { ...prev.tempLink!, x2, y2 }
       }));
+      
+      // Check if we're over a valid target connector
+      const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+      if (elemUnder && elemUnder.classList.contains('connector-dot')) {
+        const targetNodeId = elemUnder.getAttribute('data-nodeid');
+        if (targetNodeId !== linkDragging.sourceNode) {
+          document.body.style.cursor = 'pointer'; // Show that we can connect
+        }
+      } else {
+        document.body.style.cursor = 'crosshair'; // Default dragging cursor
+      }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (!linkDragging.isDragging || !linkDragging.isValidDrag) return;
+      
+      // Reset cursor
+      document.body.style.cursor = 'default';
+      
+      // Find the element under the cursor when mouse is released
       const elemUnder = document.elementFromPoint(e.clientX, e.clientY);
+      
+      // Check if it's a connector dot
       if (elemUnder && elemUnder.classList.contains('connector-dot')) {
         const targetNodeId = elemUnder.getAttribute('data-nodeid');
         const targetConnector = elemUnder.getAttribute('data-connector');
+        
+        // Make sure we're not connecting a port to itself or another port on the same node
         if (
           targetNodeId &&
           targetConnector &&
-          targetNodeId !== linkDragging.sourceNode &&
-          targetConnector !== linkDragging.sourceConnector
+          targetNodeId !== linkDragging.sourceNode
         ) {
-          createLink(
-            linkDragging.sourceNode!,
-            linkDragging.sourceConnector!,
-            targetNodeId,
-            targetConnector
-          );
+          // Create the actual link between ports with a small delay to ensure DOM is updated
+          setTimeout(() => {
+            createLink(
+              linkDragging.sourceNode!,
+              linkDragging.sourceConnector!,
+              targetNodeId,
+              targetConnector
+            );
+          }, 10);
         }
       }
+      
+      // Reset the dragging state
       setLinkDragging({
         isDragging: false,
         sourceNode: null,
@@ -632,8 +731,9 @@ const Canvas: React.FC = () => {
   };
 
   const createLink = (sourceNodeId: string, sourceConnector: string, targetNodeId: string, targetConnector: string) => {
-    const sourceNode = engine.getModel().getNode(sourceNodeId);
-    const targetNode = engine.getModel().getNode(targetNodeId);
+    const model = engine.getModel();
+    const sourceNode = model.getNode(sourceNodeId);
+    const targetNode = model.getNode(targetNodeId);
     if (!sourceNode || !targetNode) {
       return;
     }
@@ -642,23 +742,34 @@ const Canvas: React.FC = () => {
     if (!sourcePort || !targetPort) {
       return;
     }
+    
+    // Create a new link with the SysML model
     const link = new SysMLLinkModel();
     link.setSourcePort(sourcePort);
     link.setTargetPort(targetPort);
+    
+    // Store essential data for link positioning
     link.setData({
       sourceNodeId,
       sourcePosition: sourceConnector,
       targetNodeId,
       targetPosition: targetConnector
     });
-    engine.getModel().addLink(link);
-    engine.repaintCanvas();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        updateLinkPositions();
-      });
-    });
-    history.saveState();
+    
+    // Add the link to the model
+    model.addLink(link);
+    
+    // Wait for the DOM to update
+    setTimeout(() => {
+      // Force a recomputation of all link positions
+      updateLinkPositions();
+      // Then repaint the canvas
+      engine.repaintCanvas();
+      
+      // Save the diagram state
+      history.saveState();
+    }, 50);
+
   };
 
   useEffect(() => {

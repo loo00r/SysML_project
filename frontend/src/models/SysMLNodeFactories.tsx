@@ -1,5 +1,5 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
-import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
+import { DiagramEngine, DefaultLinkFactory, PortWidget, PortModelAlignment } from '@projectstorm/react-diagrams';
 import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
@@ -122,8 +122,8 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     setTitle(node.getOptions().name);
   }, [node.getOptions().name]);
   React.useEffect(() => {
-    setDesc(typeof node.getDescription === 'function' ? node.getDescription() : '');
-  }, [node]);
+    setDesc(node.getDescription ? node.getDescription() : '');
+  }, [node.getDescription ? node.getDescription() : '']);
 
   const saveTitle = () => {
     node.getOptions().name = title;
@@ -131,7 +131,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
     if (engine) engine.repaintCanvas();
   };
   const saveDesc = () => {
-    if (typeof node.setDescription === 'function') node.setDescription(desc);
+    if (node.setDescription) node.setDescription(desc);
     setEditingDesc(false);
     if (engine) engine.repaintCanvas();
   };
@@ -142,35 +142,30 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
   const bottomPort = node.getPort('bottom');
   const leftPort = node.getPort('left');
 
-  // Визначаємо кольори для System Block, Sensor, Processor — як у тулбарі
+  // Визначаємо кольори для Sensor/Processor/System Block
   const name = node.getOptions().name;
-  const type = node.getOptions().type || NODE_TYPES.BLOCK;
-  let color = node.getOptions().color || '#fff';
-  let borderColor;
-  let dotColor;
-  if (type === NODE_TYPES.BLOCK && name === 'Sensor') {
-    borderColor = '#e53935';
-    dotColor = '#e53935';
-    color = 'linear-gradient(to bottom, #ffb3b3, #ffe6e6)'; // much more red
-  } else if (type === NODE_TYPES.BLOCK && name === 'Processor') {
-    borderColor = '#ffd600';
-    dotColor = '#ffd600';
-    color = 'linear-gradient(to bottom, #fff176, #fffbe6)'; // more yellow
-  } else if (type === NODE_TYPES.BLOCK) {
-    borderColor = '#0073e6';
-    dotColor = '#0073e6';
-    color = 'linear-gradient(to bottom, #90c8f6, #e6f3ff)'; // more blue
-  } else if (type === NODE_TYPES.ACTIVITY) {
-    borderColor = '#00b300';
-    dotColor = '#00b300';
-    color = 'linear-gradient(to bottom, #7fffd4, #e6ffe6)'; // more green
-  } else {
-    borderColor = '#666';
-    dotColor = '#666';
+  let color = node.getOptions().color;
+  let borderColor = undefined;
+  let dotColor = '#111';
+  // Якщо явно заданий color у options — використовуємо його завжди
+  if (!color) {
+    if (name === 'Sensor') {
+      color = '#ffe6e6'; // як у тулбарі
+      borderColor = '#e53935';
+      dotColor = '#e53935';
+    } else if (name === 'Processor') {
+      color = '#fffbe6'; // як у тулбарі
+      borderColor = '#ffd600';
+      dotColor = '#ffd600';
+    } else if (name === 'System Block') {
+      color = '#e6ffe6'; // як у тулбарі
+      borderColor = '#00b300';
+      dotColor = '#00b300';
+    }
   }
 
   return (
-    <NodeContainer $type={type} $color={color} $borderColor={borderColor}>
+    <NodeContainer $type={node.getOptions().type || 'sysml-block'} $color={color} $borderColor={borderColor}>
       <NodeTitle>
         {editingTitle ? (
           <input
@@ -199,7 +194,7 @@ const SysMLWidget: React.FC<SysMLWidgetProps> = ({ node, engine }) => {
             onBlur={saveDesc}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDesc(); }
-              else if (e.key === 'Escape') { setDesc(typeof node.getDescription === 'function' ? node.getDescription() : ''); setEditingDesc(false); }
+              else if (e.key === 'Escape') { setDesc(node.getDescription ? node.getDescription() : ''); setEditingDesc(false); }
               else e.stopPropagation();
             }}
             style={{ width: '100%', fontSize: 13, border: '1px solid #ccc', borderRadius: 3, resize: 'none' }}
@@ -312,7 +307,8 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
 
 // Кастомний LinkWidget для умовної стрілки
 const SysMLLinkWidget = (props: any) => {
-  const { link } = props;
+  const { link, diagramEngine } = props;
+  const sourcePort = link.getSourcePort();
   const targetPort = link.getTargetPort();
   // Стрілка тільки якщо лінк завершений (є targetPort)
   const markerEnd = targetPort ? 'url(#arrowhead)' : undefined;
