@@ -1,4 +1,5 @@
 import { DiagramModel, NodeModel } from '@projectstorm/react-diagrams';
+import { SysMLBlockModel, SysMLActivityModel } from '../models/SysMLNodeModels';
 
 interface Point {
   x: number;
@@ -93,8 +94,7 @@ export class LayoutEngine {
           : (direction === 'LR' ? padding + index * nodeSeparation : padding + level * levelSeparation);
         
         node.setPosition(x, y);
-        
-        // Adjust node size to favor vertical growth
+          // Adjust node size to favor vertical growth
         const nodeSize = this.getNodeSize(node);
         if (nodeSize && verticalGrowth) {
           // If the node is a SysML node, it might have a description
@@ -102,6 +102,7 @@ export class LayoutEngine {
           if (nodeOptions && nodeOptions.description) {
             const textLength = nodeOptions.description?.length || 0;
             const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+            // For SysML nodes, width will be maintained at STANDARD_NODE_WIDTH by their setSize method
             this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
           }
         }
@@ -233,12 +234,16 @@ export class LayoutEngine {
     // Default fallback size
     return { width: 200, height: 150 };
   }
-  
-  // Helper method to set node size
+    // Helper method to set node size
   private static setNodeSize(node: NodeModel, width: number, height: number): void {
     // Try to access the setSize method
     if (typeof (node as any).setSize === 'function') {
-      (node as any).setSize(width, height);
+      // For SysML nodes, we only adjust height and keep standard width
+      if ((node instanceof SysMLBlockModel) || (node instanceof SysMLActivityModel)) {
+        (node as any).setSize(width, height); // The model's setSize method already enforces standard width
+      } else {
+        (node as any).setSize(width, height);
+      }
     }
   }
   
@@ -275,14 +280,13 @@ export class LayoutEngine {
     const nodes = model.getNodes();
     const numNodes = nodes.length;
     if (numNodes === 0) return;
-    
-    // Calculate grid dimensions - prioritize vertical arrangement
+      // Calculate grid dimensions - prioritize vertical arrangement
     // Use fewer columns and more rows for vertical growth
-    const columnsCount = Math.ceil(Math.sqrt(numNodes / 2)); // Fewer columns
+    const columnsCount = Math.ceil(Math.sqrt(numNodes / 3)); // Even fewer columns to enhance vertical layout
     const rowsCount = Math.ceil(numNodes / columnsCount); // More rows
     
-    const horizontalSpacing = 250; // More horizontal space between columns
-    const verticalSpacing = 180;   // Less vertical space between rows
+    const horizontalSpacing = STANDARD_NODE_WIDTH * 1.5; // Space based on standard width
+    const verticalSpacing = 180; // Less vertical space between rows
     const startX = 100;
     const startY = 100;
     
@@ -295,8 +299,7 @@ export class LayoutEngine {
         startX + col * horizontalSpacing, 
         startY + row * verticalSpacing
       );
-      
-      // Adjust node size for vertical growth
+        // Adjust node size for vertical growth
       const nodeSize = this.getNodeSize(node);
       if (nodeSize) {
         // If the node is a SysML node, it might have a description
@@ -304,6 +307,7 @@ export class LayoutEngine {
         if (nodeOptions && nodeOptions.description) {
           const textLength = nodeOptions.description?.length || 0;
           const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+          // For SysML nodes, width will be maintained at STANDARD_NODE_WIDTH by their setSize method
           this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
         }
       }
@@ -343,11 +347,11 @@ export class LayoutEngine {
           const dx = center2.x - center1.x;
           const dy = center2.y - center1.y;
           // We don't use the distance directly, but calculate separate requirements for X and Y
-          
-          // Calculate minimum required distance based on node sizes and minimum spacing
-          // Use larger distance horizontally to promote vertical stacking
-          const requiredX = (size1.width + size2.width)/2 + 220; // Horizontal distance
-          const requiredY = (size1.height + size2.height)/2 + 120; // Vertical distance
+            // Calculate minimum required distance based on node sizes and minimum spacing
+          // Use larger distance horizontally to promote vertical stacking and respect standard width
+          // We use STANDARD_NODE_WIDTH instead of actual width to maintain consistent spacing
+          const requiredX = STANDARD_NODE_WIDTH + 50; // Fixed horizontal distance based on standard width
+          const requiredY = (size1.height + size2.height)/2 + 30; // Vertical distance
           
           // If nodes are too close horizontally or vertically
           if (Math.abs(dx) < requiredX && Math.abs(dy) < requiredY) {

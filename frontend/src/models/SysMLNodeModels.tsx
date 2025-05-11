@@ -20,6 +20,9 @@ const NodeDescription = styled.div`
   margin-top: 5px;
 `;
 
+// Standard width for all SysML nodes
+export const STANDARD_NODE_WIDTH = 220;
+
 export interface SysMLNodeOptions {
   name: string;
   color: string;
@@ -34,7 +37,7 @@ export interface NodeSize {
 }
 
 export class SysMLBlockModel extends DefaultNodeModel {
-  private size: NodeSize = { width: 200, height: 150 };
+  private size: NodeSize = { width: STANDARD_NODE_WIDTH, height: 150 };
   private description: string = '';
   private resizing: boolean = false;
 
@@ -45,7 +48,9 @@ export class SysMLBlockModel extends DefaultNodeModel {
       name: options.name || 'Block'
     });
     
-    this.size = options.size || { width: 200, height: 150 };
+    // Always use standard width but preserve specified height if provided
+    const height = options.size?.height || 150;
+    this.size = { width: STANDARD_NODE_WIDTH, height };
     this.description = options.description || '';
 
     // Додаємо порти: top/left — in: true, right/bottom — in: false
@@ -94,10 +99,11 @@ export class SysMLBlockModel extends DefaultNodeModel {
   getSize(): NodeSize {
     return this.size;
   }
-
-  setSize(width: number, height: number) {
+  setSize(_width: number, height: number) {
     this.size = {
-      width: Math.max(100, width),
+      // Always maintain the standard width regardless of the input width
+      width: STANDARD_NODE_WIDTH,
+      // Allow height to be adjusted but maintain minimum height
       height: Math.max(80, height)
     };
   }
@@ -125,16 +131,17 @@ export class SysMLBlockModel extends DefaultNodeModel {
       description: this.description,
     };
   }
-
   deserialize(event: any): void {
     super.deserialize(event);
-    this.size = event.size || { width: 200, height: 150 };
+    // Ensure standard width is maintained when deserializing
+    const height = event.size?.height || 150;
+    this.size = { width: STANDARD_NODE_WIDTH, height };
     this.description = event.description || '';
   }
 }
 
 export class SysMLActivityModel extends DefaultNodeModel {
-  private size: NodeSize = { width: 180, height: 100 };
+  private size: NodeSize = { width: STANDARD_NODE_WIDTH, height: 100 };
   private description: string = '';
   private resizing: boolean = false;
 
@@ -144,7 +151,9 @@ export class SysMLActivityModel extends DefaultNodeModel {
       type: 'sysml-activity',
       name: options.name || 'Activity'
     });
-    this.size = options.size || { width: 180, height: 100 };
+    // Always use standard width but preserve specified height if provided
+    const height = options.size?.height || 100;
+    this.size = { width: STANDARD_NODE_WIDTH, height };
     this.description = options.description || '';
 
     // Додаємо порти: top/left — in: true, right/bottom — in: false
@@ -188,14 +197,15 @@ export class SysMLActivityModel extends DefaultNodeModel {
       }
     });
   }
-
   getSize(): NodeSize {
     return this.size;
   }
 
-  setSize(width: number, height: number) {
+  setSize(_width: number, height: number) {
     this.size = {
-      width: Math.max(100, width),
+      // Always maintain the standard width regardless of the input width
+      width: STANDARD_NODE_WIDTH,
+      // Allow height to be adjusted but maintain minimum height
       height: Math.max(80, height)
     };
   }
@@ -223,10 +233,11 @@ export class SysMLActivityModel extends DefaultNodeModel {
       description: this.description,
     };
   }
-
   deserialize(event: any): void {
     super.deserialize(event);
-    this.size = event.size || { width: 180, height: 100 };
+    // Ensure standard width is maintained when deserializing
+    const height = event.size?.height || 100;
+    this.size = { width: STANDARD_NODE_WIDTH, height };
     this.description = event.description || '';
   }
 }

@@ -70,15 +70,14 @@ const CanvasContainer = styled.div<{ isResizing?: boolean }>`
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
   }
-  
-  .resize-handle {
+    .resize-handle {
     position: absolute;
     width: 10px;
     height: 10px;
     background: #fff;
     border: 2px solid #666;
     border-radius: 50%;
-    cursor: se-resize;
+    cursor: s-resize; /* Changed to s-resize to indicate vertical-only resize */
     bottom: -5px;
     right: -5px;
   }

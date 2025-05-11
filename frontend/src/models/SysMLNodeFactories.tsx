@@ -1,6 +1,6 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
 import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
-import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
+import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel, STANDARD_NODE_WIDTH } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
 import { NODE_TYPES } from '../utils/sysmlUtils';
@@ -14,11 +14,13 @@ const NodeContainer = styled.div<{ $type: string; $color?: string; $borderColor?
     'linear-gradient(135deg, #e6ffe6 0%, #ffffff 100%)')};
   border: 2px solid ${props => props.$borderColor || 
     (props.$type === NODE_TYPES.BLOCK ? '#0073e6' : '#00b300')};
-  min-width: 150px;
+  width: ${STANDARD_NODE_WIDTH - 34}px; /* Apply standard width minus padding and borders */
   min-height: 80px;
   position: relative;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 
   /* Прибираємо box-shadow при hover */
   &:hover {
