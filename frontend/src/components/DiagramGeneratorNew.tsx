@@ -31,8 +31,10 @@ const GeneratorContainer = styled(Paper, {
 })<{ isExpanded: boolean }>(({ theme, isExpanded }) => ({
   position: 'fixed',
   bottom: 0,
-  left: 250, // Sidebar width
+  left: 0,
   right: 0,
+  maxWidth: '100%',
+  margin: '0 auto',
   borderTopLeftRadius: theme.shape.borderRadius,
   borderTopRightRadius: theme.shape.borderRadius,
   borderTop: `1px solid ${theme.palette.divider}`,
@@ -46,6 +48,9 @@ const GeneratorContainer = styled(Paper, {
   boxShadow: theme.shadows[3],
   transition: 'transform 0.3s ease',
   transform: isExpanded ? 'translateY(0)' : 'translateY(85%)',
+  '@media (min-width: 600px)': {
+    left: 250, // Sidebar width on larger screens
+  },
 }));
 
 const ToggleButtonStyled = styled(IconButton)(({ theme }) => ({

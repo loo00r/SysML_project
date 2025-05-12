@@ -76,10 +76,11 @@ const DiagramEditor = () => {
     validationErrors,
     showValidationPanel,
     toggleValidationPanel,
+    addNode,
   } = useDiagramStore();
 
   // Get ReactFlow instance methods
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, zoomIn, zoomOut, project } = useReactFlow();
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -142,6 +143,73 @@ const DiagramEditor = () => {
     }
   };
 
+  // Handle drag over event
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle drop event
+  const onDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+      if (!reactFlowBounds) return;
+
+      try {
+        // Get the data from the drag event
+        const dataStr = event.dataTransfer.getData('application/reactflow');
+        if (!dataStr) {
+          console.error('No data found in drag event');
+          return;
+        }
+        
+        console.log('Drag data:', dataStr);
+        const data = JSON.parse(dataStr);
+        
+        // Calculate drop position
+        const x = event.clientX - reactFlowBounds.left;
+        const y = event.clientY - reactFlowBounds.top;
+        
+        console.log('Drop position (screen):', { x, y });
+        
+        // Convert to ReactFlow coordinates
+        const position = project({
+          x: x,
+          y: y,
+        });
+        
+        console.log('Drop position (flow):', position);
+
+        // Create a new node with the correct type
+        // Make sure to use only the types registered in nodeTypes
+        const nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' ? 
+          data.type : 'block';
+
+        const newNode = {
+          id: `${nodeType}-${Date.now()}`,
+          type: nodeType,
+          position,
+          data: { 
+            ...data.data,
+            type: nodeType,
+          },
+        };
+
+        console.log('Creating new node:', newNode);
+        
+        // Add the node to the diagram
+        addNode(newNode);
+        showNotification(`Added new ${nodeType} node`, 'success');
+      } catch (error) {
+        console.error('Error adding new node:', error);
+        showNotification('Failed to add node', 'error');
+      }
+    },
+    [addNode, showNotification, project]
+  );
+
   return (
     <EditorContainer>
       <Sidebar />
@@ -156,6 +224,8 @@ const DiagramEditor = () => {
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
           fitView
           attributionPosition="bottom-right"
           deleteKeyCode="Delete"

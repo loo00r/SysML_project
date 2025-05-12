@@ -76,15 +76,20 @@ const Sidebar: React.FC = () => {
   // Handle drag start for creating new nodes
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
     // Set the drag data with node type and initial data
+    const dragData = {
+      type: nodeType,
+      data: {
+        ...nodeData,
+        type: nodeType, // Ensure type is included in data
+        label: nodeData.label || 'New ' + nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+      },
+    };
+    
+    console.log('Setting drag data:', dragData);
+    
     event.dataTransfer.setData(
       'application/reactflow',
-      JSON.stringify({
-        type: nodeType,
-        data: {
-          ...nodeData,
-          label: nodeData.label || 'New ' + nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
-        },
-      })
+      JSON.stringify(dragData)
     );
     event.dataTransfer.effectAllowed = 'move';
   };
