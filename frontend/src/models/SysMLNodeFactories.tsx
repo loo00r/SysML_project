@@ -309,7 +309,7 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
 
 // Custom LinkWidget for SysML diagrams with straight, orthogonal connections
 const SysMLLinkWidget = (props: any) => {
-  const { link, diagramEngine } = props;
+  const { link } = props;
   const targetPort = link.getTargetPort();
   const sourcePort = link.getSourcePort();
     
@@ -415,8 +415,6 @@ const SysMLLinkWidget = (props: any) => {
     return `M ${points[0].getX()} ${points[0].getY()} L ${points[points.length - 1].getX()} ${points[points.length - 1].getY()}`;
   };
   
-  // Get selected state
-  const isSelected = link.isSelected();
   
   return (
     <g 

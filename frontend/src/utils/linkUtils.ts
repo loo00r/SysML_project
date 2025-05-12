@@ -1,4 +1,4 @@
-import { DiagramEngine, PointModel, LinkModel, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { DiagramEngine, PointModel, PortModelAlignment } from '@projectstorm/react-diagrams';
 import { STANDARD_NODE_WIDTH } from '../models/SysMLNodeModels';
 import { Point } from '@projectstorm/geometry';
 
@@ -154,7 +154,6 @@ export const adjustPortOffsets = (engine: DiagramEngine) => {
 
   // Adjust port offsets based on node position in the diagram
   nodes.forEach(node => {
-    const nodePos = node.getPosition();
     const nodeSize = (node as any).getSize ? (node as any).getSize() : { width: STANDARD_NODE_WIDTH, height: 150 };
       // Get ports
     const ports = node.getPorts();
