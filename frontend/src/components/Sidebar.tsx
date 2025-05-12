@@ -1,185 +1,371 @@
 import React from 'react';
-import styled from 'styled-components';
-import { NODE_TYPES } from '../utils/sysmlUtils';
+import { styled } from '@mui/material/styles';
+import {
+  Box,
+  Typography,
+  Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Divider,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Tooltip,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeviceHubIcon from '@mui/icons-material/DeviceHub';
+import SensorsIcon from '@mui/icons-material/Sensors';
+import MemoryIcon from '@mui/icons-material/Memory';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import PersonIcon from '@mui/icons-material/Person';
 
-const SidebarContainer = styled.div`
-  width: 280px;
-  background: linear-gradient(to bottom, #f8f9fa, #ffffff);
-  border-right: 1px solid #ddd;
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-`;
+import useDiagramStore from '../store/diagramStore';
 
-const CategoryTitle = styled.h3`
-  font-size: 14px;
-  color: #2c3e50;
-  margin: 15px 0 10px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #e9ecef;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+// Styled components
+const SidebarContainer = styled(Box)(({ theme }) => ({
+  width: 250,
+  backgroundColor: theme.palette.background.paper,
+  borderRight: `1px solid ${theme.palette.divider}`,
+  height: '100%',
+  overflowY: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+}));
 
-  &::before {
-    content: ${props => props.children === 'Blocks' ? '"⬛"' : '"↔️"'};
-  }
-`;
+const SidebarHeader = styled(Box)(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+}));
 
-const BlockItem = styled.div.withConfig({
-  shouldForwardProp: (prop): boolean => !['blockType', 'blockLabel'].includes(prop as string)
-})<{ blockType: string, blockLabel?: string }>`
-  padding: 15px;
-  margin: 8px 0;
-  background: ${props => {
-    if (props.blockLabel === 'System Block') return 'linear-gradient(to bottom, #e6f3ff, #fff)';
-    if (props.blockLabel === 'Sensor') return 'linear-gradient(to bottom, #ffe6e6, #fff)';
-    if (props.blockLabel === 'Processor') return 'linear-gradient(to bottom, #fffbe6, #fff)';
-    return props.blockType === NODE_TYPES.BLOCK ? 'linear-gradient(to bottom, #e6f3ff, #fff)' : '#fff';
-  }};
-  border: 2px solid ${props => {
-    if (props.blockLabel === 'System Block') return '#0073e6';
-    if (props.blockLabel === 'Sensor') return '#e53935';
-    if (props.blockLabel === 'Processor') return '#ffd600';
-    return props.blockType === NODE_TYPES.BLOCK ? '#0073e6' : '#666';
-  }};
-  border-radius: ${props => props.blockType === NODE_TYPES.ACTIVITY ? '10px' : '6px'};
-  cursor: grab;
-  user-select: none;
-  position: relative;
-  transition: all 0.2s ease;
-  z-index: 100;
-  pointer-events: all;
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  }
-  &:active {
-    cursor: grabbing;
-  }
-  &::before {
-    content: ${props => 
-      props.blockType === NODE_TYPES.BLOCK ? '"⬛"' : '"↔️"'
-    };
-    margin-right: 8px;
-  }
-  &::after {
-    content: 'Drag to canvas';
-    position: absolute;
-    right: 10px;
-    bottom: 5px;
-    font-size: 10px;
-    color: #666;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  &:hover::after {
-    opacity: 1;
-  }
-`;
-
-const Description = styled.p`
-  font-size: 12px;
-  color: #666;
-  margin-top: 5px;
-`;
-
-const InfoBlock = styled.div`
-  padding: 15px;
-  margin: 15px 0;
-  background: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #2c3e50;
-`;
-
-const blocks = [
-  { 
-    id: 'system-block', 
-    type: NODE_TYPES.BLOCK, 
-    label: 'System Block',
-    description: 'Main system component with inputs and outputs'
+const DraggableItem = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(1),
+  marginBottom: theme.spacing(1),
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  cursor: 'grab',
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+    boxShadow: theme.shadows[2],
   },
-  { 
-    id: 'sensor', 
-    type: NODE_TYPES.BLOCK, 
-    label: 'Sensor',
-    description: 'Data collection component'
+  '&:active': {
+    cursor: 'grabbing',
   },
-  { 
-    id: 'processor', 
-    type: NODE_TYPES.BLOCK, 
-    label: 'Processor',
-    description: 'Data processing unit'
-  }
-];
+}));
+
+interface ColorIndicatorProps {
+  bgcolor: string;
+}
+
+const ColorIndicator = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'bgcolor',
+})<ColorIndicatorProps>(({ theme, bgcolor }) => ({
+  width: 16,
+  height: 16,
+  backgroundColor: bgcolor,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: 2,
+}));
 
 const Sidebar: React.FC = () => {
-  const onDragStart = (event: React.DragEvent, block: any) => {
-    try {
-      const data = {
-        type: block.type,
-        label: block.label,
-        description: block.description
-      };
-      event.dataTransfer.setData('application/json', JSON.stringify(data));
-      event.dataTransfer.effectAllowed = 'copy';
+  const { diagramType } = useDiagramStore();
 
-      // Create and customize drag preview
-      const dragPreview = document.createElement('div');
-      dragPreview.style.padding = '10px';
-      dragPreview.style.background = block.type === NODE_TYPES.BLOCK ? '#e6f3ff' : '#e6ffe6';
-      dragPreview.style.border = `2px solid ${block.type === NODE_TYPES.BLOCK ? '#0073e6' : '#00b300'}`;
-      dragPreview.style.borderRadius = block.type === NODE_TYPES.ACTIVITY ? '10px' : '6px';
-      dragPreview.style.position = 'fixed';
-      dragPreview.style.top = '-1000px';
-      dragPreview.style.left = '-1000px';
-      dragPreview.style.zIndex = '9999';
-      dragPreview.style.pointerEvents = 'none';
-      dragPreview.textContent = block.label;
-      
-      document.body.appendChild(dragPreview);
-      event.dataTransfer.setDragImage(dragPreview, 0, 0);
-      
-      // Clean up the preview element
-      requestAnimationFrame(() => {
-        document.body.removeChild(dragPreview);
-      });
-    } catch (error) {
-      console.error('Error starting drag:', error);
-    }
+  // Handle drag start for creating new nodes
+  const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
+    // Set the drag data with node type and initial data
+    event.dataTransfer.setData(
+      'application/reactflow',
+      JSON.stringify({
+        type: nodeType,
+        data: {
+          ...nodeData,
+          label: nodeData.label || 'New ' + nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+        },
+      })
+    );
+    event.dataTransfer.effectAllowed = 'move';
   };
 
-  const renderBlocksByType = (type: string) => {
-    return blocks
-      .filter(block => block.type === type)
-      .map(block => (
-        <BlockItem
-          key={block.id}
-          draggable
-          blockType={block.type}
-          blockLabel={block.label}
-          onDragStart={(e) => onDragStart(e, block)}
-        >
-          {block.label}
-          <Description>{block.description}</Description>
-        </BlockItem>
-      ));
+  // Get the appropriate node palette based on diagram type
+  const renderNodePalette = () => {
+    switch (diagramType) {
+      case 'block':
+        return (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+              Block Diagram Elements
+            </Typography>
+            <List disablePadding>
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="System Block - Main component with inputs and outputs" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'block', {
+                        type: 'block',
+                        label: 'System Block',
+                        description: 'Main system component with inputs and outputs',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#e3f2fd" />
+                    <DeviceHubIcon fontSize="small" color="primary" />
+                    <Typography variant="body2">System Block</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Sensor - Data collection component" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'sensor', {
+                        type: 'sensor',
+                        label: 'Sensor',
+                        description: 'Data collection component',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#ffebee" />
+                    <SensorsIcon fontSize="small" color="error" />
+                    <Typography variant="body2">Sensor</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Processor - Data processing unit" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'processor', {
+                        type: 'processor',
+                        label: 'Processor',
+                        description: 'Data processing unit',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#fff8e1" />
+                    <MemoryIcon fontSize="small" color="warning" />
+                    <Typography variant="body2">Processor</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+            </List>
+          </>
+        );
+
+      case 'activity':
+        return (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+              Activity Diagram Elements
+            </Typography>
+            <List disablePadding>
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Activity - Process or action" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'activity', {
+                        type: 'activity',
+                        label: 'Activity',
+                        description: 'Process or action',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#e8f5e9" />
+                    <AccountTreeIcon fontSize="small" color="success" />
+                    <Typography variant="body2">Activity</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+            </List>
+          </>
+        );
+
+      case 'requirement':
+        return (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+              Requirement Diagram Elements
+            </Typography>
+            <List disablePadding>
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Requirement - System requirement" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'requirement', {
+                        type: 'requirement',
+                        label: 'Requirement',
+                        description: 'System requirement',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#e0f7fa" />
+                    <AssignmentIcon fontSize="small" color="info" />
+                    <Typography variant="body2">Requirement</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+            </List>
+          </>
+        );
+
+      case 'use_case':
+        return (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+              Use Case Diagram Elements
+            </Typography>
+            <List disablePadding>
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Use Case - System functionality" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'useCase', {
+                        type: 'useCase',
+                        label: 'Use Case',
+                        description: 'System functionality',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#f3e5f5" />
+                    <AccountTreeIcon fontSize="small" color="secondary" />
+                    <Typography variant="body2">Use Case</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+
+              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+                <Tooltip title="Actor - External entity interacting with the system" placement="right">
+                  <DraggableItem
+                    draggable
+                    onDragStart={(e) =>
+                      onDragStart(e, 'actor', {
+                        type: 'actor',
+                        label: 'Actor',
+                        description: 'External entity interacting with the system',
+                      })
+                    }
+                  >
+                    <ColorIndicator bgcolor="#fce4ec" />
+                    <PersonIcon fontSize="small" />
+                    <Typography variant="body2">Actor</Typography>
+                  </DraggableItem>
+                </Tooltip>
+              </ListItem>
+            </List>
+          </>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
     <SidebarContainer>
-      <CategoryTitle>Blocks</CategoryTitle>
-      {renderBlocksByType(NODE_TYPES.BLOCK)}
-      
-      <InfoBlock>
-        <b>Hint:</b> Drag a block onto the canvas to create a diagram. Or use the generator below for automatic creation!
-      </InfoBlock>
+      <SidebarHeader>
+        <Typography variant="h6" fontWeight="bold">
+          SysML Modeling Tool
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          AI-Powered Diagram Generator
+        </Typography>
+      </SidebarHeader>
+
+      <Box sx={{ p: 2 }}>
+        <Accordion defaultExpanded>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight="medium">Diagram Elements</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {renderNodePalette()}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+              Drag elements onto the canvas to create your diagram. Connect nodes by dragging from one handle to another.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight="medium">Diagram Types</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              This tool supports four SysML diagram types:
+            </Typography>
+            <List dense disablePadding>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <DeviceHubIcon fontSize="small" color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Block Diagram" secondary="Structure and components" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <AccountTreeIcon fontSize="small" color="success" />
+                </ListItemIcon>
+                <ListItemText primary="Activity Diagram" secondary="Behaviors and processes" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <AssignmentIcon fontSize="small" color="info" />
+                </ListItemIcon>
+                <ListItemText primary="Requirement Diagram" secondary="System requirements" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <AccountTreeIcon fontSize="small" color="secondary" />
+                </ListItemIcon>
+                <ListItemText primary="Use Case Diagram" secondary="System functionality" />
+              </ListItem>
+            </List>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography fontWeight="medium">Help</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              <strong>Quick Tips:</strong>
+            </Typography>
+            <List dense disablePadding>
+              <ListItem>
+                <ListItemText primary="Drag elements from the sidebar to the canvas" />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Connect nodes by dragging from one handle to another" />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Use the AI generator to create diagrams from text descriptions" />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Click on a node to edit its properties" />
+              </ListItem>
+              <ListItem>
+                <ListItemText primary="Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)" />
+              </ListItem>
+            </List>
+          </AccordionDetails>
+        </Accordion>
+      </Box>
+
+      <Box sx={{ mt: 'auto', p: 2 }}>
+        <Divider />
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          SysML AI Modeling Tool v1.0
+        </Typography>
+      </Box>
     </SidebarContainer>
   );
 };
