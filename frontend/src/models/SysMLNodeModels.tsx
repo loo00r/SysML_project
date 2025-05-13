@@ -2,22 +2,36 @@ import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignmen
 import EditableText from '../components/custom/EditableText';
 import styled from 'styled-components';
 
+export const STANDARD_NODE_WIDTH = 260;
+
 const NodeContainer = styled.div`
   padding: 10px;
   border-radius: 5px;
   border: 1px solid black;
   user-select: none;
+  width: ${STANDARD_NODE_WIDTH}px;
+  min-width: ${STANDARD_NODE_WIDTH}px;
+  max-width: ${STANDARD_NODE_WIDTH}px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 `;
 
 const NodeTitle = styled.div`
   font-weight: 500;
   margin-bottom: 5px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const NodeDescription = styled.div`
   font-size: 12px;
   color: #666;
   margin-top: 5px;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 export interface SysMLNodeOptions {
@@ -34,7 +48,7 @@ export interface NodeSize {
 }
 
 export class SysMLBlockModel extends DefaultNodeModel {
-  private size: NodeSize = { width: 200, height: 150 };
+  private size: NodeSize = { width: STANDARD_NODE_WIDTH, height: 150 };
   private description: string = '';
   private resizing: boolean = false;
 
@@ -45,7 +59,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
       name: options.name || 'Block'
     });
     
-    this.size = options.size || { width: 200, height: 150 };
+    this.size = options.size || { width: STANDARD_NODE_WIDTH, height: 150 };
     this.description = options.description || '';
 
     // Додаємо порти: top/left — in: true, right/bottom — in: false
@@ -61,7 +75,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
         const widget = event.widget;
         if (widget) {
           widget.renderContainer = () => (
-            <NodeContainer>
+            <NodeContainer style={{width: STANDARD_NODE_WIDTH, minWidth: STANDARD_NODE_WIDTH, maxWidth: STANDARD_NODE_WIDTH, boxSizing: 'border-box'}}>
               <NodeTitle>
                 <EditableText
                   value={this.getOptions().name || ''}
@@ -92,12 +106,15 @@ export class SysMLBlockModel extends DefaultNodeModel {
   }
 
   getSize(): NodeSize {
-    return this.size;
+    return {
+      width: STANDARD_NODE_WIDTH,
+      height: this.size.height
+    };
   }
 
   setSize(width: number, height: number) {
     this.size = {
-      width: Math.max(100, width),
+      width: STANDARD_NODE_WIDTH,
       height: Math.max(80, height)
     };
   }
@@ -128,13 +145,16 @@ export class SysMLBlockModel extends DefaultNodeModel {
 
   deserialize(event: any): void {
     super.deserialize(event);
-    this.size = event.size || { width: 200, height: 150 };
+    this.size = {
+      width: STANDARD_NODE_WIDTH,
+      height: (event.size && event.size.height) ? event.size.height : 150
+    };
     this.description = event.description || '';
   }
 }
 
 export class SysMLActivityModel extends DefaultNodeModel {
-  private size: NodeSize = { width: 180, height: 100 };
+  private size: NodeSize = { width: STANDARD_NODE_WIDTH, height: 100 };
   private description: string = '';
   private resizing: boolean = false;
 
@@ -144,7 +164,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
       type: 'sysml-activity',
       name: options.name || 'Activity'
     });
-    this.size = options.size || { width: 180, height: 100 };
+    this.size = options.size || { width: STANDARD_NODE_WIDTH, height: 100 };
     this.description = options.description || '';
 
     // Додаємо порти: top/left — in: true, right/bottom — in: false
@@ -159,7 +179,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
         const widget = event.widget;
         if (widget) {
           widget.renderContainer = () => (
-            <NodeContainer>
+            <NodeContainer style={{width: STANDARD_NODE_WIDTH, minWidth: STANDARD_NODE_WIDTH, maxWidth: STANDARD_NODE_WIDTH, boxSizing: 'border-box'}}>
               <NodeTitle>
                 <EditableText
                   value={this.getOptions().name || ''}
@@ -190,12 +210,15 @@ export class SysMLActivityModel extends DefaultNodeModel {
   }
 
   getSize(): NodeSize {
-    return this.size;
+    return {
+      width: STANDARD_NODE_WIDTH,
+      height: this.size.height
+    };
   }
 
   setSize(width: number, height: number) {
     this.size = {
-      width: Math.max(100, width),
+      width: STANDARD_NODE_WIDTH,
       height: Math.max(80, height)
     };
   }
@@ -226,7 +249,10 @@ export class SysMLActivityModel extends DefaultNodeModel {
 
   deserialize(event: any): void {
     super.deserialize(event);
-    this.size = event.size || { width: 180, height: 100 };
+    this.size = {
+      width: STANDARD_NODE_WIDTH,
+      height: (event.size && event.size.height) ? event.size.height : 100
+    };
     this.description = event.description || '';
   }
 }

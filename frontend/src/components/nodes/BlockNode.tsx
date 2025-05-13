@@ -3,14 +3,17 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 
+const STANDARD_NODE_WIDTH = 260;
+
 // Styled components for the block node
 const BlockPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(1.5),
   borderRadius: '4px',
   border: '1px solid #ccc',
   backgroundColor: '#e3f2fd', // Light blue background for blocks
-  minWidth: 150,
-  maxWidth: 250,
+  width: STANDARD_NODE_WIDTH,
+  minWidth: STANDARD_NODE_WIDTH,
+  maxWidth: STANDARD_NODE_WIDTH,
   boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
   '&:hover': {
     boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
