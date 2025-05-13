@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 
@@ -48,8 +48,11 @@ const SensorProperties = styled(Box)(({ theme }) => ({
 }));
 
 // Define the SensorNode component
-const SensorNode = ({ data, selected }: NodeProps) => {
+const SensorNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
+    // Check if this node has any incoming connections
+  const edges = useStore((state) => state.edges);
+  const hasIncomingConnections = edges.some((edge) => edge.target === id);
   
   return (
     <SensorPaper
@@ -57,10 +60,9 @@ const SensorNode = ({ data, selected }: NodeProps) => {
       sx={{
         border: selected ? '2px solid #c62828' : '1px solid #ccc',
       }}
-    >
-      {/* Input handle at the top */}
+    >      {/* Output handle at the top */}
       <Handle
-        type="target"
+        type="source"
         position={Position.Top}
         style={{ background: '#555' }}
       />
@@ -92,15 +94,29 @@ const SensorNode = ({ data, selected }: NodeProps) => {
               </Typography>
             </div>
           ))}
-        </SensorProperties>
-      )}
-      
-      {/* Output handle at the bottom */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{ background: '#555' }}
-      />
+        </SensorProperties>      )}      {/* Input handle at the bottom */}
+      <div style={{ position: 'relative', width: '100%', height: 10 }}>
+        <Handle
+          type="target"
+          position={Position.Bottom}
+          style={{ background: '#555' }}
+        />
+        {/* Triangle arrow indicator - only shown if the node has incoming connections */}
+        {hasIncomingConnections && (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            style={{
+            position: 'absolute', 
+            left: '50%', 
+            bottom: '-18px', // Moved further down to be completely outside
+            transform: 'translateX(-50%)' 
+          }}
+        >
+          <polygon points="7,0 14,14 0,14" fill="#555" />        </svg>
+        )}
+      </div>
       
       {/* Left handle for additional connections */}
       <Handle
