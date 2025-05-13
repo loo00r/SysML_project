@@ -93,28 +93,30 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
                 {String(value)}
               </Typography>
             </div>
-          ))}
-        </SensorProperties>      )}      {/* Input handle at the bottom */}
-      <div style={{ position: 'relative', width: '100%', height: 10 }}>
+          ))}        </SensorProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
         <Handle
           type="target"
           position={Position.Bottom}
-          style={{ background: '#555' }}
+          style={{ 
+            background: '#555',
+            bottom: -10, // Розташування нижче границі блока
+            top: 'auto'
+          }}
         />
         {/* Triangle arrow indicator - only shown if the node has incoming connections */}
-        {hasIncomingConnections && (
-          <svg
+        {hasIncomingConnections && (          <svg
             width="14"
             height="14"
             viewBox="0 0 14 14"
             style={{
-            position: 'absolute', 
-            left: '50%', 
-            bottom: '-18px', // Moved further down to be completely outside
-            transform: 'translateX(-50%)' 
-          }}
-        >
-          <polygon points="7,0 14,14 0,14" fill="#555" />        </svg>
+              position: 'absolute', 
+              left: '50%', 
+              bottom: '-24px', // Розташування нижче під точкою з'єднання
+              transform: 'translateX(-50%)' 
+            }}
+          >
+            <polygon points="7,0 14,14 0,14" fill="#555" />
+          </svg>
         )}
       </div>
       
