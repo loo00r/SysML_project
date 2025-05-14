@@ -224,9 +224,8 @@ const DiagramEditor = () => {
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
           onDrop={onDrop}
-          onDragOver={onDragOver}
-          fitView
-          attributionPosition="bottom-right"
+          onDragOver={onDragOver}          fitView
+          proOptions={{ hideAttribution: true }}
           deleteKeyCode="Delete"
           multiSelectionKeyCode="Control"
           selectionOnDrag
