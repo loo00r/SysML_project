@@ -117,24 +117,7 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
           >
             <polygon points="7,0 14,14 0,14" fill="#555" />
           </svg>
-        )}
-      </div>
-      
-      {/* Left handle for additional connections */}
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="left"
-        style={{ background: '#555' }}
-      />
-      
-      {/* Right handle for additional connections */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right"
-        style={{ background: '#555' }}
-      />
+        )}      </div>
     </ProcessorPaper>
   );
 };
