@@ -1,12 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
   MiniMap,
   Panel,
   ReactFlowProvider,
   useReactFlow,
-} from 'reactflow';
+}from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Box, Paper, Snackbar, Alert, Typography, Button, IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -237,8 +236,7 @@ const DiagramEditor = () => {
         >
           {/* Background grid */}
           <Background color="#aaa" gap={16} />
-          
-          {/* Mini map for navigation */}
+            {/* Mini map for navigation */}
           <MiniMap
             nodeStrokeColor={(n) => {
               if (n.type === 'block') return '#0041d0';
@@ -254,9 +252,6 @@ const DiagramEditor = () => {
             }}
             maskColor="rgba(0, 0, 0, 0.1)"
           />
-          
-          {/* Controls for zooming */}
-          <Controls />
           
           {/* Toolbar */}
           <ToolbarPanel position="top-center">
@@ -288,8 +283,7 @@ const DiagramEditor = () => {
               color={validationErrors.length > 0 ? 'warning' : 'primary'}
             >
               {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'Validate'}
-            </Button>
-          </ToolbarPanel>
+            </Button>          </ToolbarPanel>
           
           {/* Status panel */}
           <Panel position="bottom-left">
