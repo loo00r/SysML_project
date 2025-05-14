@@ -90,7 +90,7 @@ interface DiagramGeneratorProps {
 }
 
 const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Генератор завжди видимий, стартує розгорнутим
   const [text, setText] = useState('');
   const [diagramType, setDiagramType] = useState('block');
   const [includeRelationships, setIncludeRelationships] = useState(true);
@@ -146,121 +146,136 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   };
   
   const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+    setIsExpanded((prev) => !prev);
   };
 
   return (
     <>
-      <ToggleButtonStyled onClick={toggleExpanded}>
-        {isExpanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
-      </ToggleButtonStyled>
-      
       <GeneratorContainer isExpanded={isExpanded}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">AI Diagram Generator</Typography>
-        </Box>
-        
-        <Divider />
-        
-        {isExpanded && (
-          <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="diagram-type-label">Diagram Type</InputLabel>
-              <Select
-                labelId="diagram-type-label"
-                value={diagramType}
-                label="Diagram Type"
-                onChange={handleDiagramTypeChange}
-                disabled={isGenerating}
+        <Box sx={{ position: 'relative', width: '100%' }}>
+          <ToggleButtonStyled
+            onClick={toggleExpanded}
+            aria-label={isExpanded ? 'Hide generator' : 'Show generator'}
+            title={isExpanded ? 'Hide AI generator' : 'Show AI generator'}
+          >
+            {isExpanded ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+          </ToggleButtonStyled>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 40 }}>
+            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 18 }}>
+              <PlayArrowIcon color="primary" />
+              AI Diagram Generator
+            </Typography>
+            {!isExpanded && (
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                onClick={handleGenerate}
+                disabled={isGenerating || !text.trim()}
+                sx={{ ml: 2 }}
               >
-                <MenuItem value="block">Block Diagram</MenuItem>
-                <MenuItem value="activity">Activity Diagram</MenuItem>
-                <MenuItem value="usecase">Use Case Diagram</MenuItem>
-              </Select>
-            </FormControl>
-            
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel id="diagram-style-label">Style</InputLabel>
-              <Select
-                labelId="diagram-style-label"
-                value={diagramStyle}
-                label="Style"
-                onChange={handleDiagramStyleChange}
-                disabled={isGenerating}
-              >
-                <MenuItem value="technical">Technical</MenuItem>
-                <MenuItem value="conceptual">Conceptual</MenuItem>
-              </Select>
-            </FormControl>
-            
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={includeRelationships}
-                  onChange={(e) => setIncludeRelationships(e.target.checked)}
-                  disabled={isGenerating}
-                />
-              }
-              label="Include Relationships"
-            />
-          </Stack>
-        )}
-        
-        <TextField
-          multiline
-          rows={isExpanded ? 5 : 2}
-          fullWidth
-          value={text}
-          onChange={handleTextChange}
-          placeholder="Enter your system description here. The AI will analyze your text and generate a SysML diagram automatically."
-          disabled={isGenerating}
-          variant="outlined"
-        />
-        
-        {isGenerating && (
-          <Box sx={{ width: '100%', mt: 1 }}>
-            <LinearProgress variant="determinate" value={progress} />
-            <Stack direction="column" spacing={1} sx={{ mt: 2 }}>
-              {steps.map((step) => (
-                <StepItem key={step.id} status={step.status}>
-                  {step.status === 'completed' ? (
-                    <CheckCircleOutlineIcon fontSize="small" />
-                  ) : step.status === 'active' ? (
-                    <PlayArrowIcon fontSize="small" />
-                  ) : (
-                    <RadioButtonUncheckedIcon fontSize="small" />
-                  )}
-                  <Typography variant="body2">{step.label}</Typography>
-                </StepItem>
-              ))}
-            </Stack>
+                Generate
+              </Button>
+            )}
           </Box>
+        </Box>
+        <Divider sx={{ my: 1 }} />
+        {isExpanded && (
+          <>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="diagram-type-label">Diagram Type</InputLabel>
+                <Select
+                  labelId="diagram-type-label"
+                  value={diagramType}
+                  label="Diagram Type"
+                  onChange={handleDiagramTypeChange}
+                  disabled={isGenerating}
+                >
+                  <MenuItem value="block">Block Diagram</MenuItem>
+                  <MenuItem value="activity">Activity Diagram</MenuItem>
+                  <MenuItem value="usecase">Use Case Diagram</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="diagram-style-label">Style</InputLabel>
+                <Select
+                  labelId="diagram-style-label"
+                  value={diagramStyle}
+                  label="Style"
+                  onChange={handleDiagramStyleChange}
+                  disabled={isGenerating}
+                >
+                  <MenuItem value="technical">Technical</MenuItem>
+                  <MenuItem value="conceptual">Conceptual</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={includeRelationships}
+                    onChange={(e) => setIncludeRelationships(e.target.checked)}
+                    disabled={isGenerating}
+                  />
+                }
+                label="Include Relationships"
+              />
+            </Stack>
+            <TextField
+              multiline
+              rows={5}
+              fullWidth
+              value={text}
+              onChange={handleTextChange}
+              placeholder="Enter your system description here. The AI will analyze your text and generate a SysML diagram automatically."
+              disabled={isGenerating}
+              variant="outlined"
+              sx={{ mb: 2 }}
+            />
+            {isGenerating && (
+              <Box sx={{ width: '100%', mt: 1 }}>
+                <LinearProgress variant="determinate" value={progress} />
+                <Stack direction="column" spacing={1} sx={{ mt: 2 }}>
+                  {steps.map((step) => (
+                    <StepItem key={step.id} status={step.status}>
+                      {step.status === 'completed' ? (
+                        <CheckCircleOutlineIcon fontSize="small" />
+                      ) : step.status === 'active' ? (
+                        <PlayArrowIcon fontSize="small" />
+                      ) : (
+                        <RadioButtonUncheckedIcon fontSize="small" />
+                      )}
+                      <Typography variant="body2">{step.label}</Typography>
+                    </StepItem>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+            {error && (
+              <Typography color="error" variant="body2">
+                {error}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleGenerate}
+                disabled={isGenerating || !text.trim()}
+                startIcon={isGenerating ? null : <PlayArrowIcon />}
+              >
+                {isGenerating ? 'Generating...' : 'Generate Diagram'}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={handleClear}
+                disabled={isGenerating}
+              >
+                Clear
+              </Button>
+            </Stack>
+          </>
         )}
-        
-        {error && (
-          <Typography color="error" variant="body2">
-            {error}
-          </Typography>
-        )}
-        
-        <Stack direction="row" spacing={2}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGenerate}
-            disabled={isGenerating || !text.trim()}
-            startIcon={isGenerating ? null : <PlayArrowIcon />}
-          >
-            {isGenerating ? 'Generating...' : 'Generate Diagram'}
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={handleClear}
-            disabled={isGenerating}
-          >
-            Clear
-          </Button>
-        </Stack>
       </GeneratorContainer>
     </>
   );
