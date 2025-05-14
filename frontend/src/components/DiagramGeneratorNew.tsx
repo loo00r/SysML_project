@@ -90,7 +90,7 @@ interface DiagramGeneratorProps {
 }
 
 const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Генератор завжди видимий, стартує розгорнутим
+  const [isExpanded, setIsExpanded] = useState(false); // За замовчуванням приховано
   const [text, setText] = useState('');
   const [diagramType, setDiagramType] = useState('block');
   const [includeRelationships, setIncludeRelationships] = useState(true);
