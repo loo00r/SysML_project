@@ -15,54 +15,75 @@ interface AIGenerationResult {
   error?: string;
 }
 
-// Mock API call - in a real implementation, this would call your backend AI service
-const mockGenerateDiagram = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // This is just a mock implementation
-  // In a real app, this would call your backend AI service
-  
-  // Simple mock response based on the prompt
-  if (options.prompt.toLowerCase().includes('error')) {
-    return { nodes: [], edges: [], error: 'Failed to generate diagram from the provided description.' };
-  }
-  
-  // Generate some mock nodes and edges based on the prompt
-  const words = options.prompt
-    .split(' ')
-    .filter(word => word.length > 3)
-    .slice(0, 5);
-  
-  const nodes = words.map((word, index) => ({
-    id: `node-${index}`,
-    type: index % 3 === 0 ? 'block' : index % 3 === 1 ? 'sensor' : 'processor',
-    data: { 
-      label: word.charAt(0).toUpperCase() + word.slice(1),
-      properties: {
-        id: `node-${index}`,
-        name: word.charAt(0).toUpperCase() + word.slice(1),
-        description: `This is a ${word} component`,
-      }
-    },
-    position: { x: 100 + index * 200, y: 100 + (index % 2) * 100 },
-  }));
-  
-  // Create some mock edges between nodes
-  const edges = [];
-  for (let i = 0; i < nodes.length - 1; i++) {
-    if (Math.random() > 0.3) { // 70% chance to create an edge
-      edges.push({
-        id: `edge-${i}`,
-        source: nodes[i].id,
-        target: nodes[i + 1].id,
-        type: 'default',
-        animated: false,
-      });
+// Call the backend API to generate a diagram
+const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
+  try {
+    // Call the backend API
+    const response = await fetch('/api/v1/create-diagram/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: options.prompt,
+        diagram_type: options.style === 'technical' ? 'block' : 
+                      options.complexity === 'complex' ? 'activity' : 'usecase'
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
     }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      return { nodes: [], edges: [], error: data.error };
+    }
+    
+    // Convert the backend diagram format to ReactFlow format
+    const nodes = data.diagram.elements.map((element: any) => ({
+      id: element.id,
+      type: element.type === 'block' ? 'blockNode' : 
+            element.type === 'activity' ? 'activityNode' : 
+            element.type === 'useCase' ? 'useCaseNode' : 
+            element.type === 'actor' ? 'actorNode' : 'defaultNode',
+      data: { 
+        label: element.name,
+        properties: {
+          id: element.id,
+          name: element.name,
+          description: element.description,
+          ...element.properties
+        },
+        type: element.type
+      },
+      position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
+    }));
+    
+    // Convert relationships to edges
+    const edges = data.diagram.relationships.map((rel: any) => ({
+      id: `edge-${rel.source_id}-${rel.target_id}`,
+      source: rel.source_id,
+      target: rel.target_id,
+      type: rel.type === 'flow' ? 'smoothstep' : 'default',
+      animated: rel.type === 'flow',
+      label: rel.name,
+      data: {
+        type: rel.type,
+        name: rel.name
+      }
+    }));
+    
+    return { nodes, edges };
+  } catch (error) {
+    console.error('Error generating diagram:', error);
+    return { 
+      nodes: [], 
+      edges: [], 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
   }
-  
-  return { nodes, edges };
 };
 
 // Custom hook for AI diagram generation
@@ -87,8 +108,8 @@ export const useAIGeneration = () => {
         });
       }, 300);
       
-      // Call the AI generation service
-      const result = await mockGenerateDiagram(options);
+      // Call the backend API service
+      const result = await callGenerateDiagramAPI(options);
       
       clearInterval(progressInterval);
       

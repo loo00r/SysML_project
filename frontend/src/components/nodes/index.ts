@@ -1,24 +1,38 @@
 import BlockNode from './BlockNode';
 import SensorNode from './SensorNode';
 import ProcessorNode from './ProcessorNode';
+import ActivityNode from './ActivityNode';
+import UseCaseNode from './UseCaseNode';
+import ActorNode from './ActorNode';
 
 // Export all node components
 export {
   BlockNode,
   SensorNode,
-  ProcessorNode
+  ProcessorNode,
+  ActivityNode,
+  UseCaseNode,
+  ActorNode
 };
 
 // Node types mapping for ReactFlow
-// Use BlockNode as a fallback for other node types that don't have specific components yet
+// Map each node type to its corresponding component
 export const nodeTypes = {
+  // Basic node types
   block: BlockNode,
   sensor: SensorNode,
   processor: ProcessorNode,
-  // Use BlockNode as fallback for other types
-  actor: BlockNode,
-  useCase: BlockNode,
-  activity: BlockNode,
+  
+  // New node types for different diagram types
+  activity: ActivityNode,
+  activityNode: ActivityNode,
+  useCase: UseCaseNode,
+  useCaseNode: UseCaseNode,
+  actor: ActorNode,
+  actorNode: ActorNode,
+  
+  // Default node for types without specific implementations
+  defaultNode: BlockNode,
   requirement: BlockNode,
   interface: BlockNode
 };
