@@ -44,7 +44,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "flight_time": "45min",
         "max_altitude": "120m"
       },
-      "position": {"x": 100, "y": 400}
+      "position": {"x": 0, "y": 500}
     },
     {
       "id": "sensor-1",
@@ -52,10 +52,9 @@ async def create_diagram(request: DiagramRequest = Body(...)):
       "name": "Thermal Camera",
       "description": "Detects heat signatures for survivor location",
       "properties": {
-        "resolution": "640x480",
-        "sensitivity": "0.05°C"
+        "resolution": "640x480"
       },
-      "position": {"x": 100, "y": 250}
+      "position": {"x": 0, "y": 250}
     },
     {
       "id": "sensor-2",
@@ -64,7 +63,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
       "description": "Creates 3D maps of flood areas",
       "properties": {
         "range": "100m",
-        "accuracy": "±2cm"
+        "accuracy": "±20cm"
       },
       "position": {"x": 250, "y": 250}
     },
@@ -77,7 +76,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "accuracy": "±1cm",
         "range": "0-10m"
       },
-      "position": {"x": 400, "y": 250}
+      "position": {"x": 500, "y": 250}
     },
     {
       "id": "processor-1",
@@ -88,7 +87,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "processor": "Quad-core ARM",
         "memory": "8GB"
       },
-      "position": {"x": 250, "y": 100}
+      "position": {"x": 250, "y": 0}
     }
   ],
   "relationships": [
