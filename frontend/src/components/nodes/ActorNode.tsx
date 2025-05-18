@@ -4,7 +4,7 @@ import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 
-const STANDARD_NODE_WIDTH = 180;
+const STANDARD_NODE_WIDTH = 150;
 
 // Styled components for the actor node
 const ActorPaper = styled(Paper)(({ theme }) => ({

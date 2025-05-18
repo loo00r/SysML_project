@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 
-const STANDARD_NODE_WIDTH = 260;
+const STANDARD_NODE_WIDTH = 150;
 
 // Styled components for the sensor node
 const SensorPaper = styled(Paper)(({ theme }) => ({

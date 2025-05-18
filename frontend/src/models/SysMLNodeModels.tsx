@@ -2,7 +2,7 @@ import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignmen
 import EditableText from '../components/custom/EditableText';
 import styled from 'styled-components';
 
-export const STANDARD_NODE_WIDTH = 260;
+export const STANDARD_NODE_WIDTH = 150;
 
 const NodeContainer = styled.div`
   padding: 10px;

@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 
-const STANDARD_NODE_WIDTH = 220;
+const STANDARD_NODE_WIDTH = 150;
 
 // Styled components for the use case node
 const UseCasePaper = styled(Paper)(({ theme }) => ({
