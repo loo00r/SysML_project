@@ -265,8 +265,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       const data = await response.json();
       
       // Process the response and update the diagram
-      if (data.nodes && data.edges) {
-        // Transform the API response to ReactFlow format
+      if (data.nodes && data.edges) {        // Transform the API response to ReactFlow format
         const rfNodes = data.nodes.map((node: any) => ({
           id: node.id,
           type: node.type,
@@ -274,7 +273,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
           data: {
             label: node.name || node.label,
             description: node.description || '',
-            type: node.element_type,
+            type: node.type, // Use node.type instead of element_type for consistency
             properties: node.properties || {},
             inputs: node.inputs || [],
             outputs: node.outputs || []

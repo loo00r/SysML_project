@@ -39,23 +39,21 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     
     if (data.error) {
       return { nodes: [], edges: [], error: data.error };
-    }
-    
-    // Convert the backend diagram format to ReactFlow format
+    }    // Convert the backend diagram format to ReactFlow format
     const nodes = data.diagram.elements.map((element: any) => ({
       id: element.id,
-      type: element.type === 'block' ? 'blockNode' : 
-            element.type === 'activity' ? 'activityNode' : 
-            element.type === 'useCase' ? 'useCaseNode' : 
-            element.type === 'actor' ? 'actorNode' : 'defaultNode',
+      // Use the element.type directly to determine the node type
+      type: element.type,
       data: { 
         label: element.name,
+        // Move description out of properties to display correctly in the blocks
+        description: element.description,
         properties: {
           id: element.id,
           name: element.name,
-          description: element.description,
           ...element.properties
         },
+        // Make sure type is properly set in node data
         type: element.type
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },

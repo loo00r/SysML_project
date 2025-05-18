@@ -20,13 +20,13 @@ export {
 export const nodeTypes = {
   // Basic node types
   block: BlockNode,
+  blockNode: BlockNode,  // Support both naming conventions for compatibility
   sensor: SensorNode,
   processor: ProcessorNode,
   
   // New node types for different diagram types
   activity: ActivityNode,
-  activityNode: ActivityNode,
-  useCase: UseCaseNode,
+  activityNode: ActivityNode,  useCase: UseCaseNode,
   useCaseNode: UseCaseNode,
   actor: ActorNode,
   actorNode: ActorNode,
