@@ -89,27 +89,26 @@ async def create_diagram(request: DiagramRequest = Body(...)):
       },
       "position": {"x": 350, "y": 0}
     }
-  ],
-  "relationships": [
+  ],  "relationships": [
     {
       "source_id": "sensor-1",
       "target_id": "processor-1",
-      "type": "default"
+      "type": "smoothstep"
     },
     {
       "source_id": "sensor-2",
       "target_id": "processor-1",
-      "type": "default"
+      "type": "smoothstep"
     },
     {
       "source_id": "sensor-3",
       "target_id": "processor-1",
-      "type": "default"
+      "type": "smoothstep"
     },
     {
       "source_id": "uav-1",
       "target_id": "sensor-1",
-      "type": "default"
+      "type": "smoothstep"
     }
   ]
 }
