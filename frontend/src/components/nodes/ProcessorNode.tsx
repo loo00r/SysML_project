@@ -70,23 +70,23 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
         <ProcessorTitle variant="subtitle1">
           {label || 'Unnamed Processor'}
         </ProcessorTitle>
-        <Typography variant="caption" display="block" textAlign="center">
-          «processor»
-        </Typography>
       </ProcessorHeader>
       
       {Object.keys(properties).length > 0 && (
         <ProcessorProperties>
-          {Object.entries(properties).map(([key, value]) => (
-            <div key={key}>
-              <Typography variant="caption" component="span" fontWeight="bold">
-                {key}:
-              </Typography>{' '}
-              <Typography variant="caption" component="span">
-                {String(value)}
-              </Typography>
-            </div>
-          ))}        </ProcessorProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
+          {Object.entries(properties)
+            .filter(([key]) => key.toLowerCase() !== 'name')
+            .map(([key, value]) => (
+              <div key={key}>
+                <Typography variant="caption" component="span" fontWeight="bold">
+                  {key}:
+                </Typography>{' '}
+                <Typography variant="caption" component="span">
+                  {String(value)}
+                </Typography>
+              </div>
+            ))}
+        </ProcessorProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
         <Handle
           type="target"
           position={Position.Bottom}

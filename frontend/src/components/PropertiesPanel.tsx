@@ -165,7 +165,14 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ nodeId, onClose }) =>
     if (selectedNode) {
       setLabel(selectedNode.data.label || '');
       setDescription(selectedNode.data.description || '');
-      setProperties(selectedNode.data.properties || {});
+      
+      // Filter out the 'name' property if it exists
+      const nodeProperties = selectedNode.data.properties || {};
+      const filteredProperties = Object.entries(nodeProperties)
+        .filter(([key]) => key.toLowerCase() !== 'name')
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+      
+      setProperties(filteredProperties);
     }
   }, [selectedNode]);
   
@@ -182,6 +189,9 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ nodeId, onClose }) =>
   
   // Handle adding a new property
   const handleAddProperty = (key: string, value: string) => {
+    // Skip if the property key is 'name' as we want to remove this field
+    if (key.toLowerCase() === 'name') return;
+    
     const newProperties = { ...properties, [key]: value };
     setProperties(newProperties);
     

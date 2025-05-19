@@ -70,23 +70,23 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
         <SensorTitle variant="subtitle1">
           {label || 'Unnamed Sensor'}
         </SensorTitle>
-        <Typography variant="caption" display="block" textAlign="center">
-          «sensor»
-        </Typography>
       </SensorHeader>
       
       {Object.keys(properties).length > 0 && (
         <SensorProperties>
-          {Object.entries(properties).map(([key, value]) => (
-            <div key={key}>
-              <Typography variant="caption" component="span" fontWeight="bold">
-                {key}:
-              </Typography>{' '}
-              <Typography variant="caption" component="span">
-                {String(value)}
-              </Typography>
-            </div>
-          ))}        </SensorProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
+          {Object.entries(properties)
+            .filter(([key]) => key.toLowerCase() !== 'name')
+            .map(([key, value]) => (
+              <div key={key}>
+                <Typography variant="caption" component="span" fontWeight="bold">
+                  {key}:
+                </Typography>{' '}
+                <Typography variant="caption" component="span">
+                  {String(value)}
+                </Typography>
+              </div>
+            ))}
+        </SensorProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
         <Handle
           type="target"
           position={Position.Bottom}

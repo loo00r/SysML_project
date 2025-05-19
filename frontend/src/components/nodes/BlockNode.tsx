@@ -70,23 +70,22 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
         <BlockTitle variant="subtitle1">
           {label || 'Unnamed Block'}
         </BlockTitle>
-        <Typography variant="caption" display="block" textAlign="center">
-          «block»
-        </Typography>
       </BlockHeader>
       
       {Object.keys(properties).length > 0 && (
         <BlockProperties>
-          {Object.entries(properties).map(([key, value]) => (
-            <div key={key}>
-              <Typography variant="caption" component="span" fontWeight="bold">
-                {key}:
-              </Typography>{' '}
-              <Typography variant="caption" component="span">
-                {String(value)}
-              </Typography>
-            </div>
-          ))}
+          {Object.entries(properties)
+            .filter(([key]) => key.toLowerCase() !== 'name')
+            .map(([key, value]) => (
+              <div key={key}>
+                <Typography variant="caption" component="span" fontWeight="bold">
+                  {key}:
+                </Typography>{' '}
+                <Typography variant="caption" component="span">
+                  {String(value)}
+                </Typography>
+              </div>
+            ))}
         </BlockProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
         <Handle
           type="target"
