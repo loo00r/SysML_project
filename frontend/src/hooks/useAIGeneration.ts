@@ -36,20 +36,20 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
 
     const data = await response.json();
-    
-    if (data.error) {
+      if (data.error) {
       return { nodes: [], edges: [], error: data.error };
     }
-      // Convert the backend diagram format to ReactFlow format
+    
+    // Convert the backend diagram format to ReactFlow format
     const nodes = data.diagram.elements.map((element: any) => ({
       id: element.id,
       type: element.type, // Use the element type directly from backend ('block', 'sensor', 'processor', etc.)
       data: { 
         label: element.name,
+        description: element.description, // Keep description as a direct property
         properties: {
           id: element.id,
           name: element.name,
-          description: element.description,
           ...element.properties
         },
         type: element.type

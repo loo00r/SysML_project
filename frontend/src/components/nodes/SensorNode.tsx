@@ -66,8 +66,7 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
         position={Position.Top}
         style={{ background: '#555' }}
       />
-      
-      <SensorHeader>
+        <SensorHeader>
         <SensorTitle variant="subtitle1">
           {label || 'Unnamed Sensor'}
         </SensorTitle>
@@ -75,12 +74,6 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
           «sensor»
         </Typography>
       </SensorHeader>
-      
-      {description && (
-        <SensorDescription variant="body2">
-          {description}
-        </SensorDescription>
-      )}
       
       {Object.keys(properties).length > 0 && (
         <SensorProperties>

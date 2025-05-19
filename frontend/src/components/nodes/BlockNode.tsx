@@ -66,8 +66,7 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
         position={Position.Top}
         style={{ background: '#555' }}
       />
-      
-      <BlockHeader>
+        <BlockHeader>
         <BlockTitle variant="subtitle1">
           {label || 'Unnamed Block'}
         </BlockTitle>
@@ -75,12 +74,6 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
           «block»
         </Typography>
       </BlockHeader>
-      
-      {description && (
-        <BlockDescription variant="body2">
-          {description}
-        </BlockDescription>
-      )}
       
       {Object.keys(properties).length > 0 && (
         <BlockProperties>

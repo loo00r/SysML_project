@@ -66,8 +66,7 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
         position={Position.Top}
         style={{ background: '#555' }}
       />
-      
-      <ProcessorHeader>
+        <ProcessorHeader>
         <ProcessorTitle variant="subtitle1">
           {label || 'Unnamed Processor'}
         </ProcessorTitle>
@@ -75,12 +74,6 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
           «processor»
         </Typography>
       </ProcessorHeader>
-      
-      {description && (
-        <ProcessorDescription variant="body2">
-          {description}
-        </ProcessorDescription>
-      )}
       
       {Object.keys(properties).length > 0 && (
         <ProcessorProperties>
