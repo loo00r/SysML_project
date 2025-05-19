@@ -280,8 +280,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
             outputs: node.outputs || []
           }
         }));
-        
-        const rfEdges = data.edges.map((edge: any) => ({
+          const rfEdges = data.edges.map((edge: any) => ({
           id: edge.id,
           source: edge.source,
           target: edge.target,

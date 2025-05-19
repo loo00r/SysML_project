@@ -44,7 +44,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "flight_time": "45min",
         "max_altitude": "120m"
       },
-      "position": {"x": 0, "y": 500}
+      "position": {"x": 0, "y": 600}
     },
     {
       "id": "sensor-1",
@@ -54,7 +54,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
       "properties": {
         "resolution": "640x480"
       },
-      "position": {"x": 0, "y": 250}
+      "position": {"x": 0, "y": 300}
     },
     {
       "id": "sensor-2",
@@ -65,7 +65,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "range": "100m",
         "accuracy": "±20cm"
       },
-      "position": {"x": 250, "y": 250}
+      "position": {"x": 350, "y": 300}
     },
     {
       "id": "sensor-3",
@@ -76,7 +76,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "accuracy": "±1cm",
         "range": "0-10m"
       },
-      "position": {"x": 500, "y": 250}
+      "position": {"x": 700, "y": 300}
     },
     {
       "id": "processor-1",
@@ -87,7 +87,7 @@ async def create_diagram(request: DiagramRequest = Body(...)):
         "processor": "Quad-core ARM",
         "memory": "8GB"
       },
-      "position": {"x": 250, "y": 0}
+      "position": {"x": 350, "y": 0}
     }
   ],
   "relationships": [

@@ -60,13 +60,12 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
-    
-    // Convert relationships to edges
+      // Convert relationships to edges
     const edges = data.diagram.relationships.map((rel: any) => ({
       id: `edge-${rel.source_id}-${rel.target_id}`,
       source: rel.source_id,
       target: rel.target_id,
-      type: rel.type === 'flow' ? 'smoothstep' : 'default',
+      type: 'smoothstep', // Always use smoothstep for consistent styling
       animated: rel.type === 'flow',
       label: rel.name,
       data: {
