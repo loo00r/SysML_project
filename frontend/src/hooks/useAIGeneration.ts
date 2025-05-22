@@ -18,8 +18,11 @@ interface AIGenerationResult {
 // Call the backend API to generate a diagram
 const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
   try {
+    // Determine which endpoint to use - RAG or standard
+    const endpoint = '/api/v1/rag/generate-diagram-with-context/';
+    
     // Call the backend API
-    const response = await fetch('/api/v1/create-diagram/', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,7 +30,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       body: JSON.stringify({
         text: options.prompt,
         diagram_type: options.style === 'technical' ? 'block' : 
-                      options.complexity === 'complex' ? 'activity' : 'usecase'
+                      options.complexity === 'complex' ? 'activity' : 'usecase',
+        use_rag: true // Enable RAG by default
       }),
     });
 

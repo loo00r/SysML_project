@@ -87,10 +87,12 @@ async def generate_diagram_with_context(
     """
     Generate a diagram using context from the database if use_rag is True
     """
+    # Initialize context and one-shot examples
     context = ""
+    one_shot_examples = []
     
     if use_rag:
-        # Find similar diagrams for context
+        # Find similar diagrams for context using vector similarity search
         similar_diagrams = await find_similar_diagrams(
             db=db, 
             query_text=text, 
@@ -98,37 +100,38 @@ async def generate_diagram_with_context(
             diagram_type=diagram_type
         )
         
-        # Get relevant templates
+        # Get relevant templates for the requested diagram type
         templates = await get_template_by_type(db, diagram_type)
         
-        # Build context from similar diagrams and templates
-        context += "Here are some example diagrams similar to what you might want to create:\n\n"
+        # If we found similar diagrams, use them as one-shot examples
+        if similar_diagrams:
+            # Format the best match as a one-shot example
+            best_match = similar_diagrams[0]
+            one_shot_examples.append({
+                "input": best_match.raw_text,
+                "output": best_match.diagram_json
+            })
+            
+            # Add additional context from other similar diagrams
+            context += "Here are some similar examples for reference:\n\n"
+            for i, diagram in enumerate(similar_diagrams[1:], start=1):
+                context += f"Example {i}: {diagram.name}\n"
+                context += f"Description: {diagram.description}\n\n"
         
-        for i, diagram in enumerate(similar_diagrams):
-            context += f"Example {i+1}: {diagram.name}\n"
-            context += f"Description: {diagram.description}\n"
-            context += f"Structure: {json.dumps(diagram.diagram_json, indent=2)}\n\n"
-        
-        context += "Here are some templates you can use as a starting point:\n\n"
-        
-        for i, template in enumerate(templates):
-            context += f"Template {i+1}: {template.template_name}\n"
-            context += f"Description: {template.template_description}\n"
-            context += f"Structure: {json.dumps(template.template_json, indent=2)}\n\n"
+        # Add templates as additional context if available
+        if templates:
+            context += "\nRelevant templates for this diagram type:\n\n"
+            for i, template in enumerate(templates, start=1):
+                context += f"Template {i}: {template.template_name}\n"
+                context += f"Description: {template.template_description}\n\n"
     
-    # Enhanced prompt with context
-    enhanced_prompt = f"""
-    Generate a {diagram_type} diagram for the following system description:
+    # Construct the enhanced prompt with one-shot examples and context
+    enhanced_prompt = f"Generate a {diagram_type} diagram for the following system description:\n\n{text}"
     
-    {text}
+    # Generate diagram with RAG context
+    result = generate_diagram(enhanced_prompt, one_shot_examples=one_shot_examples, additional_context=context)
     
-    {context}
-    """
-    
-    # Generate diagram with context
-    result = generate_diagram(enhanced_prompt)
-    
-    # Store the generated diagram in the database
+    # Store the generated diagram in the database for future RAG use
     if "diagram" in result and "error" not in result:
         try:
             await store_diagram_with_embedding(
