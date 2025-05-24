@@ -9,7 +9,105 @@ class DiagramTypes:
     ACTIVITY = "activity"
     USE_CASE = "use_case"
 
-# Core SysML prompt template to help guide model responses
+# Define positioning constants
+class DiagramPositioning:
+    # Vertical spacing (y-coordinates)
+    Y_SPACING = 200
+    BASE_Y = 0
+    
+    # Horizontal spacing (x-coordinates)
+    ELEMENT_X_SPACING = 300
+    
+    @staticmethod
+    def get_x_position(index_in_level: int) -> int:
+        """Calculate x position based on element index within its level"""
+        return index_in_level * DiagramPositioning.ELEMENT_X_SPACING
+    
+    @staticmethod
+    def get_y_position(level_index: int) -> int:
+        """
+        Calculate y position based on level index
+        Level index can be positive or negative, with 0 being the middle reference point
+        Positive indices increase y (move down), negative indices decrease y (move up)
+        """
+        return DiagramPositioning.BASE_Y + (level_index * DiagramPositioning.Y_SPACING)
+
+    @staticmethod
+    def apply_positioning(diagram_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply automatic positioning to diagram elements based on their types and relationships.
+        
+        This function organizes elements into levels (top, middle, bottom) based on their types
+        and relationships, then assigns appropriate x, y coordinates.
+        
+        Args:
+            diagram_data: The diagram data without position information
+            
+        Returns:
+            Updated diagram data with position information
+        """
+        elements = diagram_data.get("elements", [])
+        relationships = diagram_data.get("relationships", [])
+        
+        # Create a map of element IDs to their indices
+        element_map = {element["id"]: i for i, element in enumerate(elements)}
+        
+        # Identify source and target elements from relationships
+        source_elements = set()
+        target_elements = set()
+        for rel in relationships:
+            source_elements.add(rel.get("source_id"))
+            target_elements.add(rel.get("target_id"))
+        
+        # Assign level indices based on relationship patterns
+        element_level_indices = {}
+        for element in elements:
+            element_id = element["id"]
+            
+            # Elements that are only targets (receive connections) are likely top-level (negative index)
+            if element_id in target_elements and element_id not in source_elements:
+                element_level_indices[element_id] = -1
+            # Elements that are both sources and targets are likely middle-level (index 0)
+            elif element_id in target_elements and element_id in source_elements:
+                element_level_indices[element_id] = 0
+            # Elements that are only sources (initiate connections) are likely bottom-level (positive index)
+            elif element_id in source_elements and element_id not in target_elements:
+                element_level_indices[element_id] = 1
+            else:
+                # Default to middle level for elements without connections
+                element_level_indices[element_id] = 0
+        
+        # Count elements per level index for horizontal positioning
+        level_counts = {}
+        
+        # Initialize level counts for any level index that might be used
+        for element_id, level_index in element_level_indices.items():
+            if level_index not in level_counts:
+                level_counts[level_index] = 0
+        
+        # Apply positions based on level indices
+        for element in elements:
+            element_id = element["id"]
+            level_index = element_level_indices.get(element_id, 0)  # Default to middle level (0)
+            
+            # Set position
+            x_pos = DiagramPositioning.get_x_position(level_counts[level_index])
+            y_pos = DiagramPositioning.get_y_position(level_index)
+            
+            # Update element with position
+            if "position" not in element or not element["position"]:
+                element["position"] = {}
+            
+            element["position"]["x"] = x_pos
+            element["position"]["y"] = y_pos
+            
+            # Increment count for this level
+            level_counts[level_index] += 1
+        
+        # Return the updated diagram data
+        return diagram_data
+
+# Core SysML prompt template to help guide model responses (without positioning logic)
 SYSML_PROMPT_TEMPLATE = """
 You are a SysML diagram expert. Based on the provided system description, generate a SysML diagram with the following components:
 
@@ -27,8 +125,7 @@ Format your response as a valid JSON object with the following structure:
       "type": "block | sensor | processor",
       "name": "element_name",
       "description": "description_text",
-      "properties": {},
-      "position": {"x": 0, "y": 0} // Position coordinates for layout
+      "properties": {}
     }
   ],
   "relationships": [
@@ -40,23 +137,10 @@ Format your response as a valid JSON object with the following structure:
   ]
 }
 
-Important positioning and connection instructions:
-1. Organize elements by hierarchical levels using the y-coordinate
-   - Top level: y = 0 (any component type can be here)
-   - Middle level: y = 200 (any component type can be here)
-   - Bottom level: y = 400 (any component type can be here)
-
-2. Space elements horizontally within the same level using the x-coordinate
-   - First element: x = 0
-   - Second element: x = 300
-   - Third element: x = 600
-   - Continue with 300 unit increments for additional elements
-
-3. Connection rules:
-   - Components should primarily connect to components in adjacent levels (e.g., top to middle, middle to bottom)
-   - Avoid direct connections between top and bottom levels unless specifically requested
-   - Components on the same level should generally not connect to each other unless specifically requested
-   - Each bottom-level component should connect to exactly one middle-level component unless otherwise specified
+Connection rules:
+- Components should primarily connect based on their functional relationships
+- Each component should have logical connections that reflect data or control flow
+- Avoid creating unnecessary connections
 
 Here is a concrete example of a well-formatted diagram for a UAV flood monitoring system:
 
@@ -72,8 +156,7 @@ Here is a concrete example of a well-formatted diagram for a UAV flood monitorin
         "weight": "5kg",
         "flight_time": "45min",
         "max_altitude": "120m"
-      },
-      "position": {"x": 0, "y": 400}
+      }
     },
     {
       "id": "sensor-1",
@@ -82,8 +165,7 @@ Here is a concrete example of a well-formatted diagram for a UAV flood monitorin
       "description": "Detects heat signatures for survivor location",
       "properties": {
         "resolution": "640x480"
-      },
-      "position": {"x": 0, "y": 200}
+      }
     },
     {
       "id": "sensor-2",
@@ -93,8 +175,7 @@ Here is a concrete example of a well-formatted diagram for a UAV flood monitorin
       "properties": {
         "range": "100m",
         "accuracy": "±20cm"
-      },
-      "position": {"x": 300, "y": 200}
+      }
     },
     {
       "id": "sensor-3",
@@ -104,8 +185,7 @@ Here is a concrete example of a well-formatted diagram for a UAV flood monitorin
       "properties": {
         "accuracy": "±1cm",
         "range": "0-10m"
-      },
-      "position": {"x": 600, "y": 200}
+      }
     },
     {
       "id": "processor-1",
@@ -115,8 +195,7 @@ Here is a concrete example of a well-formatted diagram for a UAV flood monitorin
       "properties": {
         "processor": "Quad-core ARM",
         "memory": "8GB"
-      },
-      "position": {"x": 300, "y": 0}
+      }
     }
   ],
   "relationships": [
@@ -200,9 +279,12 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
         response_text = response.choices[0].message.content
         diagram_data = json.loads(response_text)
         
+        # Apply automatic positioning to the diagram elements
+        positioned_diagram = DiagramPositioning.apply_positioning(diagram_data)
+        
         # Add metadata about the generation
         return {
-            "diagram": diagram_data,
+            "diagram": positioned_diagram,
             "raw_text": prompt,
             "model_used": settings.OPENAI_GENERATIVE_MODEL,
             "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0
