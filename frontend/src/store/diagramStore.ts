@@ -51,6 +51,7 @@ interface DiagramState {
   history: {
     past: { nodes: Node<NodeData>[]; edges: Edge[] }[];
     future: { nodes: Node<NodeData>[]; edges: Edge[] }[];
+    lastActionTimestamp: number;
   };
   
   // Actions
@@ -115,7 +116,8 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   
   history: {
     past: [],
-    future: []
+    future: [],
+    lastActionTimestamp: 0
   },
   
   // Basic node and edge operations
@@ -135,6 +137,9 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   },
   
   onConnect: (connection) => {
+    // Save current state before connecting nodes
+    get().saveToHistory();
+    
     const newEdge: Edge = {
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
@@ -147,59 +152,69 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     set({
       edges: [...get().edges, newEdge]
     });
-    
-    get().saveToHistory();
   },
   
   // Node operations
   addNode: (node) => {
+    // Save current state before adding node
+    get().saveToHistory();
+    
     set({
       nodes: [...get().nodes, node]
     });
-    get().saveToHistory();
   },
   
   updateNode: (id, data) => {
+    // Save current state before updating node
+    get().saveToHistory();
+    
     set({
       nodes: get().nodes.map(node => 
         node.id === id ? { ...node, data: { ...node.data, ...data } } : node
       )
     });
-    get().saveToHistory();
   },
   
   removeNode: (id) => {
+    // Save current state before removing node
+    get().saveToHistory();
+    
     // Remove the node
     set({
       nodes: get().nodes.filter(node => node.id !== id),
       // Also remove any connected edges
       edges: get().edges.filter(edge => edge.source !== id && edge.target !== id)
     });
-    get().saveToHistory();
   },
   
   // Edge operations
   addEdge: (edge) => {
+    // Save current state before adding edge
+    get().saveToHistory();
+    
     set({
       edges: [...get().edges, edge]
     });
-    get().saveToHistory();
   },
   
   updateEdge: (id, data) => {
+    // Save current state before updating edge
+    get().saveToHistory();
+    
     set({
       edges: get().edges.map(edge => 
         edge.id === id ? { ...edge, ...data } : edge
       )
     });
-    get().saveToHistory();
   },
   
   removeEdge: (id) => {
+    // Save current state before removing edge
+    get().saveToHistory();
+    
     set({
       edges: get().edges.filter(edge => edge.id !== id)
     });
-    get().saveToHistory();
   },
   
   // Selection operations
@@ -367,7 +382,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   
   // History operations
   undo: () => {
-    const { past, future } = get().history;
+    const { past, future, lastActionTimestamp } = get().history;
     
     if (past.length === 0) return;
     
@@ -379,21 +394,21 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     // Get current state before applying undo
     const currentState = { nodes: get().nodes, edges: get().edges };
     
-    // Only add to future if the current state is different from the previous state
-    const isDifferent = JSON.stringify(currentState) !== JSON.stringify(previousState);
-    
+    // Add current state to future for redo
     set({
       nodes: previousState.nodes,
       edges: previousState.edges,
       history: {
         past: newPast,
-        future: isDifferent ? [currentState, ...future] : future
+        future: [currentState, ...future],
+        lastActionTimestamp
       }
     });
   },
   
+  
   redo: () => {
-    const { past, future } = get().history;
+    const { past, future, lastActionTimestamp } = get().history;
     
     if (future.length === 0) return;
     
@@ -402,23 +417,37 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     
     if (!nextState) return;
     
+    // Get current state before applying redo
+    const currentState = { nodes: get().nodes, edges: get().edges };
+    
     set({
       nodes: nextState.nodes,
       edges: nextState.edges,
       history: {
-        past: [...past, { nodes: get().nodes, edges: get().edges }],
-        future: newFuture
+        past: [...past, currentState],
+        future: newFuture,
+        lastActionTimestamp
       }
     });
   },
   
+  
   saveToHistory: () => {
-    set(state => ({
-      history: {
-        past: [...state.history.past, { nodes: state.nodes, edges: state.edges }],
-        future: [] // Clear future when a new action is performed
-      }
-    }));
+    // Get current timestamp
+    const now = Date.now();
+    const { lastActionTimestamp } = get().history;
+    
+    // Only save state if it's been more than 300ms since the last action
+    // This prevents multiple history entries for rapid sequential changes
+    if (now - lastActionTimestamp > 300) {
+      set({
+        history: {
+          past: [...get().history.past, { nodes: get().nodes, edges: get().edges }],
+          future: [], // Clear future when a new action is performed
+          lastActionTimestamp: now
+        }
+      });
+    }
   }
 }));
 

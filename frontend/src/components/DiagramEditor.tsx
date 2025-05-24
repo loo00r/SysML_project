@@ -137,31 +137,6 @@ const DiagramEditor = () => {
     setNotification({ ...notification, open: false });
   };
 
-  // Auto-save diagram to localStorage whenever nodes or edges change
-  useEffect(() => {
-    if (nodes.length > 0 || edges.length > 0) {
-      localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
-      console.log('Auto-saved diagram to localStorage');
-    }
-  }, [nodes, edges]);
-
-  // Load diagram from localStorage when component mounts
-  useEffect(() => {
-    try {
-      const savedDiagram = localStorage.getItem('sysml-diagram');
-      if (savedDiagram) {
-        const { nodes: savedNodes, edges: savedEdges } = JSON.parse(savedDiagram);
-        if (savedNodes && savedNodes.length > 0) {
-          setNodes(savedNodes);
-          setEdges(savedEdges || []);
-          console.log('Loaded diagram from localStorage');
-        }
-      }
-    } catch (error) {
-      console.error('Error loading diagram from localStorage:', error);
-    }
-  }, [setNodes, setEdges]);
-
   // Handle diagram save
   const handleSave = async () => {
     try {
