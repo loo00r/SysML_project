@@ -131,18 +131,10 @@ async def generate_diagram_with_context(
     # Generate diagram with RAG context
     result = generate_diagram(enhanced_prompt, one_shot_examples=one_shot_examples, additional_context=context)
     
-    # Store the generated diagram in the database for future RAG use
+    # We no longer automatically store the generated diagram in the database
+    # This will only happen when the user explicitly clicks 'Save Diagram'
+    # Adding a flag to indicate this diagram hasn't been saved to the RAG database yet
     if "diagram" in result and "error" not in result:
-        try:
-            await store_diagram_with_embedding(
-                db=db,
-                name=f"Generated {diagram_type.capitalize()} Diagram",
-                description=text[:100] + "...",
-                raw_text=text,
-                diagram_type=diagram_type,
-                diagram_json=result["diagram"]
-            )
-        except Exception as e:
-            print(f"Error storing generated diagram: {str(e)}")
+        result["saved_to_rag"] = False
     
     return result

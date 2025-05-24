@@ -127,10 +127,47 @@ const DiagramEditor = () => {
   };
 
   // Handle diagram save
-  const handleSave = () => {
-    // In a real app, this would save to a backend
-    localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
-    showNotification('Diagram saved successfully', 'success');
+  const handleSave = async () => {
+    try {
+      // Save to localStorage as backup
+      localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
+      
+      // Get diagram type from nodes (default to 'block' if not found)
+      const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type : 'block';
+      
+      // Generate a description from the diagram
+      const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
+      
+      // Get the original text from the store if available
+      const { generationPrompt, diagramDescription } = useDiagramStore.getState();
+      
+      // Use the original generation prompt if available, otherwise use diagram description or a default
+      const originalText = generationPrompt || diagramDescription || description;
+      
+      // Save to backend and update RAG database
+      const response = await fetch('/api/v1/rag/diagrams/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `Saved Diagram - ${new Date().toLocaleString()}`,
+          description: description,
+          raw_text: originalText, // Use the original text instead of the auto-generated description
+          diagram_type: diagramType,
+          diagram_json: { nodes, edges }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error saving diagram: ${response.statusText}`);
+      }
+      
+      showNotification('Diagram saved successfully and added to knowledge base', 'success');
+    } catch (error) {
+      console.error('Error saving diagram:', error);
+      showNotification(`Failed to save diagram: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Handle validation
