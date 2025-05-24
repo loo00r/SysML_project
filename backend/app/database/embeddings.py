@@ -32,7 +32,7 @@ async def store_diagram_with_embedding(
     Store a diagram with its embedding vector in the database
     """
     # Prepare text for embedding
-    embedding_text = f"{name} {description} {raw_text}"
+    embedding_text = raw_text
     
     # Generate embedding
     embedding_vector = await generate_embedding(embedding_text)
