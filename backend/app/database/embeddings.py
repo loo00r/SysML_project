@@ -31,62 +31,57 @@ async def find_diagram_by_raw_text(db: AsyncSession, raw_text: str) -> Optional[
 
 async def optimize_diagram_json(diagram_json: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Optimize the diagram JSON structure to remove unnecessary data and reduce size
+    Optimize the diagram JSON structure to match the exact format from the prompt.
+    Position information is removed since we use Dagre for automatic positioning.
+    Converts nodes/edges format to elements/relationships format for RAG consistency.
     """
+    # Create the output structure exactly matching the prompt format
     optimized_json = {
-        "nodes": [],
-        "edges": []
+        "diagram_type": "block",
+        "elements": [],
+        "relationships": []
     }
     
-    # Process nodes - keep only essential data
+    # Process nodes -> elements (matching prompt format)
     if "nodes" in diagram_json:
         for node in diagram_json["nodes"]:
-            optimized_node = {
+            # Create element in the exact format as specified in the prompt
+            element = {
                 "id": node["id"],
                 "type": node["type"],
-                "position": node["position"],
-                "data": {
-                    "label": node["data"].get("label", ""),
-                    "type": node["data"].get("type", node["type"]),
-                }
+                "name": node["data"].get("label", ""),
+                "description": node["data"].get("description", "")
             }
             
-            # Keep important properties but skip redundant ones
+            # Add properties if available
             if "properties" in node["data"]:
-                optimized_node["data"]["properties"] = {}
+                element["properties"] = {}
                 for key, value in node["data"]["properties"].items():
-                    if key not in ["id"] or key == "name":  # Skip redundant properties
-                        optimized_node["data"]["properties"][key] = value
-            
-            # Keep description if available
-            if "description" in node["data"]:
-                optimized_node["data"]["description"] = node["data"]["description"]
+                    # Include all meaningful properties
+                    if key != "id" or key == "name":
+                        element["properties"][key] = value
+            else:
+                element["properties"] = {}
                 
-            optimized_json["nodes"].append(optimized_node)
+            optimized_json["elements"].append(element)
     
-    # Process edges - keep only essential data
+    # Process edges -> relationships (matching prompt format)
     if "edges" in diagram_json:
         for edge in diagram_json["edges"]:
-            optimized_edge = {
-                "id": edge["id"],
-                "source": edge["source"],
-                "target": edge["target"],
+            # Create relationship in the exact format as specified in the prompt
+            relationship = {
+                "source_id": edge["source"],
+                "target_id": edge["target"],
                 "type": edge["type"]
             }
             
-            # Keep data if available
-            if "data" in edge and edge["data"]:
-                optimized_edge["data"] = {}
-                if "type" in edge["data"]:
-                    optimized_edge["data"]["type"] = edge["data"]["type"]
-                if "name" in edge["data"]:
-                    optimized_edge["data"]["name"] = edge["data"]["name"]
-            
-            # Keep animated property if true
-            if edge.get("animated", False):
-                optimized_edge["animated"] = True
+            # Add label/name if available
+            if "data" in edge and edge["data"] and "name" in edge["data"]:
+                relationship["name"] = edge["data"]["name"]
+            elif "label" in edge and edge["label"]:
+                relationship["name"] = edge["label"]
                 
-            optimized_json["edges"].append(optimized_edge)
+            optimized_json["relationships"].append(relationship)
     
     return optimized_json
 
