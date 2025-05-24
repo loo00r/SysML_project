@@ -169,10 +169,12 @@ You are a SysML diagram expert. Based on the provided system description, genera
 1. Diagram Type: Block Definition Diagram (BDD) for system structure
 
 2. Elements: Create appropriate elements based on the system description
-   - Use only these element types: block, sensor, processor
+   - IMPORTANT: Use ONLY these three element types: "block", "sensor", "processor"
+   - DO NOT use any other element types like actuator, display, communication, etc.
+   - If you need to represent other components, use the "block" type with appropriate names
    - Each element should have:
      - Unique ID (e.g., "sensor-1")
-     - Type (must be one of: "block", "sensor", "processor")
+     - Type (MUST be one of: "block", "sensor", "processor" - no exceptions)
      - Name (descriptive title)
      - Description (brief explanation of purpose)
      - Properties (relevant attributes as key-value pairs)
@@ -181,7 +183,7 @@ You are a SysML diagram expert. Based on the provided system description, genera
    - Each relationship should have:
      - Source element ID
      - Target element ID
-     - Type (e.g., "smoothstep" for standard connections)
+     - Type (use "smoothstep" for all connections)
 
 Return a JSON object with this structure:
 ```json
@@ -233,110 +235,9 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
     # Initialize the OpenAI client with the API key
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     
-    # Start building the messages list with a detailed system prompt
+    # Start building the messages list with our detailed system prompt template
     messages = [
-        {"role": "system", "content": f"""
-            You are a SysML diagram expert. Based on the provided system description, generate a SysML diagram with the following components:
-            
-            1. Identify all system blocks/components
-            2. Define the relationships between blocks
-            3. Specify ports and flows for each block
-            4. Organize blocks into a hierarchical structure if applicable
-            
-            Your response must be a valid JSON object with the following structure:
-            {{
-              "diagram_type": "block",
-              "elements": [
-                {{
-                  "id": "unique-id",
-                  "type": "block",
-                  "name": "Component Name",
-                  "description": "Component description",
-                  "properties": {{}}
-                }}
-              ],
-              "relationships": [
-                {{
-                  "source_id": "source_element_id",
-                  "target_id": "target_element_id",
-                  "type": "smoothstep"
-                }}
-              ]
-            }}
-            
-            Connection rules:
-            - Components should primarily connect based on their functional relationships
-            - Each component should have logical connections that reflect data or control flow
-            - Avoid creating unnecessary connections
-            
-            For disaster management scenarios, particularly focus on sensor systems, data transmission, and decision-making components.
-            
-            Here is a concrete example of a well-formatted diagram for a UAV flood monitoring system:
-            {{
-              "diagram_type": "block",
-              "elements": [
-                {{
-                  "id": "uav-1",
-                  "type": "block",
-                  "name": "UAV Platform",
-                  "description": "Main aerial vehicle platform for flood monitoring",
-                  "properties": {{
-                    "weight": "5kg",
-                    "flight_time": "45min"
-                  }}
-                }},
-                {{
-                  "id": "sensor-1",
-                  "type": "sensor",
-                  "name": "Optical Camera",
-                  "description": "High-resolution optical imaging sensor",
-                  "properties": {{
-                    "resolution": "20MP",
-                    "weight": "250g"
-                  }}
-                }},
-                {{
-                  "id": "sensor-2",
-                  "type": "sensor",
-                  "name": "Thermal Camera",
-                  "description": "Thermal imaging for night operations",
-                  "properties": {{
-                    "resolution": "640x480",
-                    "weight": "300g"
-                  }}
-                }},
-                {{
-                  "id": "processor-1",
-                  "type": "processor",
-                  "name": "Data Processing Unit",
-                  "description": "Onboard computer for image analysis",
-                  "properties": {{
-                    "processor": "Quad-core ARM",
-                    "memory": "8GB"
-                  }}
-                }}
-              ],
-              "relationships": [
-                {{
-                  "source_id": "sensor-1",
-                  "target_id": "processor-1",
-                  "type": "smoothstep"
-                }},
-                {{
-                  "source_id": "sensor-2",
-                  "target_id": "processor-1",
-                  "type": "smoothstep"
-                }},
-                {{
-                  "source_id": "uav-1",
-                  "target_id": "sensor-1",
-                  "type": "smoothstep"
-                }}
-              ]
-            }}
-            
-            IMPORTANT: Your response must be a valid JSON object with the exact structure shown above.
-        """}
+        {"role": "system", "content": SYSML_PROMPT_TEMPLATE}
     ]
     
     # Log RAG usage
