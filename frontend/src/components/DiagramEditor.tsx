@@ -7,7 +7,7 @@ import ReactFlow, {
   useReactFlow,
 }from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Box, Paper, Snackbar, Alert, Typography, Button, IconButton } from '@mui/material';
+import { Box, Paper, Snackbar, Alert, Typography, Button, IconButton, Tooltip } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
@@ -16,12 +16,14 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 import { nodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
 import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
+import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
 
 // Styled components
 const EditorContainer = styled(Box)({
@@ -58,6 +60,13 @@ const DiagramEditor = () => {
     open: false,
     message: '',
     severity: 'info',
+  });
+  
+  // State for export functionality
+  const [isExportEnabled, setIsExportEnabled] = useState(false);
+  const [validationResult, setValidationResult] = useState<{ isValid: boolean; errors: string[] }>({
+    isValid: false,
+    errors: []
   });
 
   // Access the diagram store
@@ -199,10 +208,44 @@ const DiagramEditor = () => {
 
   // Handle validation
   const handleValidate = () => {
-    if (validationErrors.length > 0) {
-      toggleValidationPanel();
+    // Get diagram type from nodes (default to 'block' if not found)
+    const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
+    
+    // Validate the diagram
+    const result = validateSysMLDiagram(nodes, edges, diagramType);
+    setValidationResult(result);
+    
+    // Enable or disable export based on validation result
+    setIsExportEnabled(result.isValid);
+    
+    if (result.isValid) {
+      showNotification('Diagram validation successful. Export is now enabled.', 'success');
     } else {
-      showNotification('No validation issues found', 'success');
+      // Show validation panel with errors
+      if (!showValidationPanel) {
+        toggleValidationPanel();
+      }
+      showNotification(`Validation failed with ${result.errors.length} issues. Please fix them before exporting.`, 'warning');
+    }
+  };
+  
+  // Handle XMI export
+  const handleExport = () => {
+    try {
+      // Get diagram type from nodes (default to 'block' if not found)
+      const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
+      
+      // Generate XMI content
+      const xmiContent = generateXMI(nodes, edges, diagramType);
+      
+      // Download the XMI file
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      downloadXMI(xmiContent, `sysml-${diagramType}-diagram-${timestamp}.xmi`);
+      
+      showNotification('Diagram exported successfully as XMI file', 'success');
+    } catch (error) {
+      console.error('Error exporting diagram:', error);
+      showNotification(`Failed to export diagram: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -345,8 +388,19 @@ const DiagramEditor = () => {
               onClick={handleValidate}
               color={validationErrors.length > 0 ? 'warning' : 'primary'}
             >
-              {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'Validate'}
-            </Button>          </ToolbarPanel>
+              {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'VALIDATE'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExport}
+              disabled={!isExportEnabled}
+              color="warning"
+              sx={{ minWidth: '80px' }}
+            >
+              EXPORT
+            </Button>
+          </ToolbarPanel>
           
           {/* Status panel */}
           <Panel position="bottom-left">
