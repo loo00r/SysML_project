@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
+import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Define node types based on SysML diagram elements
 export type NodeType = 'block' | 'sensor' | 'processor';
@@ -280,35 +281,39 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       const data = await response.json();
       
       // Process the response and update the diagram
-      if (data.nodes && data.edges) {
-        // Transform the API response to ReactFlow format
-        const rfNodes = data.nodes.map((node: any) => ({
-          id: node.id,
-          type: node.type || node.data?.type || 'block',
-          position: node.position,
-          data: {
-            label: node.name || node.data?.label || node.label,
-            description: node.description || node.data?.description || '',
-            type: node.data?.type || node.type || 'block',
-            properties: node.properties || node.data?.properties || {},
-            inputs: node.inputs || node.data?.inputs || [],
-            outputs: node.outputs || node.data?.outputs || []
-          }
-        }));
-        const rfEdges = data.edges.map((edge: any) => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          type: 'smoothstep',
-          label: edge.label || '',
-          animated: edge.animated || false,
-          style: { stroke: '#555' }
-        }));
-        
-        set({
-          nodes: rfNodes,
-          edges: rfEdges
-        });
+    if (data.nodes && data.edges) {
+      // Transform the API response to ReactFlow format
+      const rfNodes = data.nodes.map((node: any) => ({
+        id: node.id,
+        type: node.type || node.data?.type || 'block',
+        // Позиція буде встановлена алгоритмом Dagre
+        position: node.position || { x: 0, y: 0 },
+        data: {
+          label: node.name || node.data?.label || node.label,
+          description: node.description || node.data?.description || '',
+          type: node.data?.type || node.type || 'block',
+          properties: node.properties || node.data?.properties || {},
+          inputs: node.inputs || node.data?.inputs || [],
+          outputs: node.outputs || node.data?.outputs || []
+        }
+      }));
+      const rfEdges = data.edges.map((edge: any) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: 'smoothstep',
+        label: edge.label || '',
+        animated: edge.animated || false,
+        style: { stroke: '#555' }
+      }));
+      
+      // Застосовуємо автоматичне позиціонування за допомогою Dagre
+      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, 'TB');
+      
+      set({
+        nodes: layoutedNodes,
+        edges: layoutedEdges
+      });
         
         // Validate the generated diagram
         const errors = get().validateDiagram();

@@ -17,6 +17,7 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 import { nodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
@@ -24,6 +25,7 @@ import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
+import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Styled components
 const EditorContainer = styled(Box)({
@@ -205,22 +207,53 @@ const DiagramEditor = () => {
   };
   
   // Handle XMI export
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
       // Get diagram type from nodes (default to 'block' if not found)
       const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
       
-      // Generate XMI content
+      // First validate the diagram
+      const validationResults = validateSysMLDiagram(nodes, edges, diagramType);
+      setValidationResult(validationResults);
+      
+      if (!validationResults.isValid) {
+        showNotification(`Cannot export: ${validationResults.errors.join(', ')}`, 'error');
+        return;
+      }
+      
+      // Generate XMI
       const xmiContent = generateXMI(nodes, edges, diagramType);
       
       // Download the XMI file
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      downloadXMI(xmiContent, `sysml-${diagramType}-diagram-${timestamp}.xmi`);
+      downloadXMI(xmiContent, `${useDiagramStore.getState().diagramName.replace(/\s+/g, '_')}.xmi`);
       
-      showNotification('Diagram exported successfully as XMI file', 'success');
+      showNotification('XMI exported successfully', 'success');
     } catch (error) {
-      console.error('Error exporting diagram:', error);
-      showNotification(`Failed to export diagram: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error('Error exporting XMI:', error);
+      showNotification(`Failed to export: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+  
+  // Handle auto layout
+  const handleAutoLayout = () => {
+    try {
+      // Зберігаємо поточний стан у історію перед автоматичним позиціонуванням
+      useDiagramStore.getState().saveToHistory();
+      
+      // Застосовуємо автоматичне позиціонування
+      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(nodes, edges, 'TB');
+      
+      // Оновлюємо стан діаграми
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      
+      // Підлаштовуємо вигляд під нове розташування
+      setTimeout(() => fitView(), 50);
+      
+      showNotification('Auto layout applied successfully', 'success');
+    } catch (error) {
+      console.error('Error applying auto layout:', error);
+      showNotification(`Failed to apply auto layout: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -356,6 +389,9 @@ const DiagramEditor = () => {
             </IconButton>
             <IconButton onClick={handleSave} size="small" title="Save Diagram">
               <SaveIcon />
+            </IconButton>
+            <IconButton onClick={handleAutoLayout} size="small" title="Auto Layout">
+              <AutoFixHighIcon />
             </IconButton>
             <Button
               variant="outlined"
