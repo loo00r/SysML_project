@@ -1,12 +1,12 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
+from datetime import datetime
 from openai import OpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import numpy as np
 from app.core.config import settings
 from app.database.models import DiagramEmbedding, SysMLTemplate, UAVComponent
-from typing import Optional
 
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
