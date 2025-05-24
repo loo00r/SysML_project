@@ -40,7 +40,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
 
     const data = await response.json();
-      if (data.error) {
+    if (data.error) {
       return { nodes: [], edges: [], error: data.error };
     }
     
@@ -60,7 +60,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
-      // Convert relationships to edges
+    
+    // Convert relationships to edges
     const edges = data.diagram.relationships.map((rel: any) => ({
       id: `edge-${rel.source_id}-${rel.target_id}`,
       source: rel.source_id,
@@ -91,7 +92,14 @@ export const useAIGeneration = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
-  const { setNodes, setEdges, clearDiagram } = useDiagramStore();
+  // Get all the necessary functions from the diagram store
+  const { 
+    setNodes, 
+    setEdges, 
+    clearDiagram, 
+    setGenerationPrompt, 
+    setDiagramDescription 
+  } = useDiagramStore();
   
   const generateDiagram = useCallback(async (options: AIGenerationOptions) => {
     setIsGenerating(true);
@@ -99,6 +107,14 @@ export const useAIGeneration = () => {
     setProgress(0);
     
     try {
+      // Save the original prompt text to the store for future reference
+      // This is critical for ensuring the RAG database gets the original text
+      setGenerationPrompt(options.prompt);
+      
+      // Also set a shorter version as the diagram description
+      const shortDescription = options.prompt.substring(0, 100) + (options.prompt.length > 100 ? '...' : '');
+      setDiagramDescription(shortDescription);
+      
       // Start progress animation
       const progressInterval = setInterval(() => {
         setProgress(prev => {
@@ -128,7 +144,7 @@ export const useAIGeneration = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [clearDiagram, setNodes, setEdges]);
+  }, [clearDiagram, setNodes, setEdges, setGenerationPrompt, setDiagramDescription]);
   
   return {
     generateDiagram,
