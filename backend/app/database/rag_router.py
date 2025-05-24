@@ -97,12 +97,17 @@ async def generate_diagram_with_context(
     
     if use_rag:
         try:
+            print("\n==== Starting Vector Search ====")
+            print(f"Query text: {text[:100]}...")
+            print(f"Diagram type filter: {diagram_type}")
+            
             # Find similar diagrams for context using vector similarity search
             similar_diagrams = await find_similar_diagrams(
                 db=db, 
                 query_text=text, 
                 limit=3, 
-                diagram_type=diagram_type
+                diagram_type=diagram_type,
+                include_scores=True  # Include similarity scores in results
             )
             
             print(f"Found {len(similar_diagrams)} similar diagrams for RAG context")
@@ -111,7 +116,16 @@ async def generate_diagram_with_context(
             if similar_diagrams:
                 # Format the best match as a one-shot example
                 best_match = similar_diagrams[0]
-                print(f"Using best match: {best_match.name} (similarity score: high)")
+                
+                # Get similarity score if available
+                similarity_score = getattr(best_match, "similarity_score", None)
+                score_text = f"(similarity score: {similarity_score:.4f})" if similarity_score is not None else "(high similarity)"
+                
+                print(f"\n==== Using Best Match for One-Shot Example ====")
+                print(f"Diagram: {best_match.name} {score_text}")
+                print(f"Description: {best_match.description}")
+                print(f"Raw text length: {len(best_match.raw_text)} characters")
+                print(f"JSON size: {len(json.dumps(best_match.diagram_json))} characters")
                 
                 # Create a clean one-shot example with the raw text and diagram JSON
                 one_shot_examples.append({
@@ -120,11 +134,18 @@ async def generate_diagram_with_context(
                 })
                 
                 # Add additional context from other similar diagrams
-                context += "Here are some similar examples for reference:\n\n"
-                for i, diagram in enumerate(similar_diagrams[1:], start=1):
-                    print(f"Additional context from: {diagram.name}")
-                    context += f"Example {i}: {diagram.name}\n"
-                    context += f"Description: {diagram.description}\n\n"
+                if len(similar_diagrams) > 1:
+                    print(f"\n==== Adding {len(similar_diagrams)-1} Additional Diagrams as Context ====")
+                    context += "Here are some similar examples for reference:\n\n"
+                    
+                    for i, diagram in enumerate(similar_diagrams[1:], start=1):
+                        # Get similarity score if available
+                        sim_score = getattr(diagram, "similarity_score", None)
+                        sim_text = f"(similarity: {sim_score:.4f})" if sim_score is not None else ""
+                        
+                        print(f"Context {i}: {diagram.name} {sim_text}")
+                        context += f"Example {i}: {diagram.name} {sim_text}\n"
+                        context += f"Description: {diagram.description}\n\n"
             else:
                 print("No similar diagrams found for RAG context")
             

@@ -145,23 +145,46 @@ async def find_similar_diagrams(
     db: AsyncSession, 
     query_text: str, 
     limit: int = 5, 
-    diagram_type: str = None
+    diagram_type: str = None,
+    include_scores: bool = False
 ) -> List[DiagramEmbedding]:
     """
     Find similar diagrams in the database using vector similarity search
+    
+    Args:
+        db: Database session
+        query_text: The text to find similar diagrams for
+        limit: Maximum number of results to return
+        diagram_type: Optional filter by diagram type
+        include_scores: Whether to include similarity scores in the output
+        
+    Returns:
+        List of similar diagrams, ordered by similarity
     """
+    print(f"\n==== Vector Search Details ====")
+    print(f"Searching for diagrams similar to: {query_text[:100]}...")
+    
     # Generate embedding for the query text
     query_embedding = await generate_embedding(query_text)
+    print(f"Generated embedding vector with {len(query_embedding)} dimensions")
     
     # Convert to numpy array for cosine similarity
     query_vector = np.array(query_embedding)
     
     # Start building the SQL query
-    stmt = select(DiagramEmbedding)
+    if include_scores:
+        # Include the cosine distance in the results
+        stmt = select(
+            DiagramEmbedding,
+            DiagramEmbedding.embedding.cosine_distance(query_vector).label("similarity_score")
+        )
+    else:
+        stmt = select(DiagramEmbedding)
     
     # Add diagram type filter if provided
     if diagram_type:
         stmt = stmt.filter(DiagramEmbedding.diagram_type == diagram_type)
+        print(f"Filtering by diagram type: {diagram_type}")
     
     # Order by cosine similarity and limit results
     # This uses pgvector's cosine distance operator <-> for similarity search
@@ -170,7 +193,27 @@ async def find_similar_diagrams(
     ).limit(limit)
     
     result = await db.execute(stmt)
-    return result.scalars().all()
+    
+    if include_scores:
+        # Process results with scores
+        results_with_scores = result.all()
+        
+        # Extract diagrams and scores
+        diagrams = []
+        for diagram, score in results_with_scores:
+            # Add score as an attribute to the diagram object
+            setattr(diagram, "similarity_score", score)
+            diagrams.append(diagram)
+            
+            # Log the score
+            print(f"Found diagram '{diagram.name}' with similarity score: {score:.4f}")
+        
+        return diagrams
+    else:
+        # Return just the diagrams without scores
+        results = result.scalars().all()
+        print(f"Found {len(results)} similar diagrams")
+        return results
 
 async def get_template_by_type(db: AsyncSession, template_type: str) -> List[SysMLTemplate]:
     """

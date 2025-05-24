@@ -245,9 +245,19 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
         {"role": "system", "content": "You are a SysML modeling expert specialized in systems engineering and disaster management. Generate diagrams in JSON format according to the provided specifications."}
     ]
     
+    # Log RAG usage
+    if one_shot_examples:
+        print(f"\n==== Using {len(one_shot_examples)} RAG examples ====")
+    else:
+        print("\n==== No RAG examples available ====")
+    
     # Add one-shot examples if provided
     if one_shot_examples and len(one_shot_examples) > 0:
-        for example in one_shot_examples:
+        for i, example in enumerate(one_shot_examples):
+            print(f"\n--- RAG Example {i+1} ---")
+            print(f"Input: {example['input'][:100]}...")
+            print(f"Output: {len(json.dumps(example['output']))} characters of JSON")
+            
             # Add the example input as a user message
             example_prompt = f"{SYSML_PROMPT_TEMPLATE}\n\nSystem Description: {example['input']}"
             messages.append({"role": "user", "content": example_prompt})
@@ -261,7 +271,14 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
     
     # Add additional context if provided
     if additional_context:
+        print("\n==== Additional RAG Context ====")
+        print(additional_context)
         full_prompt += f"\n\nAdditional Context:\n{additional_context}"
+    
+    # Log the full prompt being sent to the model
+    print("\n==== FULL PROMPT SENT TO MODEL ====")
+    print(full_prompt)
+    print("==== END OF PROMPT ====")
     
     # Add the actual user query
     messages.append({"role": "user", "content": full_prompt})
@@ -283,15 +300,24 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
         positioned_diagram = DiagramPositioning.apply_positioning(diagram_data)
         
         # Add metadata about the generation
-        return {
+        result = {
             "diagram": positioned_diagram,
             "raw_text": prompt,
             "model_used": settings.OPENAI_GENERATIVE_MODEL,
-            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0
+            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0,
+            "prompt_length": len(full_prompt),
+            "examples_count": len(one_shot_examples) if one_shot_examples else 0
         }
+        
+        print("\n==== Generation Successful ====")
+        print(f"Generated diagram with {len(positioned_diagram.get('elements', []))} elements and {len(positioned_diagram.get('relationships', []))} relationships")
+        
+        return result
     
     except Exception as e:
-        print(f"Error generating diagram: {str(e)}")
+        error_msg = f"Error generating diagram: {str(e)}"
+        print(f"\n==== ERROR ====")
+        print(error_msg)
         # Return a basic error structure
         return {
             "error": str(e),
@@ -300,5 +326,7 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
                 "elements": [],
                 "relationships": []
             },
-            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0
+            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0,
+            "prompt_length": len(full_prompt) if 'full_prompt' in locals() else 0,
+            "examples_count": len(one_shot_examples) if one_shot_examples else 0
         }
