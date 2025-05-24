@@ -91,42 +91,63 @@ async def generate_diagram_with_context(
     context = ""
     one_shot_examples = []
     
+    # Log the request for debugging
+    print(f"Generating {diagram_type} diagram with RAG: {use_rag}")
+    print(f"Input text: {text[:100]}...")
+    
     if use_rag:
-        # Find similar diagrams for context using vector similarity search
-        similar_diagrams = await find_similar_diagrams(
-            db=db, 
-            query_text=text, 
-            limit=3, 
-            diagram_type=diagram_type
-        )
-        
-        # Get relevant templates for the requested diagram type
-        templates = await get_template_by_type(db, diagram_type)
-        
-        # If we found similar diagrams, use them as one-shot examples
-        if similar_diagrams:
-            # Format the best match as a one-shot example
-            best_match = similar_diagrams[0]
-            one_shot_examples.append({
-                "input": best_match.raw_text,
-                "output": best_match.diagram_json
-            })
+        try:
+            # Find similar diagrams for context using vector similarity search
+            similar_diagrams = await find_similar_diagrams(
+                db=db, 
+                query_text=text, 
+                limit=3, 
+                diagram_type=diagram_type
+            )
             
-            # Add additional context from other similar diagrams
-            context += "Here are some similar examples for reference:\n\n"
-            for i, diagram in enumerate(similar_diagrams[1:], start=1):
-                context += f"Example {i}: {diagram.name}\n"
-                context += f"Description: {diagram.description}\n\n"
-        
-        # Add templates as additional context if available
-        if templates:
-            context += "\nRelevant templates for this diagram type:\n\n"
-            for i, template in enumerate(templates, start=1):
-                context += f"Template {i}: {template.template_name}\n"
-                context += f"Description: {template.template_description}\n\n"
+            print(f"Found {len(similar_diagrams)} similar diagrams for RAG context")
+            
+            # If we found similar diagrams, use them as one-shot examples
+            if similar_diagrams:
+                # Format the best match as a one-shot example
+                best_match = similar_diagrams[0]
+                print(f"Using best match: {best_match.name} (similarity score: high)")
+                
+                # Create a clean one-shot example with the raw text and diagram JSON
+                one_shot_examples.append({
+                    "input": best_match.raw_text,
+                    "output": best_match.diagram_json
+                })
+                
+                # Add additional context from other similar diagrams
+                context += "Here are some similar examples for reference:\n\n"
+                for i, diagram in enumerate(similar_diagrams[1:], start=1):
+                    print(f"Additional context from: {diagram.name}")
+                    context += f"Example {i}: {diagram.name}\n"
+                    context += f"Description: {diagram.description}\n\n"
+            else:
+                print("No similar diagrams found for RAG context")
+            
+            # Get relevant templates for the requested diagram type
+            templates = await get_template_by_type(db, diagram_type)
+            
+            # Add templates as additional context if available
+            if templates:
+                print(f"Adding {len(templates)} templates as additional context")
+                context += "\nRelevant templates for this diagram type:\n\n"
+                for i, template in enumerate(templates, start=1):
+                    context += f"Template {i}: {template.template_name}\n"
+                    context += f"Description: {template.template_description}\n\n"
+        except Exception as e:
+            print(f"Error during RAG context retrieval: {str(e)}")
+            # Continue without RAG if there's an error
+            use_rag = False
     
     # Construct the enhanced prompt with one-shot examples and context
     enhanced_prompt = f"Generate a {diagram_type} diagram for the following system description:\n\n{text}"
+    
+    # Add information about the expected output format
+    enhanced_prompt += "\n\nThe output should be a SysML diagram with appropriate nodes and connections."
     
     # Generate diagram with RAG context
     result = generate_diagram(enhanced_prompt, one_shot_examples=one_shot_examples, additional_context=context)
@@ -136,5 +157,8 @@ async def generate_diagram_with_context(
     # Adding a flag to indicate this diagram hasn't been saved to the RAG database yet
     if "diagram" in result and "error" not in result:
         result["saved_to_rag"] = False
+        result["used_rag"] = use_rag
+        if one_shot_examples:
+            result["used_examples"] = len(one_shot_examples)
     
     return result

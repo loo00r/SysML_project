@@ -6,6 +6,7 @@ from sqlalchemy import select
 import numpy as np
 from app.core.config import settings
 from app.database.models import DiagramEmbedding, SysMLTemplate, UAVComponent
+from typing import Optional
 
 # Initialize OpenAI client
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -20,6 +21,75 @@ async def generate_embedding(text: str) -> List[float]:
     )
     return response.data[0].embedding
 
+async def find_diagram_by_raw_text(db: AsyncSession, raw_text: str) -> Optional[DiagramEmbedding]:
+    """
+    Find a diagram by its raw_text field
+    """
+    stmt = select(DiagramEmbedding).filter(DiagramEmbedding.raw_text == raw_text)
+    result = await db.execute(stmt)
+    return result.scalars().first()
+
+async def optimize_diagram_json(diagram_json: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Optimize the diagram JSON structure to remove unnecessary data and reduce size
+    """
+    optimized_json = {
+        "nodes": [],
+        "edges": []
+    }
+    
+    # Process nodes - keep only essential data
+    if "nodes" in diagram_json:
+        for node in diagram_json["nodes"]:
+            optimized_node = {
+                "id": node["id"],
+                "type": node["type"],
+                "position": node["position"],
+                "data": {
+                    "label": node["data"].get("label", ""),
+                    "type": node["data"].get("type", node["type"]),
+                }
+            }
+            
+            # Keep important properties but skip redundant ones
+            if "properties" in node["data"]:
+                optimized_node["data"]["properties"] = {}
+                for key, value in node["data"]["properties"].items():
+                    if key not in ["id"] or key == "name":  # Skip redundant properties
+                        optimized_node["data"]["properties"][key] = value
+            
+            # Keep description if available
+            if "description" in node["data"]:
+                optimized_node["data"]["description"] = node["data"]["description"]
+                
+            optimized_json["nodes"].append(optimized_node)
+    
+    # Process edges - keep only essential data
+    if "edges" in diagram_json:
+        for edge in diagram_json["edges"]:
+            optimized_edge = {
+                "id": edge["id"],
+                "source": edge["source"],
+                "target": edge["target"],
+                "type": edge["type"]
+            }
+            
+            # Keep data if available
+            if "data" in edge and edge["data"]:
+                optimized_edge["data"] = {}
+                if "type" in edge["data"]:
+                    optimized_edge["data"]["type"] = edge["data"]["type"]
+                if "name" in edge["data"]:
+                    optimized_edge["data"]["name"] = edge["data"]["name"]
+            
+            # Keep animated property if true
+            if edge.get("animated", False):
+                optimized_edge["animated"] = True
+                
+            optimized_json["edges"].append(optimized_edge)
+    
+    return optimized_json
+
 async def store_diagram_with_embedding(
     db: AsyncSession, 
     name: str, 
@@ -30,29 +100,46 @@ async def store_diagram_with_embedding(
 ) -> DiagramEmbedding:
     """
     Store a diagram with its embedding vector in the database
+    If a diagram with the same raw_text exists, update it instead of creating a new one
     """
-    # Prepare text for embedding
-    embedding_text = raw_text
+    # First, check if a diagram with the same raw_text already exists
+    existing_diagram = await find_diagram_by_raw_text(db, raw_text)
     
-    # Generate embedding
-    embedding_vector = await generate_embedding(embedding_text)
+    # Optimize the diagram JSON structure
+    optimized_json = await optimize_diagram_json(diagram_json)
     
-    # Create new diagram embedding record
-    db_embedding = DiagramEmbedding(
-        name=name,
-        description=description,
-        raw_text=raw_text,
-        diagram_type=diagram_type,
-        diagram_json=diagram_json,
-        embedding=embedding_vector
-    )
+    # Generate embedding for the raw text
+    embedding_vector = await generate_embedding(raw_text)
     
-    # Save to database
-    db.add(db_embedding)
-    await db.commit()
-    await db.refresh(db_embedding)
-    
-    return db_embedding
+    if existing_diagram:
+        # Update the existing diagram
+        existing_diagram.name = name
+        existing_diagram.description = description
+        existing_diagram.diagram_type = diagram_type
+        existing_diagram.diagram_json = optimized_json
+        existing_diagram.embedding = embedding_vector
+        existing_diagram.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(existing_diagram)
+        return existing_diagram
+    else:
+        # Create a new diagram embedding record
+        db_embedding = DiagramEmbedding(
+            name=name,
+            description=description,
+            raw_text=raw_text,
+            diagram_type=diagram_type,
+            diagram_json=optimized_json,
+            embedding=embedding_vector
+        )
+        
+        # Save to database
+        db.add(db_embedding)
+        await db.commit()
+        await db.refresh(db_embedding)
+        
+        return db_embedding
 
 async def find_similar_diagrams(
     db: AsyncSession, 
