@@ -7,7 +7,7 @@ router = APIRouter(prefix="/create-diagram", tags=["Create Diagram"])
 
 class DiagramRequest(BaseModel):
     text: str
-    diagram_type: str = "block"  # Default to block diagram if not specified
+    diagram_type: str = "block"  # Only block diagram type is supported
 
 class DiagramResponse(BaseModel):
     diagram: Dict[str, Any]

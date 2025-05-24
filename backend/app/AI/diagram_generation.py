@@ -6,8 +6,6 @@ from app.core.config import settings
 # Define the SysML element types for better structure
 class DiagramTypes:
     BLOCK = "block"
-    ACTIVITY = "activity"
-    USE_CASE = "use_case"
 
 # Define positioning constants
 class DiagramPositioning:
@@ -166,120 +164,58 @@ class DiagramPositioning:
 
 # Core SysML prompt template to help guide model responses (without positioning logic)
 SYSML_PROMPT_TEMPLATE = """
-You are a SysML diagram expert. Based on the provided system description, generate a SysML diagram with the following components:
+You are a SysML diagram expert. Based on the provided system description, generate a SysML Block Definition Diagram (BDD) with the following components:
 
-1. Identify all system blocks/components
-2. Define the relationships between blocks
-3. Specify ports and flows for each block
-4. Organize blocks into a hierarchical structure if applicable
+1. Diagram Type: Block Definition Diagram (BDD) for system structure
 
-Format your response as a valid JSON object with the following structure:
-{
-  "diagram_type": "block | activity | use_case",
-  "elements": [
-    {
-      "id": "unique_id",
-      "type": "block | sensor | processor",
-      "name": "element_name",
-      "description": "description_text",
-      "properties": {}
-    }
-  ],
-  "relationships": [
-    {
-      "source_id": "source_element_id",
-      "target_id": "target_element_id",
-      "type": "smoothstep"
-    }
-  ]
-}
+2. Elements: Create appropriate elements based on the system description
+   - Use only these element types: block, sensor, processor
+   - Each element should have:
+     - Unique ID (e.g., "sensor-1")
+     - Type (must be one of: "block", "sensor", "processor")
+     - Name (descriptive title)
+     - Description (brief explanation of purpose)
+     - Properties (relevant attributes as key-value pairs)
 
-Connection rules:
-- Components should primarily connect based on their functional relationships
-- Each component should have logical connections that reflect data or control flow
-- Avoid creating unnecessary connections
+3. Relationships: Define connections between elements
+   - Each relationship should have:
+     - Source element ID
+     - Target element ID
+     - Type (e.g., "smoothstep" for standard connections)
 
-Here is a concrete example of a well-formatted diagram for a UAV flood monitoring system:
-
+Return a JSON object with this structure:
+```json
 {
   "diagram_type": "block",
   "elements": [
     {
-      "id": "uav-1",
+      "id": "element-1",
       "type": "block",
-      "name": "UAV Platform",
-      "description": "Main aerial vehicle platform for flood monitoring",
-      "properties": {
-        "weight": "5kg",
-        "flight_time": "45min",
-        "max_altitude": "120m"
-      }
+      "name": "Element Name",
+      "description": "Element description",
+      "properties": { "key": "value" }
     },
-    {
-      "id": "sensor-1",
-      "type": "sensor",
-      "name": "Thermal Camera",
-      "description": "Detects heat signatures for survivor location",
-      "properties": {
-        "resolution": "640x480"
-      }
-    },
-    {
-      "id": "sensor-2",
-      "type": "sensor",
-      "name": "LiDAR Scanner",
-      "description": "Creates 3D maps of flood areas",
-      "properties": {
-        "range": "100m",
-        "accuracy": "±20cm"
-      }
-    },
-    {
-      "id": "sensor-3",
-      "type": "sensor",
-      "name": "Water Level Sensor",
-      "description": "Measures flood water depth",
-      "properties": {
-        "accuracy": "±1cm",
-        "range": "0-10m"
-      }
-    },
-    {
-      "id": "processor-1",
-      "type": "processor",
-      "name": "Data Processing Unit",
-      "description": "Onboard computer for image analysis",
-      "properties": {
-        "processor": "Quad-core ARM",
-        "memory": "8GB"
-      }
-    }
+    ...
   ],
   "relationships": [
     {
-      "source_id": "sensor-1",
-      "target_id": "processor-1",
+      "source_id": "element-1",
+      "target_id": "element-2",
       "type": "smoothstep"
     },
-    {
-      "source_id": "sensor-2",
-      "target_id": "processor-1",
-      "type": "smoothstep"
-    },
-    {
-      "source_id": "sensor-3",
-      "target_id": "processor-1",
-      "type": "smoothstep"
-    },
-    {
-      "source_id": "uav-1",
-      "target_id": "sensor-1",
-      "type": "smoothstep"
-    }
+    ...
   ]
 }
+```
 
-For disaster management scenarios, particularly focus on sensor systems, data transmission, and decision-making components.
+Guidelines:
+- Focus on creating a clear, logical structure
+- Include only essential elements and relationships
+- Each component should have logical connections that reflect data or control flow
+- Avoid creating unnecessary connections
+- Only use the three allowed element types: block, sensor, processor
+
+
 """
 
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
@@ -448,8 +384,24 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
         response_text = response.choices[0].message.content
         diagram_data = json.loads(response_text)
         
+        # Validate and correct element types to ensure they are only 'block', 'sensor', or 'processor'
+        def validate_element_types(diagram):
+            valid_types = ['block', 'sensor', 'processor']
+            if 'elements' in diagram:
+                for element in diagram['elements']:
+                    # Check if type exists and is valid
+                    if 'type' not in element or element['type'] not in valid_types:
+                        # Default to 'block' if type is missing or invalid
+                        original_type = element.get('type', 'unknown')
+                        element['type'] = 'block'
+                        print(f"Warning: Changed invalid element type '{original_type}' to 'block' for element {element.get('id', 'unknown')}")
+            return diagram
+        
+        # Apply validation to ensure only allowed types are used
+        validated_diagram = validate_element_types(diagram_data)
+        
         # Apply automatic positioning to the diagram elements
-        positioned_diagram = DiagramPositioning.apply_positioning(diagram_data)
+        positioned_diagram = DiagramPositioning.apply_positioning(validated_diagram)
         
         # Add metadata about the generation
         result = {

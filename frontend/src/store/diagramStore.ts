@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 
 // Define node types based on SysML diagram elements
-export type NodeType = 'block' | 'sensor' | 'processor' | 'interface' | 'requirement' | 'useCase' | 'activity' | 'actor';
+export type NodeType = 'block' | 'sensor' | 'processor';
 
 // Define node data structure
 export interface NodeData {
@@ -15,7 +15,7 @@ export interface NodeData {
 }
 
 // Define diagram types
-export type DiagramType = 'block' | 'requirement' | 'activity' | 'use_case';
+export type DiagramType = 'block';
 
 // Define validation error structure
 export interface ValidationError {
@@ -269,18 +269,18 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
         // Transform the API response to ReactFlow format
         const rfNodes = data.nodes.map((node: any) => ({
           id: node.id,
-          type: node.type,
+          type: node.type || node.data?.type || 'block',
           position: node.position,
           data: {
-            label: node.name || node.label,
-            description: node.description || '',
-            type: node.element_type,
-            properties: node.properties || {},
-            inputs: node.inputs || [],
-            outputs: node.outputs || []
+            label: node.name || node.data?.label || node.label,
+            description: node.description || node.data?.description || '',
+            type: node.data?.type || node.type || 'block',
+            properties: node.properties || node.data?.properties || {},
+            inputs: node.inputs || node.data?.inputs || [],
+            outputs: node.outputs || node.data?.outputs || []
           }
         }));
-          const rfEdges = data.edges.map((edge: any) => ({
+        const rfEdges = data.edges.map((edge: any) => ({
           id: edge.id,
           source: edge.source,
           target: edge.target,
@@ -353,76 +353,13 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     }
     
     // 3. Diagram type specific validations
-    if (diagramType === 'block') {
-      // Check if there's at least one block
-      const hasBlocks = nodes.some(node => node.data.type === 'block');
-      if (!hasBlocks) {
-        errors.push({
-          type: 'error',
-          message: 'Block diagram must contain at least one block'
-        });
-      }
-    } else if (diagramType === 'requirement') {
-      // Check if there's at least one requirement
-      const hasRequirements = nodes.some(node => node.data.type === 'requirement');
-      if (!hasRequirements) {
-        errors.push({
-          type: 'error',
-          message: 'Requirement diagram must contain at least one requirement'
-        });
-      }
-    } else if (diagramType === 'activity') {
-      // Check if there's at least one activity
-      const hasActivities = nodes.some(node => node.data.type === 'activity');
-      if (!hasActivities) {
-        errors.push({
-          type: 'error',
-          message: 'Activity diagram must contain at least one activity'
-        });
-      }
-      
-      // Check for proper flow (no dead ends)
-      const startNodes = nodes.filter(node => 
-        edges.some(edge => edge.source === node.id) && 
-        !edges.some(edge => edge.target === node.id)
-      );
-      
-      const endNodes = nodes.filter(node => 
-        edges.some(edge => edge.target === node.id) && 
-        !edges.some(edge => edge.source === node.id)
-      );
-      
-      if (startNodes.length === 0) {
-        errors.push({
-          type: 'warning',
-          message: 'Activity diagram has no clear starting point'
-        });
-      }
-      
-      if (endNodes.length === 0) {
-        errors.push({
-          type: 'warning',
-          message: 'Activity diagram has no clear ending point'
-        });
-      }
-    } else if (diagramType === 'use_case') {
-      // Check if there's at least one use case and one actor
-      const hasUseCases = nodes.some(node => node.data.type === 'useCase');
-      const hasActors = nodes.some(node => node.data.type === 'actor');
-      
-      if (!hasUseCases) {
-        errors.push({
-          type: 'error',
-          message: 'Use case diagram must contain at least one use case'
-        });
-      }
-      
-      if (!hasActors) {
-        errors.push({
-          type: 'warning',
-          message: 'Use case diagram should contain at least one actor'
-        });
-      }
+    // Check if there's at least one block
+    const hasBlocks = nodes.some(node => node.data.type === 'block');
+    if (!hasBlocks) {
+      errors.push({
+        type: 'error',
+        message: 'Block diagram must contain at least one block'
+      });
     }
     
     return errors;
@@ -439,12 +376,18 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     
     if (!previousState) return;
     
+    // Get current state before applying undo
+    const currentState = { nodes: get().nodes, edges: get().edges };
+    
+    // Only add to future if the current state is different from the previous state
+    const isDifferent = JSON.stringify(currentState) !== JSON.stringify(previousState);
+    
     set({
       nodes: previousState.nodes,
       edges: previousState.edges,
       history: {
         past: newPast,
-        future: [{ nodes: get().nodes, edges: get().edges }, ...future]
+        future: isDifferent ? [currentState, ...future] : future
       }
     });
   },

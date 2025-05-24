@@ -348,13 +348,13 @@ const DiagramEditor = () => {
               if (n.type === 'block') return '#0041d0';
               if (n.type === 'sensor') return '#ff0072';
               if (n.type === 'processor') return '#ff9500';
-              return '#eee';
+              return '#0041d0'; // Default to block color
             }}
             nodeColor={(n) => {
               if (n.type === 'block') return '#e3f2fd';
               if (n.type === 'sensor') return '#ffebee';
               if (n.type === 'processor') return '#fff8e1';
-              return '#fff';
+              return '#e3f2fd'; // Default to block color
             }}
             maskColor="rgba(0, 0, 0, 0.1)"
           />

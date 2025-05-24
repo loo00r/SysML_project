@@ -94,185 +94,73 @@ const Sidebar: React.FC = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  // Get the appropriate node palette based on diagram type
+  // Render the node palette for block diagrams
   const renderNodePalette = () => {
-    switch (diagramType) {
-      case 'block':
-        return (
-          <>
-            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-              Block Diagram Elements
-            </Typography>
-            <List disablePadding>
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="System Block - Main component with inputs and outputs" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'block', {
-                        type: 'block',
-                        label: 'System Block',
-                        description: 'Main system component with inputs and outputs',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#e3f2fd" />
-                    <DeviceHubIcon fontSize="small" color="primary" />
-                    <Typography variant="body2">System Block</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
+    return (
+      <>
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+          Block Diagram Elements
+        </Typography>
+        <List disablePadding>
+          <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+            <Tooltip title="System Block - Main component with inputs and outputs" placement="right">
+              <DraggableItem
+                draggable
+                onDragStart={(e) =>
+                  onDragStart(e, 'block', {
+                    type: 'block',
+                    label: 'System Block',
+                    description: 'Main system component with inputs and outputs',
+                  })
+                }
+              >
+                <ColorIndicator bgcolor="#e3f2fd" />
+                <DeviceHubIcon fontSize="small" color="primary" />
+                <Typography variant="body2">System Block</Typography>
+              </DraggableItem>
+            </Tooltip>
+          </ListItem>
 
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Sensor - Data collection component" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'sensor', {
-                        type: 'sensor',
-                        label: 'Sensor',
-                        description: 'Data collection component',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#ffebee" />
-                    <SensorsIcon fontSize="small" color="error" />
-                    <Typography variant="body2">Sensor</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
+          <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+            <Tooltip title="Sensor - Data collection component" placement="right">
+              <DraggableItem
+                draggable
+                onDragStart={(e) =>
+                  onDragStart(e, 'sensor', {
+                    type: 'sensor',
+                    label: 'Sensor',
+                    description: 'Component that collects data from the environment',
+                  })
+                }
+              >
+                <ColorIndicator bgcolor="#ffebee" />
+                <SensorsIcon fontSize="small" color="error" />
+                <Typography variant="body2">Sensor</Typography>
+              </DraggableItem>
+            </Tooltip>
+          </ListItem>
 
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Processor - Data processing unit" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'processor', {
-                        type: 'processor',
-                        label: 'Processor',
-                        description: 'Data processing unit',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#fff8e1" />
-                    <MemoryIcon fontSize="small" color="warning" />
-                    <Typography variant="body2">Processor</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
-            </List>
-          </>
-        );
-
-      case 'activity':
-        return (
-          <>
-            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-              Activity Diagram Elements
-            </Typography>
-            <List disablePadding>
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Activity - Process or action" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'activity', {
-                        type: 'activity',
-                        label: 'Activity',
-                        description: 'Process or action',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#e8f5e9" />
-                    <AccountTreeIcon fontSize="small" color="success" />
-                    <Typography variant="body2">Activity</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
-            </List>
-          </>
-        );
-
-      case 'requirement':
-        return (
-          <>
-            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-              Requirement Diagram Elements
-            </Typography>
-            <List disablePadding>
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Requirement - System requirement" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'requirement', {
-                        type: 'requirement',
-                        label: 'Requirement',
-                        description: 'System requirement',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#e0f7fa" />
-                    <AssignmentIcon fontSize="small" color="info" />
-                    <Typography variant="body2">Requirement</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
-            </List>
-          </>
-        );
-
-      case 'use_case':
-        return (
-          <>
-            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-              Use Case Diagram Elements
-            </Typography>
-            <List disablePadding>
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Use Case - System functionality" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'useCase', {
-                        type: 'useCase',
-                        label: 'Use Case',
-                        description: 'System functionality',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#f3e5f5" />
-                    <AccountTreeIcon fontSize="small" color="secondary" />
-                    <Typography variant="body2">Use Case</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
-
-              <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-                <Tooltip title="Actor - External entity interacting with the system" placement="right">
-                  <DraggableItem
-                    draggable
-                    onDragStart={(e) =>
-                      onDragStart(e, 'actor', {
-                        type: 'actor',
-                        label: 'Actor',
-                        description: 'External entity interacting with the system',
-                      })
-                    }
-                  >
-                    <ColorIndicator bgcolor="#fce4ec" />
-                    <PersonIcon fontSize="small" />
-                    <Typography variant="body2">Actor</Typography>
-                  </DraggableItem>
-                </Tooltip>
-              </ListItem>
-            </List>
-          </>
-        );
-
-      default:
-        return null;
-    }
+          <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+            <Tooltip title="Processor - Data processing component" placement="right">
+              <DraggableItem
+                draggable
+                onDragStart={(e) =>
+                  onDragStart(e, 'processor', {
+                    type: 'processor',
+                    label: 'Processor',
+                    description: 'Component that processes data',
+                  })
+                }
+              >
+                <ColorIndicator bgcolor="#fff8e1" />
+                <MemoryIcon fontSize="small" color="warning" />
+                <Typography variant="body2">Processor</Typography>
+              </DraggableItem>
+            </Tooltip>
+          </ListItem>
+        </List>
+      </>
+    );
   };
 
   return (
@@ -305,7 +193,7 @@ const Sidebar: React.FC = () => {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              This tool supports four SysML diagram types:
+              This tool supports Block Definition Diagrams (BDD):
             </Typography>
             <List dense disablePadding>
               <ListItem>
@@ -313,24 +201,6 @@ const Sidebar: React.FC = () => {
                   <DeviceHubIcon fontSize="small" color="primary" />
                 </ListItemIcon>
                 <ListItemText primary="Block Diagram" secondary="Structure and components" />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon sx={{ minWidth: 36 }}>
-                  <AccountTreeIcon fontSize="small" color="success" />
-                </ListItemIcon>
-                <ListItemText primary="Activity Diagram" secondary="Behaviors and processes" />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon sx={{ minWidth: 36 }}>
-                  <AssignmentIcon fontSize="small" color="info" />
-                </ListItemIcon>
-                <ListItemText primary="Requirement Diagram" secondary="System requirements" />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon sx={{ minWidth: 36 }}>
-                  <AccountTreeIcon fontSize="small" color="secondary" />
-                </ListItemIcon>
-                <ListItemText primary="Use Case Diagram" secondary="System functionality" />
               </ListItem>
             </List>
           </AccordionDetails>
