@@ -17,7 +17,6 @@ import ZoomOutIcon from '@mui/icons-material/ZoomOut';
 import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 import { nodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
@@ -25,7 +24,6 @@ import Sidebar from './Sidebar';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
-import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Styled components
 const EditorContainer = styled(Box)({
@@ -94,6 +92,28 @@ const DiagramEditor = () => {
   // Get ReactFlow instance methods
   const { fitView, zoomIn, zoomOut, project } = useReactFlow();
 
+  // Load saved diagram from localStorage on component initialization
+  useEffect(() => {
+    try {
+      const savedDiagram = localStorage.getItem('sysml-diagram');
+      if (savedDiagram) {
+        const { nodes: savedNodes, edges: savedEdges } = JSON.parse(savedDiagram);
+        if (savedNodes && savedNodes.length > 0) {
+          // Only load if there are nodes
+          setNodes(savedNodes);
+          setEdges(savedEdges || []);
+          
+          // Fit view to show all nodes
+          setTimeout(() => fitView(), 100);
+          
+          console.log(`Loaded saved diagram with ${savedNodes.length} nodes and ${(savedEdges || []).length} edges`);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved diagram:', error);
+    }
+  }, [setNodes, setEdges, fitView]);
+
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
     setSelectedNodeId(node.id);
@@ -144,6 +164,7 @@ const DiagramEditor = () => {
     try {
       // Save to localStorage as backup
       localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
+      localStorage.setItem('sysml-diagram-timestamp', Date.now().toString());
       
       // Get diagram type from nodes (default to 'block' if not found)
       const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type : 'block';
@@ -234,28 +255,7 @@ const DiagramEditor = () => {
     }
   };
   
-  // Handle auto layout
-  const handleAutoLayout = () => {
-    try {
-      // Зберігаємо поточний стан у історію перед автоматичним позиціонуванням
-      useDiagramStore.getState().saveToHistory();
-      
-      // Застосовуємо автоматичне позиціонування
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(nodes, edges, 'TB');
-      
-      // Оновлюємо стан діаграми
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
-      
-      // Підлаштовуємо вигляд під нове розташування
-      setTimeout(() => fitView(), 50);
-      
-      showNotification('Auto layout applied successfully', 'success');
-    } catch (error) {
-      console.error('Error applying auto layout:', error);
-      showNotification(`Failed to apply auto layout: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-    }
-  };
+
 
   // Handle drag over event
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -389,9 +389,6 @@ const DiagramEditor = () => {
             </IconButton>
             <IconButton onClick={handleSave} size="small" title="Save Diagram">
               <SaveIcon />
-            </IconButton>
-            <IconButton onClick={handleAutoLayout} size="small" title="Auto Layout">
-              <AutoFixHighIcon />
             </IconButton>
             <Button
               variant="outlined"
