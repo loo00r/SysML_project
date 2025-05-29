@@ -94,6 +94,7 @@ async def generate_diagram_with_context(
     
     if use_rag:
         try:
+            # First, try to find diagrams of the specified type
             similar_diagrams = await find_similar_diagrams(
                 db=db, 
                 query_text=text, 
@@ -102,23 +103,35 @@ async def generate_diagram_with_context(
                 include_scores=True
             )
             
+            # If no diagrams of the specified type are found, try to find any diagrams
+            if not similar_diagrams:
+                print(f"No diagrams of type '{diagram_type}' found, searching for any diagram type")
+                similar_diagrams = await find_similar_diagrams(
+                    db=db, 
+                    query_text=text, 
+                    limit=1,
+                    diagram_type=None,  # No type filter
+                    include_scores=True
+                )
+            
             if similar_diagrams:
                 best_match = similar_diagrams[0]
                 similarity_score = getattr(best_match, "similarity_score", None)
                 
-                if similarity_score is None or similarity_score < 0.5:  
-                    print(f"Found best match: {best_match.name} with similarity score: {similarity_score:.4f}")
-                    
-                    one_shot_examples.append({
-                        "input": best_match.raw_text,
-                        "output": best_match.diagram_json
-                    })
-                    
-                    print(f"Using one-shot example with {len(best_match.raw_text)} chars of text and {len(json.dumps(best_match.diagram_json))} chars of JSON")
-                else:
-                    print(f"Best match {best_match.name} has poor similarity score ({similarity_score:.4f}), not using it")
+                # For cosine_distance, lower values mean higher similarity
+                # 0 = perfect match, 2 = completely dissimilar
+                # So we want to use examples with LOW distance scores
+                print(f"Found best match: {best_match.name} (type: {best_match.diagram_type}) with similarity score: {similarity_score:.4f}")
+                
+                # Always use the best match regardless of score
+                one_shot_examples.append({
+                    "input": best_match.raw_text,
+                    "output": best_match.diagram_json
+                })
+                
+                print(f"Using one-shot example with {len(best_match.raw_text)} chars of text and {len(json.dumps(best_match.diagram_json))} chars of JSON")
             else:
-                print("No similar diagrams found for RAG context")
+                print("No similar diagrams found for RAG context at all")
                 
         except Exception as e:
             print(f"Error during RAG context retrieval: {str(e)}")

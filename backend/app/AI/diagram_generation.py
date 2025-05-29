@@ -185,31 +185,6 @@ You are a SysML diagram expert. Based on the provided system description, genera
      - Target element ID
      - Type (use "smoothstep" for all connections)
 
-Return a JSON object with this structure:
-```json
-{
-  "diagram_type": "block",
-  "elements": [
-    {
-      "id": "element-1",
-      "type": "block",
-      "name": "Element Name",
-      "description": "Element description",
-      "properties": { "key": "value" }
-    },
-    ...
-  ],
-  "relationships": [
-    {
-      "source_id": "element-1",
-      "target_id": "element-2",
-      "type": "smoothstep"
-    },
-    ...
-  ]
-}
-```
-
 Guidelines:
 - Focus on creating a clear, logical structure
 - Include only essential elements and relationships
@@ -217,7 +192,10 @@ Guidelines:
 - Avoid creating unnecessary connections
 - Only use the three allowed element types: block, sensor, processor
 
-
+I will provide examples in the following format:
+1. First, I'll show you a system description as a USER message
+2. Then, I'll show you the expected JSON output as an ASSISTANT message
+3. Finally, I'll give you a new system description to create a diagram for
 """
 
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
@@ -244,25 +222,27 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
     if one_shot_examples and len(one_shot_examples) > 0:
         print(f"\n==== Using {len(one_shot_examples)} RAG examples ====")
         
-        # Add one-shot examples if provided - just raw input and output
+        # Add one-shot examples if provided with clear structure
         for i, example in enumerate(one_shot_examples):
-            # Add the example input as a user message - keep it simple
-            messages.append({"role": "user", "content": example['input']})
+            # Add the example input as a user message with clear formatting
+            example_input = f"System description:\n\n{example['input']}"
+            messages.append({"role": "user", "content": example_input})
             
-            # Add the example output as an assistant message - just the JSON
-            example_output = json.dumps(example['output'])
+            # Add the example output as an assistant message - formatted JSON
+            example_output = json.dumps(example['output'], indent=2)
             messages.append({"role": "assistant", "content": example_output})
             
             print(f"Added example with {len(example['input'])} chars input and {len(example_output)} chars output")
     else:
         print("\n==== No RAG examples available ====")
     
-    # Add the actual user query - keep it simple and clean
-    messages.append({"role": "user", "content": prompt})
+    # Add the actual user query with clear formatting
+    user_prompt = f"Generate a block diagram for the following system description:\n\n{prompt}"
+    messages.append({"role": "user", "content": user_prompt})
     
     # Log what we're sending to the model
-    print(f"\n==== Sending prompt to model ({len(prompt)} chars) ====")
-    print(f"Prompt: {prompt[:200]}...")
+    print(f"\n==== Sending prompt to model ({len(user_prompt)} chars) ====")
+    print(f"Prompt: {user_prompt[:200]}...")
     
     # Log the full conversation for debugging
     print("\n==== FULL CONVERSATION SENT TO MODEL ====")
@@ -278,7 +258,7 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
             model=settings.OPENAI_GENERATIVE_MODEL,
             messages=messages,
             response_format={"type": "json_object"},
-            temperature=0.7
+            temperature=0.1
         )
         
         # Extract and parse the JSON response

@@ -24,9 +24,9 @@ async def startup():
     # Create tables if they don't exist
     # In production, you'd use Alembic migrations instead
     async with engine.begin() as conn:
-        # Uncomment the following line to automatically create tables on startup
-        # await conn.run_sync(Base.metadata.create_all)
-        pass
+        # Create tables automatically on startup
+        await conn.run_sync(Base.metadata.create_all)
+        print("Database tables created successfully")
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -34,5 +34,3 @@ async def shutdown():
     await engine.dispose()
 
 app.include_router(router)
-
-# tetst

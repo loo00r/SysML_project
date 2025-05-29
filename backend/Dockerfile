@@ -2,6 +2,9 @@ FROM python:3.12.7
 
 WORKDIR /sysml-backend
 
+# Install PostgreSQL client for psql commands
+RUN apt-get update && apt-get install -y postgresql-client && apt-get clean
+
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
 ENV PATH="/root/.local/bin:$PATH"
