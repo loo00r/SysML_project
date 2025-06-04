@@ -101,25 +101,44 @@ class DiagramPositioning:
             # Update relationships with only valid ones
             diagram_data["relationships"] = valid_relationships
             
-            # Assign level indices based on relationship patterns
-            element_level_indices = {}
+            # --- Determine element levels based on connectivity ---
+            # Build adjacency and inbound count for BFS traversal
+            adjacency: Dict[str, List[str]] = {}
+            inbound: Dict[str, int] = {}
             for element in elements:
-                element_id = element.get("id")
-                if not element_id:
-                    continue
-                    
-                # Elements that are only targets (receive connections) are likely top-level (negative index)
-                if element_id in target_elements and element_id not in source_elements:
-                    element_level_indices[element_id] = -1
-                # Elements that are both sources and targets are likely middle-level (index 0)
-                elif element_id in target_elements and element_id in source_elements:
-                    element_level_indices[element_id] = 0
-                # Elements that are only sources (initiate connections) are likely bottom-level (positive index)
-                elif element_id in source_elements and element_id not in target_elements:
-                    element_level_indices[element_id] = 1
-                else:
-                    # Default to middle level for elements without connections
-                    element_level_indices[element_id] = 0
+                el_id = element.get("id")
+                if el_id:
+                    adjacency[el_id] = []
+                    inbound.setdefault(el_id, 0)
+
+            for rel in valid_relationships:
+                s_id = rel.get("source_id")
+                t_id = rel.get("target_id")
+                if s_id in adjacency and t_id in adjacency:
+                    adjacency[s_id].append(t_id)
+                    inbound[t_id] = inbound.get(t_id, 0) + 1
+
+            # Queue starting nodes with no inbound edges
+            from collections import deque
+
+            queue = deque([nid for nid, deg in inbound.items() if deg == 0])
+            element_level_indices: Dict[str, int] = {nid: 0 for nid in queue}
+
+            visited = set(queue)
+            while queue:
+                node = queue.popleft()
+                for neighbor in adjacency.get(node, []):
+                    level = element_level_indices[node] + 1
+                    if element_level_indices.get(neighbor, -1) < level:
+                        element_level_indices[neighbor] = level
+                    inbound[neighbor] -= 1
+                    if inbound[neighbor] <= 0 and neighbor not in visited:
+                        queue.append(neighbor)
+                        visited.add(neighbor)
+
+            # Default any unvisited elements to level 0
+            for el_id in adjacency.keys():
+                element_level_indices.setdefault(el_id, 0)
             
             # Count elements per level index for horizontal positioning
             level_counts = {}
