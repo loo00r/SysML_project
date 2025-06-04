@@ -164,38 +164,31 @@ class DiagramPositioning:
 
 # Core SysML prompt template to help guide model responses (without positioning logic)
 SYSML_PROMPT_TEMPLATE = """
-You are a SysML diagram expert. Based on the provided system description, generate a SysML Block Definition Diagram (BDD) with the following components:
+You are a SysML expert assisting a software tool.  When given a system description
+and optional example diagrams, produce a Block Definition Diagram in JSON with the
+structure shown below.
 
-1. Diagram Type: Block Definition Diagram (BDD) for system structure
+Required output format:
+{
+  "diagram_type": "block",
+  "elements": [
+    {"id": "sensor-1", "type": "sensor", "name": "...", "description": "...", "properties": {...}}
+  ],
+  "relationships": [
+    {"source_id": "sensor-1", "target_id": "processor-1", "type": "smoothstep", "name": "..."}
+  ]
+}
 
-2. Elements: Create appropriate elements based on the system description
-   - IMPORTANT: Use ONLY these three element types: "block", "sensor", "processor"
-   - DO NOT use any other element types like actuator, display, communication, etc.
-   - If you need to represent other components, use the "block" type with appropriate names
-   - Each element should have:
-     - Unique ID (e.g., "sensor-1")
-     - Type (MUST be one of: "block", "sensor", "processor" - no exceptions)
-     - Name (descriptive title)
-     - Description (brief explanation of purpose)
-     - Properties (relevant attributes as key-value pairs)
+Rules:
+1. Allowed element types: "block", "sensor", "processor".  Use "block" for anything else.
+2. Keep descriptions concise.
+3. Use unique IDs for all elements.
+4. Do **not** include position data in the response.
+5. Only create logical connections relevant to the description.
+6. Follow the style of provided examples without copying them verbatim.
 
-3. Relationships: Define connections between elements
-   - Each relationship should have:
-     - Source element ID
-     - Target element ID
-     - Type (use "smoothstep" for all connections)
-
-Guidelines:
-- Focus on creating a clear, logical structure
-- Include only essential elements and relationships
-- Each component should have logical connections that reflect data or control flow
-- Avoid creating unnecessary connections
-- Only use the three allowed element types: block, sensor, processor
-
-I will provide examples in the following format:
-1. First, I'll show you a system description as a USER message
-2. Then, I'll show you the expected JSON output as an ASSISTANT message
-3. Finally, I'll give you a new system description to create a diagram for
+Examples may be provided in the conversation before the actual request.  Use them
+to guide your structure, then return only a single JSON object in your final reply.
 """
 
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
