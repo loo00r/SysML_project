@@ -145,27 +145,42 @@ class DiagramPositioning:
                 for el_id in element_level_indices:
                     element_level_indices[el_id] = max_level - element_level_indices[el_id]
 
-            # Count elements per level index for horizontal positioning
-            level_counts = {}
-            
-            # Initialize level counts for any level index that might be used
-            for level_index in set(element_level_indices.values()):
-                level_counts[level_index] = 0
-            
-            # Apply positions based on level indices
+            # First pass: count elements at each level
+            level_counts: Dict[int, int] = {}
+            for el_id, level_index in element_level_indices.items():
+                level_counts[level_index] = level_counts.get(level_index, 0) + 1
+
+            if level_counts:
+                bottom_level_index = max(level_counts.keys())
+                bottom_count = level_counts[bottom_level_index]
+            else:
+                bottom_level_index = 0
+                bottom_count = 0
+
+            # Calculate horizontal offsets so higher levels are centered relative to the bottom level
+            level_offsets: Dict[int, float] = {}
+            for lvl, count in level_counts.items():
+                offset = ((bottom_count - count) / 2) * DiagramPositioning.ELEMENT_X_SPACING
+                level_offsets[lvl] = offset
+
+            # Track element index within each level for x positioning
+            level_position_indices = {lvl: 0 for lvl in level_counts.keys()}
+
+            # Apply positions using counts and offsets
             for element in elements:
                 element_id = element.get("id")
                 if not element_id:
                     continue
                     
-                level_index = element_level_indices.get(element_id, 0)  # Default to middle level (0)
-                
-                # Ensure level_index exists in level_counts
-                if level_index not in level_counts:
-                    level_counts[level_index] = 0
-                
-                # Set position
-                x_pos = DiagramPositioning.get_x_position(level_counts[level_index])
+                level_index = element_level_indices.get(element_id, bottom_level_index)
+
+                # Ensure position counter exists
+                if level_index not in level_position_indices:
+                    level_position_indices[level_index] = 0
+                    level_offsets.setdefault(level_index, 0)
+
+                x_index = level_position_indices[level_index]
+                x_pos = DiagramPositioning.get_x_position(x_index) + level_offsets[level_index]
                 y_pos = DiagramPositioning.get_y_position(level_index)
                 
                 # Update element with position
@@ -176,7 +191,7 @@ class DiagramPositioning:
                 element["position"]["y"] = y_pos
                 
                 # Increment count for this level
-                level_counts[level_index] += 1
+                level_position_indices[level_index] += 1
             
             # Return the updated diagram data
             return diagram_data
