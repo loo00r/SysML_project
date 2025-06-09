@@ -87,11 +87,12 @@ const rotation = keyframes`
 const AnimationContainer = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isVisible'
 })<{ isVisible: boolean }>(({ theme, isVisible }) => ({
-  position: 'fixed',
+  position: 'absolute',
   top: 0,
   left: 0,
-  width: '100%',
+  width: 'calc(100% - 250px)', // Accounting for sidebar width (250px)
   height: '100%',
+  marginLeft: '250px', // Push content to the right of sidebar
   backgroundColor: '#f5f5f7',
   zIndex: 10000,
   display: isVisible ? 'flex' : 'none',
@@ -99,6 +100,10 @@ const AnimationContainer = styled(Box, {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
+  '@media (max-width: 600px)': {
+    width: '100%',
+    marginLeft: 0,
+  },
 }));
 
 const GlitchText = styled(Typography)(({ theme }) => ({
