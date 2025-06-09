@@ -9,7 +9,6 @@ import {
   Checkbox,
   Select,
   MenuItem,
-  LinearProgress,
   IconButton,
   FormControl,
   InputLabel,
@@ -20,10 +19,9 @@ import {
 import { styled } from '@mui/material/styles';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import useAIGeneration from '../hooks/useAIGeneration';
+import LoadingAnimation from './LoadingAnimation';
 
 // Styled components using Material UI
 const GeneratorContainer = styled(Paper, {
@@ -99,12 +97,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   // Use our custom AI generation hook
   const { generateDiagram, isGenerating, progress, error } = useAIGeneration();
   
-  // Steps for the generation process
-  const steps: GenerationStep[] = [
-    { id: 'parse', label: 'Parsing text', status: progress > 0 && progress < 40 ? 'active' : progress >= 40 ? 'completed' : 'pending' },
-    { id: 'analyze', label: 'Analyzing components', status: progress >= 40 && progress < 80 ? 'active' : progress >= 80 ? 'completed' : 'pending' },
-    { id: 'generate', label: 'Generating diagram', status: progress >= 80 ? 'active' : progress === 100 ? 'completed' : 'pending' },
-  ];
+  // We don't need to explicitly track steps anymore as our animation handles this
 
   const handleGenerate = async () => {
     if (!text.trim()) return;
@@ -151,6 +144,9 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
 
   return (
     <>
+      {/* Full screen loading animation */}
+      <LoadingAnimation isVisible={isGenerating} progress={progress} />
+
       <GeneratorContainer isExpanded={isExpanded}>
         <Box sx={{ position: 'relative', width: '100%' }}>
           <ToggleButtonStyled
@@ -232,25 +228,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
               variant="outlined"
               sx={{ mb: 2 }}
             />
-            {isGenerating && (
-              <Box sx={{ width: '100%', mt: 1 }}>
-                <LinearProgress variant="determinate" value={progress} />
-                <Stack direction="column" spacing={1} sx={{ mt: 2 }}>
-                  {steps.map((step) => (
-                    <StepItem key={step.id} status={step.status}>
-                      {step.status === 'completed' ? (
-                        <CheckCircleOutlineIcon fontSize="small" />
-                      ) : step.status === 'active' ? (
-                        <PlayArrowIcon fontSize="small" />
-                      ) : (
-                        <RadioButtonUncheckedIcon fontSize="small" />
-                      )}
-                      <Typography variant="body2">{step.label}</Typography>
-                    </StepItem>
-                  ))}
-                </Stack>
-              </Box>
-            )}
+            {/* Loading indicator is now handled by the LoadingAnimation component */}
             {error && (
               <Typography color="error" variant="body2">
                 {error}
