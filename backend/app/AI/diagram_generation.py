@@ -140,6 +140,11 @@ class DiagramPositioning:
             for el_id in adjacency.keys():
                 element_level_indices.setdefault(el_id, 0)
             
+            if element_level_indices:
+                max_level = max(element_level_indices.values())
+                for el_id in element_level_indices:
+                    element_level_indices[el_id] = max_level - element_level_indices[el_id]
+
             # Count elements per level index for horizontal positioning
             level_counts = {}
             
