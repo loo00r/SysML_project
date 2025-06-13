@@ -25,6 +25,7 @@ import {
 import { LayoutEngine } from '../utils/layoutUtils';
 import { DiagramHistory } from '../utils/historyUtils';
 import { SysMLBlockFactory, SysMLActivityFactory, SysMLLinkFactory } from '../models/SysMLNodeFactories';
+import { optimizeLinkRouting, adjustPortOffsets } from '../utils/linkUtils';
 
 const CanvasWrapper = styled.div`
   flex: 1;
@@ -70,15 +71,14 @@ const CanvasContainer = styled.div<{ isResizing?: boolean }>`
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
   }
-  
-  .resize-handle {
+    .resize-handle {
     position: absolute;
     width: 10px;
     height: 10px;
     background: #fff;
     border: 2px solid #666;
     border-radius: 50%;
-    cursor: se-resize;
+    cursor: s-resize; /* Changed to s-resize to indicate vertical-only resize */
     bottom: -5px;
     right: -5px;
   }
@@ -529,8 +529,12 @@ const Canvas: React.FC = () => {
             const targetPort = targetNode.getPort('left') || targetNode.getPorts()[0];
             
             if (sourcePort && targetPort) {
-              // Create link
-              const link = new SysMLLinkModel();
+              // Create link with orthogonal routing options
+              const link = new SysMLLinkModel({
+                orthogonal: true,
+                curvyness: 0,
+                stepOffset: 50
+              });
               link.setSourcePort(sourcePort);
               link.setTargetPort(targetPort);
               
@@ -549,9 +553,14 @@ const Canvas: React.FC = () => {
           }
         }
       }
-      
-      // Apply the layout optimization using LayoutEngine
+        // Apply the layout optimization using LayoutEngine
       LayoutEngine.optimizeLayout(model);
+      
+      // Apply port offset adjustments for better link connections
+      adjustPortOffsets(engine);
+      
+      // Optimize link routing for straight, aligned connections
+      optimizeLinkRouting(engine);
       
       // Fit the diagram to view all elements and update links
       engine.zoomToFit();
@@ -878,8 +887,12 @@ const Canvas: React.FC = () => {
       return;
     }
     
-    // Create a new link with the SysML model
-    const link = new SysMLLinkModel();
+    // Create a new link with the SysML model and orthogonal routing
+    const link = new SysMLLinkModel({
+      orthogonal: true,
+      curvyness: 0,
+      stepOffset: 50
+    });
     link.setSourcePort(sourcePort);
     link.setTargetPort(targetPort);
     
@@ -920,29 +933,84 @@ const Canvas: React.FC = () => {
     };
   }, [engine, updateLinkPositions]);
 
+  // Add event listeners for node movement and link creation to optimize routing
+  useEffect(() => {
+    const handleNodeMoved = () => {
+      // Apply port offset adjustments and optimize link routing after node movement
+      adjustPortOffsets(engine);
+      optimizeLinkRouting(engine);
+      engine.repaintCanvas();
+    };
+
+    const handleModelsUpdated = () => {
+      // Apply link optimization when models are updated (new links added, etc.)
+      setTimeout(() => {
+        adjustPortOffsets(engine);
+        optimizeLinkRouting(engine);
+        engine.repaintCanvas();
+      }, 50); // Small delay to ensure all updates are processed
+    };
+
+    // Get model and register listeners
+    const model = engine.getModel();
+    if (model) {
+      model.registerListener({
+        nodesUpdated: handleNodeMoved,
+        linksUpdated: handleModelsUpdated
+      });
+    }
+
+    return () => {
+      // Clean up listeners
+      if (model) {
+        model.deregisterListener({
+          nodesUpdated: handleNodeMoved,
+          linksUpdated: handleModelsUpdated
+        });
+      }
+    };
+  }, [engine]);
+
   return (
-    <CanvasWrapper>
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+    <CanvasWrapper>      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
+          {/* Standard arrow for regular links */}
           <marker
             id="arrowhead"
+            markerWidth="12"
+            markerHeight="8"
+            refX="11"
+            refY="4"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon points="0 0, 12 4, 0 8" fill="#0073e6" />
+          </marker>
+          
+          {/* Selected link arrow */}
+          <marker
+            id="arrowhead-selected"
+            markerWidth="12"
+            markerHeight="8"
+            refX="11"
+            refY="4"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon points="0 0, 12 4, 0 8" fill="#00cc00" />
+          </marker>
+          
+          {/* Temporary arrow for dragging */}
+          <marker
+            id="arrowhead-temp"
             markerWidth="10"
             markerHeight="7"
             refX="9"
             refY="3.5"
             orient="auto"
+            markerUnits="strokeWidth"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="#111" />
-          </marker>
-          <marker
-            id="arrowhead-temp"
-            markerWidth="8"
-            markerHeight="6"
-            refX="7"
-            refY="3"
-            orient="auto"
-          >
-            <polygon points="0 0, 8 3, 0 6" fill="#888" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="#888" />
           </marker>
         </defs>
       </svg>

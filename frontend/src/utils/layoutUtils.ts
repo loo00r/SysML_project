@@ -1,4 +1,5 @@
 import { DiagramModel, NodeModel } from '@projectstorm/react-diagrams';
+import { SysMLBlockModel, SysMLActivityModel, STANDARD_NODE_WIDTH } from '../models/SysMLNodeModels';
 
 interface Point {
   x: number;
@@ -50,14 +51,12 @@ export class LayoutEngine {
     });
 
     return levels;
-  }
-
-  static applyHierarchicalLayout(model: DiagramModel, options: LayoutOptions = {}) {
+  }  static applyHierarchicalLayout(model: DiagramModel, options: LayoutOptions = {}) {
     const {
       padding = 50,
-      levelSeparation = 200,
-      nodeSeparation = 150,
-      direction = 'LR',
+      levelSeparation = 250, // Increased for better vertical separation
+      nodeSeparation = STANDARD_NODE_WIDTH + 50, // Use standard width + padding for separation
+      direction = 'TB', // Change default to top-bottom for better hierarchical representation
       verticalGrowth = true // Default to vertical growth
     } = options;
 
@@ -79,22 +78,35 @@ export class LayoutEngine {
     let maxNodesInLevel = 0;
     levelGroups.forEach(nodes => {
       maxNodesInLevel = Math.max(maxNodesInLevel, nodes.length);
-    });
-
+    });    // Center the nodes at each level for better symmetry
     levelGroups.forEach((nodes, level) => {
       nodes.forEach((node, index) => {
-        // If verticalGrowth is true, use TB-like layout even in LR direction
-        // This prioritizes stacking nodes vertically
-        const x = verticalGrowth
-          ? padding + index * nodeSeparation 
-          : (direction === 'LR' ? padding + level * levelSeparation : padding + index * nodeSeparation);
-        const y = verticalGrowth
-          ? padding + level * levelSeparation
-          : (direction === 'LR' ? padding + index * nodeSeparation : padding + level * levelSeparation);
+        // Center the nodes horizontally within their level
+        // This ensures nodes are evenly distributed and centered
+        const centerOffset = (maxNodesInLevel - nodes.length) * (nodeSeparation / 2);
+        
+        let x, y;
+        if (direction === 'TB') {
+          // Top-to-bottom layout with horizontal centering
+          x = padding + centerOffset + index * nodeSeparation;
+          y = padding + level * levelSeparation;
+        } else if (direction === 'LR') {
+          // Left-to-right layout with vertical centering
+          x = padding + level * levelSeparation;
+          y = padding + centerOffset + index * nodeSeparation;
+        } else {
+          // Default centered layout
+          x = padding + centerOffset + index * nodeSeparation;
+          y = padding + level * levelSeparation;
+        }
+        
+        // Ensure precise alignment by rounding to nearest grid position
+        const gridSize = 10;
+        x = Math.round(x / gridSize) * gridSize;
+        y = Math.round(y / gridSize) * gridSize;
         
         node.setPosition(x, y);
-        
-        // Adjust node size to favor vertical growth
+          // Adjust node size to favor vertical growth
         const nodeSize = this.getNodeSize(node);
         if (nodeSize && verticalGrowth) {
           // If the node is a SysML node, it might have a description
@@ -102,6 +114,7 @@ export class LayoutEngine {
           if (nodeOptions && nodeOptions.description) {
             const textLength = nodeOptions.description?.length || 0;
             const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+            // For SysML nodes, width will be maintained at STANDARD_NODE_WIDTH by their setSize method
             this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
           }
         }
@@ -117,16 +130,15 @@ export class LayoutEngine {
         : (levelGroups.size * levelSeparation + padding * 2)
     };
   }
-
   static applyForceDirectedLayout(model: DiagramModel, iterations: number = 100) {
     const nodes = model.getNodes();
     const links = model.getLinks();
     
-    // Forces tuned to favor vertical arrangement
-    const repulsionForce = 3500;   // Higher repulsion
-    const attractionForce = 0.25;  // Slightly higher attraction 
+    // Forces tuned to favor vertical arrangement with standard width
+    const repulsionForce = 4000;   // Higher repulsion to prevent overlaps
+    const attractionForce = 0.2;   // Lower attraction for more spread out layout
     const damping = 0.85; 
-    const minDistance = 180;       // Base distance for node separation
+    const minDistance = STANDARD_NODE_WIDTH + 30;  // Base distance using standard node width
     
     // Initialize velocities
     const velocities = new Map<string, Point>();
@@ -147,8 +159,7 @@ export class LayoutEngine {
             const dy = pos1.y - pos2.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance > 0) {
-              // Apply stronger repulsion when nodes are too close
+            if (distance > 0) {              // Apply stronger repulsion when nodes are too close
               let force = repulsionForce / (distance * distance);
               
               // Extra repulsion if nodes are closer than minimum distance
@@ -156,8 +167,9 @@ export class LayoutEngine {
                 force = force * (1 + (minDistance - distance) / minDistance * 2);
               }
               
-              vel1.x += (dx / distance) * force;
-              vel1.y += (dy / distance) * force;
+              // Apply asymmetric force to favor vertical spacing (reduce horizontal movement)
+              vel1.x += (dx / distance) * force * 0.7; // Reduce horizontal repulsion
+              vel1.y += (dy / distance) * force * 1.3; // Increase vertical repulsion
             }
           }
         });
@@ -178,12 +190,12 @@ export class LayoutEngine {
           if (distance > 0) {
             const force = distance * attractionForce;
             const velSource = velocities.get(sourceNode.getID())!;
-            const velTarget = velocities.get(targetNode.getID())!;
-
-            velSource.x += (dx / distance) * force;
-            velSource.y += (dy / distance) * force;
-            velTarget.x -= (dx / distance) * force;
-            velTarget.y -= (dy / distance) * force;
+            const velTarget = velocities.get(targetNode.getID())!;            // Modify attraction forces to encourage vertical alignment
+            // Apply stronger attraction vertically than horizontally
+            velSource.x += (dx / distance) * force * 0.8; // Reduced horizontal attraction
+            velSource.y += (dy / distance) * force * 1.2; // Increased vertical attraction
+            velTarget.x -= (dx / distance) * force * 0.8; // Reduced horizontal attraction
+            velTarget.y -= (dy / distance) * force * 1.2; // Increased vertical attraction
           }
         }
       });
@@ -222,26 +234,36 @@ export class LayoutEngine {
       node.setPosition(pos.x + offset.x, pos.y + offset.y);
     });
   }
-
   // Helper method to get node size
   private static getNodeSize(node: NodeModel): {width: number, height: number} | null {
     // Try to access the size property through common methods
     if (typeof (node as any).getSize === 'function') {
-      return (node as any).getSize();
+      const size = (node as any).getSize();
+      // Ensure SysML nodes always return standard width
+      if ((node instanceof SysMLBlockModel) || (node instanceof SysMLActivityModel)) {
+        return { width: STANDARD_NODE_WIDTH, height: size.height };
+      }
+      return size;
     }
     
-    // Default fallback size
+    // Default fallback size, using standard width for SysML nodes
+    if ((node instanceof SysMLBlockModel) || (node instanceof SysMLActivityModel)) {
+      return { width: STANDARD_NODE_WIDTH, height: 150 };
+    }
     return { width: 200, height: 150 };
   }
-  
-  // Helper method to set node size
+    // Helper method to set node size
   private static setNodeSize(node: NodeModel, width: number, height: number): void {
     // Try to access the setSize method
     if (typeof (node as any).setSize === 'function') {
-      (node as any).setSize(width, height);
+      // For SysML nodes, we only adjust height and keep standard width
+      if ((node instanceof SysMLBlockModel) || (node instanceof SysMLActivityModel)) {
+        (node as any).setSize(width, height); // The model's setSize method already enforces standard width
+      } else {
+        (node as any).setSize(width, height);
+      }
     }
   }
-  
   static optimizeLayout(model: DiagramModel) {
     const nodes = model.getNodes();
     if (nodes.length === 0) return;
@@ -249,54 +271,84 @@ export class LayoutEngine {
     // Apply initial grid layout for better starting positions
     this.applyInitialGridLayout(model);
 
-    // Decide which layout to use based on the diagram structure
-    const hasHierarchy = nodes.some(node => {
-      const outPort = node.getPort('out');
-      return outPort && Object.keys(outPort.getLinks()).length > 0;
-    });
+    // Determine if diagram has a hierarchical structure based on connections
+    const hasHierarchy = this.detectHierarchicalStructure(model);
 
     if (hasHierarchy) {
-      // First apply hierarchical layout
-      this.applyHierarchicalLayout(model);
+      // For hierarchical diagrams, prioritize a clean hierarchical layout
+      this.applyHierarchicalLayout(model, {
+        direction: 'TB', // Use top-to-bottom for clearer hierarchy
+        levelSeparation: 250, // More vertical space between levels
+        nodeSeparation: STANDARD_NODE_WIDTH + 70, // More horizontal space for neater arrangement
+        verticalGrowth: true // Emphasize vertical relationships
+      });
       
-      // Then fine-tune with force-directed layout with fewer iterations
-      this.applyForceDirectedLayout(model, 50);
+      // Apply minimal force-directed adjustments to preserve hierarchy but fix minor issues
+      this.applyForceDirectedLayout(model, 10);
     } else {
-      // Apply more iterations for non-hierarchical layouts
-      this.applyForceDirectedLayout(model, 150);
+      // For non-hierarchical diagrams, use a more balanced arrangement
+      this.applyHierarchicalLayout(model, {
+        direction: 'TB',
+        verticalGrowth: true,
+        levelSeparation: 200,
+        nodeSeparation: STANDARD_NODE_WIDTH + 60
+      });
+      
+      // Apply more iterations for non-hierarchical layouts, but still limit to maintain control
+      this.applyForceDirectedLayout(model, 50);
     }
+    
+    // Align nodes horizontally within levels for perfect alignment
+    this.alignNodesHorizontally(model);
+    
+    // Align nodes to a grid for a cleaner appearance with 20px precision
+    this.snapNodesToGrid(model, 20);
     
     // Final pass to resolve any remaining overlaps
     this.resolveOverlaps(model);
   }
-  
   // Initial grid layout to give nodes better starting positions
   private static applyInitialGridLayout(model: DiagramModel) {
     const nodes = model.getNodes();
     const numNodes = nodes.length;
     if (numNodes === 0) return;
+      // Calculate optimal arrangement based on the number of nodes
+    // For hierarchical-looking layouts, prefer a tree-like structure
+    let columnsCount;
     
-    // Calculate grid dimensions - prioritize vertical arrangement
-    // Use fewer columns and more rows for vertical growth
-    const columnsCount = Math.ceil(Math.sqrt(numNodes / 2)); // Fewer columns
-    const rowsCount = Math.ceil(numNodes / columnsCount); // More rows
+    // Choose layout strategy based on node count
+    if (numNodes <= 3) {
+      // For very small diagrams, single column layout looks best
+      columnsCount = 1;
+    } else if (numNodes <= 9) {
+      // For small to medium diagrams, use a balanced grid
+      columnsCount = Math.ceil(Math.sqrt(numNodes));
+    } else {
+      // For larger diagrams, favor vertical arrangement with fewer columns
+      columnsCount = Math.ceil(Math.sqrt(numNodes / 2));
+    }
     
-    const horizontalSpacing = 250; // More horizontal space between columns
-    const verticalSpacing = 180;   // Less vertical space between rows
-    const startX = 100;
+    const horizontalSpacing = STANDARD_NODE_WIDTH + 100; // More horizontal space for clearer layout
+    const verticalSpacing = 220; // More vertical space between rows
+    const startX = 150; // Start further from the edge
     const startY = 100;
-    
-    // Position nodes in a grid that emphasizes vertical growth
+      // Position nodes in a grid with better alignment
     nodes.forEach((node, index) => {
-      const col = Math.floor(index / rowsCount); // Column first to fill vertically
-      const row = index % rowsCount;            // Then progress horizontally
+      // Fill grid from left to right, top to bottom for more natural reading order
+      const row = Math.floor(index / columnsCount);
+      const col = index % columnsCount;
       
-      node.setPosition(
-        startX + col * horizontalSpacing, 
-        startY + row * verticalSpacing
-      );
+      // Calculate positions with precise grid alignment
+      const xPos = startX + col * horizontalSpacing;
+      const yPos = startY + row * verticalSpacing;
       
-      // Adjust node size for vertical growth
+      // Snap to grid
+      const gridSize = 20;
+      const snappedX = Math.round(xPos / gridSize) * gridSize;
+      const snappedY = Math.round(yPos / gridSize) * gridSize;
+      
+      node.setPosition(snappedX, snappedY);
+        // Adjust node size for vertical growth
       const nodeSize = this.getNodeSize(node);
       if (nodeSize) {
         // If the node is a SysML node, it might have a description
@@ -304,6 +356,7 @@ export class LayoutEngine {
         if (nodeOptions && nodeOptions.description) {
           const textLength = nodeOptions.description?.length || 0;
           const additionalHeight = Math.min(Math.ceil(textLength / 30) * 20, 100);
+          // For SysML nodes, width will be maintained at STANDARD_NODE_WIDTH by their setSize method
           this.setNodeSize(node, nodeSize.width, nodeSize.height + additionalHeight);
         }
       }
@@ -342,12 +395,11 @@ export class LayoutEngine {
           
           const dx = center2.x - center1.x;
           const dy = center2.y - center1.y;
-          // We don't use the distance directly, but calculate separate requirements for X and Y
-          
-          // Calculate minimum required distance based on node sizes and minimum spacing
-          // Use larger distance horizontally to promote vertical stacking
-          const requiredX = (size1.width + size2.width)/2 + 220; // Horizontal distance
-          const requiredY = (size1.height + size2.height)/2 + 120; // Vertical distance
+          // We don't use the distance directly, but calculate separate requirements for X and Y          // Calculate minimum required distance based on node sizes and minimum spacing
+          // Use larger distance horizontally to promote vertical stacking and respect standard width
+          const requiredX = STANDARD_NODE_WIDTH + 50; // Fixed horizontal distance based on standard width
+          // For vertical spacing, use the actual heights since nodes can vary in height
+          const requiredY = (size1.height + size2.height)/2 + 40; // Increased vertical distance for better readability
           
           // If nodes are too close horizontally or vertically
           if (Math.abs(dx) < requiredX && Math.abs(dy) < requiredY) {
@@ -356,16 +408,16 @@ export class LayoutEngine {
             // Prefer moving vertically over horizontally
             let moveX = 0;
             let moveY = 0;
-            
-            // If nodes are more aligned horizontally than vertically
-            if (Math.abs(dx) / requiredX < Math.abs(dy) / requiredY) {
-              // Move primarily vertically
-              moveY = (dy === 0) ? 1 : dy / Math.abs(dy);
-              moveY *= (requiredY - Math.abs(dy)) / 2;
-            } else {
-              // Move horizontally if necessary
+              // Always prefer vertical movement to maintain consistent width layout
+            // Only use horizontal movement if vertical alignment is nearly perfect
+            if (Math.abs(dy) < 20) {
+              // Move horizontally if nodes are almost perfectly aligned vertically
               moveX = (dx === 0) ? 1 : dx / Math.abs(dx);
               moveX *= (requiredX - Math.abs(dx)) / 2;
+            } else {
+              // Move primarily vertically in most cases
+              moveY = (dy === 0) ? 1 : dy / Math.abs(dy);
+              moveY *= (requiredY - Math.abs(dy)) / 2;
             }
             
             // Apply the movement
@@ -375,5 +427,124 @@ export class LayoutEngine {
         }
       }
     }
+  }
+
+  // Snap all nodes to a grid for a cleaner appearance
+  private static snapNodesToGrid(model: DiagramModel, gridSize: number = 10) {
+    const nodes = model.getNodes();
+    
+    nodes.forEach(node => {
+      const pos = node.getPosition();
+      
+      // Snap positions to grid
+      const snappedX = Math.round(pos.x / gridSize) * gridSize;
+      const snappedY = Math.round(pos.y / gridSize) * gridSize;
+      
+      // Only update if position changed to avoid unnecessary redraws
+      if (snappedX !== pos.x || snappedY !== pos.y) {
+        node.setPosition(snappedX, snappedY);
+      }
+    });
+  }
+
+  // Detect if the diagram has a hierarchical structure by analyzing the connections between nodes
+  private static detectHierarchicalStructure(model: DiagramModel): boolean {
+    const nodes = model.getNodes();
+    const links = model.getLinks();
+    
+    // No hierarchy with 0-1 nodes
+    if (nodes.length <= 1) return false;
+    
+    // Check if we have links forming a tree or hierarchical structure
+    const linkCount = Object.keys(links).length;
+    
+    // If we have very few links compared to nodes, it's likely not hierarchical
+    if (linkCount < nodes.length / 2) return false;
+    
+    // Check for nodes with multiple incoming connections (indicates hierarchy)
+    const incomingConnectionCounts: {[key: string]: number} = {};
+    
+    Object.values(links).forEach(link => {
+      const targetNodeId = link.getTargetPort()?.getParent().getID();
+      if (targetNodeId) {
+        incomingConnectionCounts[targetNodeId] = (incomingConnectionCounts[targetNodeId] || 0) + 1;
+      }
+    });
+    
+    // Count nodes with multiple incoming connections
+    const nodesWithMultipleIncoming = Object.values(incomingConnectionCounts).filter(count => count > 1).length;
+    
+    // If we have nodes with multiple incoming connections, it's likely a hierarchy
+    if (nodesWithMultipleIncoming > 0) return true;
+    
+    // If we have a chain of connections with clear levels, it's hierarchical
+    const levels = this.calculateNodeLevels(model);
+    const distinctLevels = new Set(levels.values()).size;
+    
+    // If we have distinct levels with a reasonable depth, consider it hierarchical
+    return distinctLevels >= 2;
+  }
+  
+  // Align nodes horizontally within their respective levels for cleaner appearance
+  private static alignNodesHorizontally(model: DiagramModel) {
+    const nodes = model.getNodes();
+    if (nodes.length <= 1) return;
+    
+    // Group nodes by their Y position (with some tolerance)
+    const yTolerance = 30; // Nodes within this Y distance are considered on the same level
+    const levelGroups: {[key: number]: NodeModel[]} = {};
+    
+    nodes.forEach(node => {
+      const position = node.getPosition();
+      const y = position.y;
+      
+      // Find the closest existing level
+      let foundLevel = false;
+      for (const levelY in levelGroups) {
+        if (Math.abs(Number(levelY) - y) < yTolerance) {
+          levelGroups[Number(levelY)].push(node);
+          foundLevel = true;
+          break;
+        }
+      }
+      
+      // If no close level found, create a new one
+      if (!foundLevel) {
+        levelGroups[y] = [node];
+      }
+    });
+      // For each level, align nodes horizontally to the average Y position
+    Object.entries(levelGroups).forEach(([_, levelNodes]) => {
+      // Skip single nodes
+      if (levelNodes.length <= 1) return;
+      
+      // Calculate average Y position for this level
+      const avgY = levelNodes.reduce((sum, node) => sum + node.getPosition().y, 0) / levelNodes.length;
+      const roundedY = Math.round(avgY / 10) * 10; // Round to nearest 10px for clean alignment
+      
+      // Set all nodes in this level to the same Y position
+      levelNodes.forEach(node => {
+        const position = node.getPosition();
+        node.setPosition(position.x, roundedY);
+      });
+      
+      // Also sort them horizontally if they're close
+      levelNodes.sort((a, b) => a.getPosition().x - b.getPosition().x);
+      
+      // If nodes are clustered too close, space them out evenly
+      const xPositions = levelNodes.map(node => node.getPosition().x);
+      const minX = Math.min(...xPositions);
+      const maxX = Math.max(...xPositions);
+      const avgSpacing = (maxX - minX) / (levelNodes.length - 1 || 1);
+      
+      // If nodes are too close, redistribute them
+      if (levelNodes.length > 1 && avgSpacing < STANDARD_NODE_WIDTH) {
+        const spacing = STANDARD_NODE_WIDTH + 50; // Desired spacing
+        levelNodes.forEach((node, index) => {
+          const position = node.getPosition();
+          node.setPosition(minX + index * spacing, position.y);
+        });
+      }
+    });
   }
 }

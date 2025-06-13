@@ -1,6 +1,6 @@
 import { AbstractReactFactory } from '@projectstorm/react-canvas-core';
 import { DiagramEngine, DefaultLinkFactory, PortWidget } from '@projectstorm/react-diagrams';
-import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel } from './SysMLNodeModels';
+import { SysMLBlockModel, SysMLActivityModel, SysMLLinkModel, STANDARD_NODE_WIDTH } from './SysMLNodeModels';
 import React from 'react';
 import styled from 'styled-components';
 import { NODE_TYPES } from '../utils/sysmlUtils';
@@ -14,11 +14,13 @@ const NodeContainer = styled.div<{ $type: string; $color?: string; $borderColor?
     'linear-gradient(135deg, #e6ffe6 0%, #ffffff 100%)')};
   border: 2px solid ${props => props.$borderColor || 
     (props.$type === NODE_TYPES.BLOCK ? '#0073e6' : '#00b300')};
-  min-width: 150px;
+  width: ${STANDARD_NODE_WIDTH - 34}px; /* Apply standard width minus padding and borders */
   min-height: 80px;
   position: relative;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 
   /* Прибираємо box-shadow при hover */
   &:hover {
@@ -305,21 +307,130 @@ export class SysMLActivityFactory extends AbstractReactFactory<SysMLActivityMode
   }
 }
 
-// Кастомний LinkWidget для умовної стрілки
+// Custom LinkWidget for SysML diagrams with straight, orthogonal connections
 const SysMLLinkWidget = (props: any) => {
   const { link } = props;
   const targetPort = link.getTargetPort();
-  // Стрілка тільки якщо лінк завершений (є targetPort)
-  const markerEnd = targetPort ? 'url(#arrowhead)' : undefined;
+  const sourcePort = link.getSourcePort();
+    
+  // Only show arrow if link is complete (has target port)
+  // Use different arrowhead styling for selected links
+  const isSelected = link.isSelected();
+  const markerEnd = targetPort 
+    ? isSelected 
+      ? 'url(#arrowhead-selected)' 
+      : 'url(#arrowhead)' 
+    : undefined;
+    
+  // Generate the path based on points with optimized orthogonal routing
+  const generatePath = () => {
+    const points = link.getPoints();
+    if (points.length < 2) return '';
+    
+    // For orthogonal links, create perfectly aligned segments
+    if (link.getOptions().orthogonal && points.length >= 2) {
+      // Start with the first point
+      let path = `M ${points[0].getX()} ${points[0].getY()}`;
+      
+      // For links with exactly 2 points, evaluate if we need an orthogonal route
+      if (points.length === 2) {
+        const sourcePoint = points[0];
+        const targetPoint = points[1];
+        
+        if (sourcePort && targetPort) {
+          const sourceAlignment = sourcePort.getOptions().alignment;
+          const targetAlignment = targetPort.getOptions().alignment;
+          
+          // For top-bottom or left-right connections, use direct straight lines
+          if ((sourceAlignment === 'TOP' && targetAlignment === 'BOTTOM') || 
+              (sourceAlignment === 'BOTTOM' && targetAlignment === 'TOP') ||
+              (sourceAlignment === 'LEFT' && targetAlignment === 'RIGHT') ||
+              (sourceAlignment === 'RIGHT' && targetAlignment === 'LEFT')) {
+            // Direct straight connection
+            path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} L ${targetPoint.getX()} ${targetPoint.getY()}`;
+          } else {
+            // For connections between different sides, create perfect 90-degree routes
+            
+            // Get the parent nodes for position context
+            const sourceNode = sourcePort.getParent();
+            const targetNode = targetPort.getParent();
+            
+            if (sourceNode && targetNode) {
+              // Determine if horizontal or vertical alignment should take priority
+              const sourcePos = sourceNode.getPosition();
+              const targetPos = targetNode.getPosition();
+              
+              // Create either an L-shape or Z-shape path based on node positions
+              if (Math.abs(sourcePos.y - targetPos.y) < 50) {
+                // Nodes are roughly at the same vertical level - prioritize horizontal connection
+                const midY = (sourcePoint.getY() + targetPoint.getY()) / 2;
+                path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} 
+                       L ${sourcePoint.getX()} ${midY} 
+                       L ${targetPoint.getX()} ${midY}
+                       L ${targetPoint.getX()} ${targetPoint.getY()}`;
+              } else {
+                // Different vertical levels - use standard L-shape
+                // Calculate which point (horizontal or vertical) to move first based on port orientations
+                const useHorizontalFirst = 
+                  (sourceAlignment === 'RIGHT' && ['TOP', 'BOTTOM'].includes(targetAlignment)) ||
+                  (sourceAlignment === 'LEFT' && ['TOP', 'BOTTOM'].includes(targetAlignment));
+                
+                if (useHorizontalFirst) {
+                  // Go horizontal first, then vertical
+                  path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} 
+                         L ${targetPoint.getX()} ${sourcePoint.getY()} 
+                         L ${targetPoint.getX()} ${targetPoint.getY()}`;
+                } else {
+                  // Go vertical first, then horizontal
+                  path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} 
+                         L ${sourcePoint.getX()} ${targetPoint.getY()} 
+                         L ${targetPoint.getX()} ${targetPoint.getY()}`;
+                }
+              }
+            } else {
+              // Fallback if we don't have node context
+              path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} L ${targetPoint.getX()} ${targetPoint.getY()}`;
+            }
+          }
+        } else {
+          // No ports, draw direct line
+          path = `M ${sourcePoint.getX()} ${sourcePoint.getY()} L ${targetPoint.getX()} ${targetPoint.getY()}`;
+        }
+      } else if (points.length === 3) {
+        // For 3-point paths (common with orthogonal routing), optimize for straight segments
+        path = `M ${points[0].getX()} ${points[0].getY()} 
+               L ${points[1].getX()} ${points[1].getY()} 
+               L ${points[2].getX()} ${points[2].getY()}`;
+      } else {
+        // For links with multiple points, ensure perfect straight segments
+        for (let i = 1; i < points.length; i++) {
+          path += ` L ${points[i].getX()} ${points[i].getY()}`;
+        }
+      }
+      
+      return path;
+    } 
+    
+    // Direct link for non-orthogonal
+    return `M ${points[0].getX()} ${points[0].getY()} L ${points[points.length - 1].getX()} ${points[points.length - 1].getY()}`;
+  };
+  
+  
   return (
-    <g className={link.getOptions().className || 'sysml-link'} data-linkid={link.getID()}>
+    <g 
+      className={`${link.getOptions().className || 'sysml-link'} ${isSelected ? 'sysml-link--selected' : ''}`} 
+      data-linkid={link.getID()}
+    >
       {link.getPoints().length >= 2 && (
         <path
-          d={`M ${link.getPoints()[0].getX()} ${link.getPoints()[0].getY()} L ${link.getPoints()[link.getPoints().length-1].getX()} ${link.getPoints()[link.getPoints().length-1].getY()}`}
-          stroke="#111"
-          strokeWidth={2}
+          d={generatePath()}
+          stroke={isSelected ? "#00cc00" : "#0073e6"}
+          strokeWidth={isSelected ? 3 : 2}
           fill="none"
           markerEnd={markerEnd}
+          style={{ 
+            transition: "stroke 0.2s, stroke-width 0.2s" 
+          }}
         />
       )}
     </g>

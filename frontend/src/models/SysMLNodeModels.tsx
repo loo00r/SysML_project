@@ -1,4 +1,5 @@
 import { DefaultNodeModel, DefaultLinkModel, DefaultPortModel, PortModelAlignment } from '@projectstorm/react-diagrams';
+import { enhanceLinkRouting } from '../utils/linkOptimizer';
 import EditableText from '../components/custom/EditableText';
 import styled from 'styled-components';
 
@@ -33,6 +34,9 @@ const NodeDescription = styled.div`
   width: 100%;
   box-sizing: border-box;
 `;
+
+// Standard width for all SysML nodes
+export const STANDARD_NODE_WIDTH = 220;
 
 export interface SysMLNodeOptions {
   name: string;
@@ -111,8 +115,7 @@ export class SysMLBlockModel extends DefaultNodeModel {
       height: this.size.height
     };
   }
-
-  setSize(width: number, height: number) {
+  setSize(_width: number, height: number) {
     this.size = {
       width: STANDARD_NODE_WIDTH,
       height: Math.max(80, height)
@@ -142,7 +145,6 @@ export class SysMLBlockModel extends DefaultNodeModel {
       description: this.description,
     };
   }
-
   deserialize(event: any): void {
     super.deserialize(event);
     this.size = {
@@ -208,7 +210,6 @@ export class SysMLActivityModel extends DefaultNodeModel {
       }
     });
   }
-
   getSize(): NodeSize {
     return {
       width: STANDARD_NODE_WIDTH,
@@ -216,7 +217,7 @@ export class SysMLActivityModel extends DefaultNodeModel {
     };
   }
 
-  setSize(width: number, height: number) {
+  setSize(_width: number, height: number) {
     this.size = {
       width: STANDARD_NODE_WIDTH,
       height: Math.max(80, height)
@@ -246,7 +247,6 @@ export class SysMLActivityModel extends DefaultNodeModel {
       description: this.description,
     };
   }
-
   deserialize(event: any): void {
     super.deserialize(event);
     this.size = {
@@ -266,13 +266,16 @@ export class SysMLLinkModel extends DefaultLinkModel {
     relationName?: string;
     relationType?: string;
   };
-
   constructor(options: any = {}) {
     super({
       type: 'sysml-link',
       width: 2,
-      color: '#0073e6', // синій лінк
-      selectedColor: '#0073e6',
+      color: '#0073e6', // Blue link
+      selectedColor: '#00cc00', // Green when selected
+      orthogonal: true, // Use orthogonal routing for straight edges
+      curvyness: 0,     // No curvy segments for straighter lines
+      stepOffset: 50,   // Large step offset for very clean orthogonal lines
+      router: 'manhattan', // Force manhattan routing for perfectly straight segments
       ...options
     });
   }
@@ -308,5 +311,9 @@ export class SysMLLinkModel extends DefaultLinkModel {
     if (event.sysmlData) {
       this.setData(event.sysmlData);
     }
-  }
+  }  // Override to ensure perfectly straight lines between nodes
+  calculatePath(): void {
+    // Use our helper function to ensure perfect orthogonal routing
+    enhanceLinkRouting(this);
+  }// Method removed - link optimization now handled in linkOptimizer.ts
 }
