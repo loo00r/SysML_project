@@ -94,7 +94,6 @@ async def generate_diagram_with_context(
     
     if use_rag:
         try:
-            # First, try to find diagrams of the specified type
             similar_diagrams = await find_similar_diagrams(
                 db=db, 
                 query_text=text, 
@@ -103,7 +102,6 @@ async def generate_diagram_with_context(
                 include_scores=True
             )
             
-            # If no diagrams of the specified type are found, try to find any diagrams
             if not similar_diagrams:
                 print(f"No diagrams of type '{diagram_type}' found, searching for any diagram type")
                 similar_diagrams = await find_similar_diagrams(
@@ -118,9 +116,6 @@ async def generate_diagram_with_context(
                 best_match = similar_diagrams[0]
                 similarity_score = getattr(best_match, "similarity_score", None)
                 
-                # For cosine_distance, lower values mean higher similarity
-                # 0 = perfect match, 2 = completely dissimilar
-                # So we want to use examples with LOW distance scores
                 print(f"Found best match: {best_match.name} (type: {best_match.diagram_type}) with similarity score: {similarity_score:.4f}")
                 
                 # Always use the best match regardless of score
