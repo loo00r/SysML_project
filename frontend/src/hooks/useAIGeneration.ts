@@ -98,7 +98,10 @@ export const useAIGeneration = () => {
     setEdges, 
     clearDiagram, 
     setGenerationPrompt, 
-    setDiagramDescription 
+    setDiagramDescription,
+    openDiagram,
+    activeDiagramId,
+    openDiagrams
   } = useDiagramStore();
   
   const generateDiagram = useCallback(async (options: AIGenerationOptions) => {
@@ -132,11 +135,20 @@ export const useAIGeneration = () => {
         setError(result.error);
         setProgress(0);
       } else {
-        // Update the diagram with the generated nodes and edges
+        // Create a new diagram tab with the generated content
         setProgress(100);
-        clearDiagram();
-        setNodes(result.nodes);
-        setEdges(result.edges);
+        
+        // Generate a name for the new diagram based on the prompt
+        const diagramName = options.prompt.split(' ').slice(0, 3).join(' ') + ' Diagram';
+        
+        // Open a new diagram with the generated content
+        openDiagram({
+          name: diagramName,
+          type: 'BDD',
+          nodes: result.nodes,
+          edges: result.edges,
+          description: shortDescription
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');

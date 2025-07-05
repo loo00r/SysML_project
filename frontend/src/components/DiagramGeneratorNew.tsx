@@ -110,6 +110,10 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
         style: diagramStyle as 'technical' | 'conceptual'
       });
       
+      // Reset the form after successful generation
+      setText('');
+      setIsExpanded(false);
+      
       // Call the parent component's onGenerate if provided
       if (onGenerate) {
         await onGenerate(text);

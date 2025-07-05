@@ -16,7 +16,19 @@ export interface NodeData {
 }
 
 // Define diagram types
-export type DiagramType = 'block';
+export type DiagramType = 'BDD' | 'IBD' | 'block';
+
+// Define diagram instance interface
+export interface DiagramInstance {
+  id: string;
+  name: string;
+  type: DiagramType;
+  nodes: Node<NodeData>[];
+  edges: Edge[];
+  description?: string;
+  createdAt: Date;
+  modifiedAt: Date;
+}
 
 // Define validation error structure
 export interface ValidationError {
@@ -27,13 +39,17 @@ export interface ValidationError {
 
 // Define the store state
 interface DiagramState {
-  // Diagram elements
+  // Multi-diagram state
+  openDiagrams: DiagramInstance[];
+  activeDiagramId: string | null;
+  
+  // Legacy compatibility - computed from active diagram
   nodes: Node<NodeData>[];
   edges: Edge[];
   selectedNodes: string[];
   selectedEdges: string[];
   
-  // Diagram metadata
+  // Diagram metadata - computed from active diagram
   diagramType: DiagramType;
   diagramName: string;
   diagramDescription: string;
@@ -55,7 +71,13 @@ interface DiagramState {
     lastActionTimestamp: number;
   };
   
-  // Actions
+  // Multi-diagram actions
+  openDiagram: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
+  closeDiagram: (diagramId: string) => void;
+  setActiveDiagram: (diagramId: string) => void;
+  updateActiveDiagram: (payload: { nodes?: Node<NodeData>[], edges?: Edge[] }) => void;
+  
+  // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -98,12 +120,16 @@ interface DiagramState {
 // Create the store
 const useDiagramStore = create<DiagramState>((set, get) => ({
   // Initial state
+  openDiagrams: [],
+  activeDiagramId: null,
+  
+  // Computed/legacy state
   nodes: [],
   edges: [],
   selectedNodes: [],
   selectedEdges: [],
   
-  diagramType: 'block',
+  diagramType: 'BDD' as DiagramType,
   diagramName: 'Untitled Diagram',
   diagramDescription: '',
   
@@ -121,20 +147,116 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     lastActionTimestamp: 0
   },
   
-  // Basic node and edge operations
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
+  // Multi-diagram actions
+  openDiagram: (diagramData) => {
+    const newDiagram: DiagramInstance = {
+      id: `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      modifiedAt: new Date(),
+      ...diagramData
+    };
+    
+    set(state => ({
+      openDiagrams: [...state.openDiagrams, newDiagram],
+      activeDiagramId: newDiagram.id,
+      // Update computed state
+      nodes: newDiagram.nodes,
+      edges: newDiagram.edges,
+      diagramType: newDiagram.type,
+      diagramName: newDiagram.name,
+      diagramDescription: newDiagram.description || ''
+    }));
+  },
   
-  onNodesChange: (changes) => {
+  closeDiagram: (diagramId) => {
+    const state = get();
+    const updatedDiagrams = state.openDiagrams.filter(d => d.id !== diagramId);
+    
+    let newActiveDiagramId = state.activeDiagramId;
+    if (state.activeDiagramId === diagramId) {
+      // If closing the active diagram, switch to another one
+      newActiveDiagramId = updatedDiagrams.length > 0 ? updatedDiagrams[0].id : null;
+    }
+    
+    const activeDiagram = updatedDiagrams.find(d => d.id === newActiveDiagramId);
+    
     set({
-      nodes: applyNodeChanges(changes, get().nodes)
+      openDiagrams: updatedDiagrams,
+      activeDiagramId: newActiveDiagramId,
+      // Update computed state
+      nodes: activeDiagram?.nodes || [],
+      edges: activeDiagram?.edges || [],
+      diagramType: activeDiagram?.type || 'BDD',
+      diagramName: activeDiagram?.name || 'Untitled Diagram',
+      diagramDescription: activeDiagram?.description || '',
+      selectedNodes: [],
+      selectedEdges: []
     });
   },
   
-  onEdgesChange: (changes) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges)
+  setActiveDiagram: (diagramId) => {
+    const state = get();
+    const activeDiagram = state.openDiagrams.find(d => d.id === diagramId);
+    
+    if (activeDiagram) {
+      set({
+        activeDiagramId: diagramId,
+        // Update computed state
+        nodes: activeDiagram.nodes,
+        edges: activeDiagram.edges,
+        diagramType: activeDiagram.type,
+        diagramName: activeDiagram.name,
+        diagramDescription: activeDiagram.description || '',
+        selectedNodes: [],
+        selectedEdges: []
+      });
+    }
+  },
+  
+  updateActiveDiagram: (payload) => {
+    const state = get();
+    if (!state.activeDiagramId) return;
+    
+    const updatedDiagrams = state.openDiagrams.map(diagram => {
+      if (diagram.id === state.activeDiagramId) {
+        return {
+          ...diagram,
+          nodes: payload.nodes || diagram.nodes,
+          edges: payload.edges || diagram.edges,
+          modifiedAt: new Date()
+        };
+      }
+      return diagram;
     });
+    
+    set(state => ({
+      openDiagrams: updatedDiagrams,
+      // Update computed state
+      nodes: payload.nodes || state.nodes,
+      edges: payload.edges || state.edges
+    }));
+  },
+  
+  // Legacy actions
+  setNodes: (nodes) => {
+    set({ nodes });
+    get().updateActiveDiagram({ nodes });
+  },
+  setEdges: (edges) => {
+    set({ edges });
+    get().updateActiveDiagram({ edges });
+  },
+  
+  onNodesChange: (changes) => {
+    const newNodes = applyNodeChanges(changes, get().nodes);
+    set({ nodes: newNodes });
+    get().updateActiveDiagram({ nodes: newNodes });
+  },
+  
+  onEdgesChange: (changes) => {
+    const newEdges = applyEdgeChanges(changes, get().edges);
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
   },
   
   onConnect: (connection) => {
@@ -150,9 +272,9 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       style: { stroke: '#555' }
     };
     
-    set({
-      edges: [...get().edges, newEdge]
-    });
+    const newEdges = [...get().edges, newEdge];
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
   },
   
   // Node operations
@@ -160,32 +282,32 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     // Save current state before adding node
     get().saveToHistory();
     
-    set({
-      nodes: [...get().nodes, node]
-    });
+    const newNodes = [...get().nodes, node];
+    set({ nodes: newNodes });
+    get().updateActiveDiagram({ nodes: newNodes });
   },
   
   updateNode: (id, data) => {
     // Save current state before updating node
     get().saveToHistory();
     
-    set({
-      nodes: get().nodes.map(node => 
-        node.id === id ? { ...node, data: { ...node.data, ...data } } : node
-      )
-    });
+    const newNodes = get().nodes.map(node => 
+      node.id === id ? { ...node, data: { ...node.data, ...data } } : node
+    );
+    set({ nodes: newNodes });
+    get().updateActiveDiagram({ nodes: newNodes });
   },
   
   removeNode: (id) => {
     // Save current state before removing node
     get().saveToHistory();
     
-    // Remove the node
-    set({
-      nodes: get().nodes.filter(node => node.id !== id),
-      // Also remove any connected edges
-      edges: get().edges.filter(edge => edge.source !== id && edge.target !== id)
-    });
+    // Remove the node and connected edges
+    const newNodes = get().nodes.filter(node => node.id !== id);
+    const newEdges = get().edges.filter(edge => edge.source !== id && edge.target !== id);
+    
+    set({ nodes: newNodes, edges: newEdges });
+    get().updateActiveDiagram({ nodes: newNodes, edges: newEdges });
   },
   
   // Edge operations
@@ -193,29 +315,29 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     // Save current state before adding edge
     get().saveToHistory();
     
-    set({
-      edges: [...get().edges, edge]
-    });
+    const newEdges = [...get().edges, edge];
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
   },
   
   updateEdge: (id, data) => {
     // Save current state before updating edge
     get().saveToHistory();
     
-    set({
-      edges: get().edges.map(edge => 
-        edge.id === id ? { ...edge, ...data } : edge
-      )
-    });
+    const newEdges = get().edges.map(edge => 
+      edge.id === id ? { ...edge, ...data } : edge
+    );
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
   },
   
   removeEdge: (id) => {
     // Save current state before removing edge
     get().saveToHistory();
     
-    set({
-      edges: get().edges.filter(edge => edge.id !== id)
-    });
+    const newEdges = get().edges.filter(edge => edge.id !== id);
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
   },
   
   // Selection operations
@@ -248,6 +370,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       selectedEdges: [],
       validationErrors: []
     });
+    get().updateActiveDiagram({ nodes: [], edges: [] });
   },
   
   generateDiagramFromText: async (text) => {
@@ -314,6 +437,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
         nodes: layoutedNodes,
         edges: layoutedEdges
       });
+      get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
         
         // Validate the generated diagram
         const errors = get().validateDiagram();
