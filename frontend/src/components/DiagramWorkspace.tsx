@@ -7,6 +7,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Box, Paper, Snackbar, Alert, Typography, Button, IconButton, styled } from '@mui/material';
+import DiagramTabs from './DiagramTabs';
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
@@ -29,12 +30,29 @@ const WorkspaceContainer = styled(Box)({
   width: '100%',
   position: 'relative',
   flex: 1,
+  minWidth: 0, // Allow flex shrinking
 });
 
 const FlowContainer = styled(Box)({
   flex: 1,
   height: '100%',
+  width: '100%',
+  overflow: 'hidden',
+  position: 'relative', // Important for absolute positioning of floating panel
 });
+
+const FloatingTabPanel = styled(Paper)(({ theme }) => ({
+  position: 'absolute',
+  top: 16,
+  left: 16,
+  zIndex: 1000, // Above canvas elements
+  display: 'flex',
+  alignItems: 'center',
+  background: theme.palette.background.paper,
+  boxShadow: theme.shadows[3],
+  borderRadius: theme.shape.borderRadius,
+  overflow: 'hidden',
+}));
 
 const EmptyState = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -326,6 +344,11 @@ const DiagramWorkspace: React.FC = () => {
   return (
     <WorkspaceContainer>
       <FlowContainer ref={reactFlowWrapper}>
+        {/* Floating Tab Panel */}
+        <FloatingTabPanel elevation={3}>
+          <DiagramTabs />
+        </FloatingTabPanel>
+        
         <ReactFlow
           nodes={nodes}
           edges={edges}

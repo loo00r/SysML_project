@@ -14,27 +14,29 @@ import {
 import useDiagramStore from '../store/diagramStore';
 
 const TabsContainer = styled(Box)(({ theme }) => ({
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.background.paper,
   display: 'flex',
   alignItems: 'center',
   minHeight: 48,
   overflow: 'hidden',
+  padding: theme.spacing(0.5, 1),
 }));
 
 const StyledTabs = styled(Tabs)(({ theme }) => ({
-  minHeight: 48,
+  minHeight: 40,
   '& .MuiTabs-indicator': {
     backgroundColor: theme.palette.primary.main,
   },
   '& .MuiTab-root': {
-    minHeight: 48,
+    minHeight: 40,
     textTransform: 'none',
-    fontSize: '0.875rem',
+    fontSize: '0.75rem',
     fontWeight: 500,
-    padding: theme.spacing(0.5, 1),
-    minWidth: 120,
-    maxWidth: 200,
+    padding: theme.spacing(0.5, 0.75),
+    minWidth: 100,
+    maxWidth: 180,
+  },
+  '& .MuiTabs-flexContainer': {
+    gap: theme.spacing(0.5),
   },
 }));
 
@@ -63,8 +65,8 @@ const CloseButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const AddButton = styled(IconButton)(({ theme }) => ({
-  margin: theme.spacing(0, 1),
-  padding: 8,
+  margin: theme.spacing(0, 0.5),
+  padding: 6,
   '&:hover': {
     backgroundColor: theme.palette.action.hover,
   },
@@ -90,7 +92,7 @@ const DiagramTab: React.FC<DiagramTabProps> = ({ diagramId, label, onClose }) =>
         onClick={handleClose}
         aria-label={`Close ${label}`}
       >
-        <CloseIcon fontSize="small" />
+        <CloseIcon fontSize="inherit" sx={{ fontSize: '14px' }} />
       </CloseButton>
     </TabContent>
   );
@@ -127,8 +129,11 @@ const DiagramTabs: React.FC = () => {
   if (openDiagrams.length === 0) {
     return (
       <TabsContainer>
+        <Typography variant="caption" sx={{ mr: 1, color: 'text.secondary' }}>
+          No diagrams
+        </Typography>
         <AddButton onClick={handleAddTab} aria-label="Add new diagram">
-          <AddIcon />
+          <AddIcon fontSize="small" />
         </AddButton>
       </TabsContainer>
     );
@@ -158,7 +163,7 @@ const DiagramTabs: React.FC = () => {
         ))}
       </StyledTabs>
       <AddButton onClick={handleAddTab} aria-label="Add new diagram">
-        <AddIcon />
+        <AddIcon fontSize="small" />
       </AddButton>
     </TabsContainer>
   );

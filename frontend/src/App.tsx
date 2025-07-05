@@ -3,7 +3,6 @@ import { ThemeProvider, createTheme, styled as muiStyled } from '@mui/material/s
 import { Box, CircularProgress } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ReactFlowProvider } from 'reactflow';
-import DiagramTabs from './components/DiagramTabs';
 import DiagramWorkspace from './components/DiagramWorkspace';
 import Sidebar from './components/Sidebar';
 import DiagramGeneratorNew from './components/DiagramGeneratorNew';
@@ -38,19 +37,18 @@ const theme = createTheme({
 
 const AppContainer = muiStyled(Box)(({ theme }) => ({
   display: 'flex',
-  flexDirection: 'column',
   height: '100vh',
   width: '100vw',
   overflow: 'hidden',
   backgroundColor: theme.palette.background.default,
 }));
 
-const MainContent = muiStyled(Box)(({ theme }) => ({
-  display: 'flex',
+const WorkspaceArea = muiStyled(Box)(({ theme }) => ({
   flex: 1,
-  height: 'calc(100vh - 48px)', // Subtract tab bar height
-  width: '100%',
+  display: 'flex',
+  height: '100%',
   overflow: 'hidden',
+  minWidth: 0, // Allow flex shrinking
 }));
 
 const LoadingFallback = muiStyled(Box)(({ theme }) => ({
@@ -106,14 +104,13 @@ const App: React.FC = () => {
               <Box ml={2}>Loading SysML Modeling Tool...</Box>
             </LoadingFallback>
           }>
-            <DiagramTabs />
-            <MainContent>
-              <Sidebar />
+            <Sidebar />
+            <WorkspaceArea>
               <ReactFlowProvider>
                 <DiagramWorkspace />
               </ReactFlowProvider>
-              <DiagramGeneratorNew />
-            </MainContent>
+            </WorkspaceArea>
+            <DiagramGeneratorNew />
           </Suspense>
         </AppContainer>
       </ErrorBoundary>

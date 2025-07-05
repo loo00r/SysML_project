@@ -244,3 +244,173 @@ frontend/src/
 -   **Use Material-UI:** Leverage `<Box>`, `<Tabs>`, `<Tab>`, `<IconButton>`, and `<CloseIcon />` for a consistent look and feel.
 -   **Unique IDs:** Use a library like `uuid` or a simple counter to ensure each tab has a unique `id`.
 -   **State Synchronization:** Be careful to ensure that all diagram modifications are saved to the correct diagram instance within the `openDiagrams` array in the Zustand store. The link is the `activeDiagramId`.
+
+## ✅ COMPLETED: Tabbed Interface Implementation (2025-01-05)
+
+### Successfully Implemented Features:
+
+1. **Enhanced Diagram Store** (`src/store/diagramStore.ts`):
+   - Added `DiagramInstance` interface with id, name, type, nodes, edges, description, timestamps
+   - Modified state to handle `openDiagrams` array and `activeDiagramId`
+   - Implemented new actions: `openDiagram`, `closeDiagram`, `setActiveDiagram`, `updateActiveDiagram`
+   - Updated all existing node/edge operations to work with multi-diagram structure
+   - Maintained backward compatibility with legacy actions
+
+2. **DiagramTabs Component** (`src/components/DiagramTabs.tsx`):
+   - Material-UI styled tab bar with scrollable tabs
+   - Individual tabs with diagram names and close buttons (x)
+   - Add new diagram button (+) 
+   - Proper tab switching and closing logic
+   - Empty state handling when no diagrams are open
+   - Responsive design with proper styling
+
+3. **DiagramWorkspace Component** (`src/components/DiagramWorkspace.tsx`):
+   - Main ReactFlow canvas area for active diagram
+   - All toolbar functionality preserved (undo, redo, zoom, save, validate, export)
+   - Properties and validation panels integration
+   - Empty state with guidance when no diagram is active
+   - Proper sizing constraints (not full page width)
+   - Drag & drop functionality for adding nodes
+
+4. **Updated App Layout** (`src/App.tsx`):
+   - Integrated tabbed interface with proper layout structure
+   - Tab bar positioned at top of workspace
+   - Sidebar and generator panel maintain positions
+   - Workspace area properly constrained with flexbox layout
+   - ReactFlowProvider wrapper for diagram functionality
+
+5. **Enhanced AI Generation** (`src/hooks/useAIGeneration.ts`):
+   - Modified to create new diagram tabs automatically
+   - Intelligent diagram naming based on prompt content
+   - Integration with multi-diagram state management
+   - Form reset and UI cleanup after generation
+
+6. **Updated Generator Component** (`src/components/DiagramGeneratorNew.tsx`):
+   - Works seamlessly with new tabbed interface
+   - Automatically creates new tabs for generated diagrams
+   - Form resets and collapses after successful generation
+
+### Key Features Delivered:
+- ✅ Multiple diagram tabs (browser-like experience)
+- ✅ Tab switching with visual active state indication
+- ✅ Close tabs with 'x' button and smart tab selection
+- ✅ Add new diagram with '+' button
+- ✅ Proper workspace sizing (canvas-sized, not full width)
+- ✅ Empty state handling with user guidance
+- ✅ AI generation automatically creates new tabs
+- ✅ All original functionality preserved (save, export, validation, etc.)
+- ✅ Responsive design with Material-UI consistency
+- ✅ State synchronization across all diagram operations
+
+### Files Modified/Created:
+- `src/store/diagramStore.ts` - Enhanced with multi-diagram support
+- `src/components/DiagramTabs.tsx` - New tabbed interface component
+- `src/components/DiagramWorkspace.tsx` - New main workspace component  
+- `src/App.tsx` - Updated layout integration
+- `src/hooks/useAIGeneration.ts` - Enhanced for tab creation
+- `src/components/DiagramGeneratorNew.tsx` - Updated for tab integration
+
+The implementation fully meets all acceptance criteria and maintains the existing codebase patterns and functionality while adding the requested tabbed interface for efficient diagram management.
+
+### New task
+# Refactor: Integrate Diagram Tabs as a Floating Panel within the Canvas
+
+## 1. User Story
+
+As a systems engineer, I want the diagram tabs to be a floating panel located *inside* the main canvas area, rather than being part of the main application header. This will create a more immersive and focused modeling environment where all diagram-related controls are contained within the workspace itself.
+
+## 2. Acceptance Criteria
+
+- **Location Change:** The tab bar (`Diagram 1 [x] [+]`) is no longer displayed at the very top of the application window.
+- **New Location:** The tab bar is now rendered as a floating panel *inside* the React Flow canvas area, positioned at the top-left corner.
+- **Floating Behavior:**
+    - The tab panel must remain in a fixed position relative to the canvas viewport. It should **not** pan or zoom along with the diagram nodes.
+    - Its behavior should be similar to the existing React Flow controls (like the zoom buttons or the minimap).
+- **Functionality:** All existing tab functionalities (creating a new tab with `+`, switching between tabs, closing a tab with `x`) must work exactly as before.
+- **Styling:** The floating panel should have a distinct background (e.g., using Material-UI's `Paper` component) with a subtle shadow and padding to visually separate it from the canvas grid behind it.
+- **Responsiveness:** The panel should not interfere with nodes that might be dragged "underneath" it. It must always stay on top with a proper `z-index`.
+
+## 3. Visual Reference
+
+The final result should look conceptually like this, where the tabs are inside the canvas boundary:
++----------------------------------------------------------------------+
+| Left Sidebar | MAIN CANVAS AREA | Right Sidebar |
+| | | |
+| | +-------------------------+ | |
+| | | [Diagram 1 X] [Diagram 2 X] [+] | <-- FLOATING TABS HERE | |
+| | +-------------------------+ | |
+| | | |
+| | +--------+ | |
+| | | Node 1 | | |
+| | +--------+ | |
+| | | |
+| | | |
+| | +---------+ | |
+| | | Minimap | | |
+| | +---------+ | |
++----------------------------------------------------------------------+
+
+## 4. Technical Implementation Plan (Frontend)
+
+This task involves changing the component hierarchy and applying CSS for positioning. The state logic in Zustand should remain unchanged.
+
+1.  **Relocate the `DiagramTabs` Component:**
+    -   Currently, `<DiagramTabs />` is likely rendered in a top-level layout component (like `App.tsx` or a custom `Layout.tsx`).
+    -   You need to **move** the rendering of `<DiagramTabs />` so it becomes a child of the component that contains the `<ReactFlow />` instance (let's call it `DiagramWorkspace.tsx`).
+
+2.  **Create a Floating Panel Wrapper:**
+    -   Inside `DiagramWorkspace.tsx`, wrap the `<DiagramTabs />` component in a new container. This container will be responsible for the floating behavior.
+    -   Use a Material-UI `<Paper>` or `<Box>` component for this wrapper to easily apply styling.
+
+    ```tsx
+    // In DiagramWorkspace.tsx
+
+    import { Box, Paper } from '@mui/material';
+    import DiagramTabs from './DiagramTabs';
+    // ... other imports
+
+    const DiagramWorkspace = () => {
+      // ... existing logic
+      
+      return (
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+          <ReactFlow
+            // ... all your React Flow props
+          >
+            {/* ... other controls like MiniMap */}
+          </ReactFlow>
+
+          {/* NEW: Floating Tab Panel */}
+          <Box
+            component={Paper}
+            elevation={3}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              zIndex: 10, // Ensure it's above the canvas elements
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <DiagramTabs />
+          </Box>
+        </div>
+      );
+    };
+    ```
+
+3.  **Adjust Component Hierarchy:**
+    -   **`DiagramWorkspace.tsx` (or equivalent):** This component must have `position: 'relative'` on its root element so that the absolute positioning of the tab panel works correctly.
+    -   **`App.tsx` (or main layout):** Remove the `<DiagramTabs />` component from here. The page layout will simplify to just the sidebars and the main workspace container.
+
+4.  **Refine `DiagramTabs.tsx` Styling (If Needed):**
+    -   The `DiagramTabs` component itself might need minor style adjustments. For example, you might want to remove any background or shadow it has, as the new `Paper` wrapper will now handle that. The goal is for the tabs to look seamlessly integrated into their new floating panel.
+
+## 5. Summary of Changes
+
+-   **No changes** to the Zustand store (`src/store/diagramStore.ts`).
+-   **Move** `<DiagramTabs />` from the main layout file into the React Flow workspace component.
+-   **Wrap** `<DiagramTabs />` in a new, absolutely positioned MUI `<Box>` or `<Paper>` to create the floating panel.
+-   **Apply** CSS (`position: absolute`, `top`, `left`, `z-index`) to the new wrapper.
+-   **Ensure** the parent container of React Flow has `position: 'relative'`.
