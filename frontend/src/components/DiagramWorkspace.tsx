@@ -330,14 +330,23 @@ const DiagramWorkspace: React.FC = () => {
   // Render empty state when no diagram is active
   if (!activeDiagram) {
     return (
-      <EmptyState>
-        <Typography variant="h6" gutterBottom>
-          No diagram open
-        </Typography>
-        <Typography variant="body2">
-          Create a new diagram by clicking the + button in the tab bar
-        </Typography>
-      </EmptyState>
+      <WorkspaceContainer>
+        <FlowContainer>
+          {/* Floating Tab Panel - Always visible */}
+          <FloatingTabPanel elevation={3}>
+            <DiagramTabs />
+          </FloatingTabPanel>
+          
+          <EmptyState>
+            <Typography variant="h6" gutterBottom>
+              No diagram open
+            </Typography>
+            <Typography variant="body2">
+              Create a new diagram by clicking the + button in the tab bar above
+            </Typography>
+          </EmptyState>
+        </FlowContainer>
+      </WorkspaceContainer>
     );
   }
 
