@@ -1,29 +1,20 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
-import ReactFlow, {
-  Background,
-  MiniMap,
-  Panel,
-  useReactFlow,
-} from 'reactflow';
+import React, { useCallback, useRef, useState } from 'react';
+import { useReactFlow } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Box, Paper, Snackbar, Alert, Typography, Button, IconButton, styled } from '@mui/material';
-import DiagramTabs from './DiagramTabs';
-import SaveIcon from '@mui/icons-material/Save';
-import UndoIcon from '@mui/icons-material/Undo';
-import RedoIcon from '@mui/icons-material/Redo';
-import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import ZoomOutIcon from '@mui/icons-material/ZoomOut';
-import FitScreenIcon from '@mui/icons-material/FitScreen';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { Box, Snackbar, Alert, styled } from '@mui/material';
 
-import { nodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
+import {
+  WorkspaceToolbar,
+  EmptyWorkspaceState,
+  StatusPanel,
+  FloatingTabPanel,
+  ReactFlowCanvas,
+} from './workspace';
 
-// Styled components
 const WorkspaceContainer = styled(Box)({
   display: 'flex',
   height: '100%',
@@ -31,51 +22,6 @@ const WorkspaceContainer = styled(Box)({
   position: 'relative',
   flex: 1,
   minWidth: 0, // Allow flex shrinking
-});
-
-const FlowContainer = styled(Box)({
-  flex: 1,
-  height: '100%',
-  width: '100%',
-  overflow: 'hidden',
-  position: 'relative', // Important for absolute positioning of floating panel
-});
-
-const FloatingTabPanel = styled(Paper)(({ theme }) => ({
-  position: 'absolute',
-  top: 16,
-  left: 16,
-  right: 16, // Allow panel to expand to full width
-  zIndex: 1000, // Above canvas elements
-  display: 'flex',
-  alignItems: 'center',
-  background: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
-  borderRadius: theme.shape.borderRadius,
-  overflow: 'visible', // Allow scrolling
-  maxWidth: 'calc(100vw - 32px)', // Prevent overflow beyond viewport
-}));
-
-const EmptyState = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: '100%',
-  width: '100%',
-  backgroundColor: theme.palette.background.default,
-  color: theme.palette.text.secondary,
-  padding: theme.spacing(4),
-}));
-
-const ToolbarPanel = styled(Panel)({
-  display: 'flex',
-  gap: '8px',
-  padding: '8px',
-  background: 'white',
-  borderRadius: '4px',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-  marginTop: '80px', // Move toolbar down to avoid overlap with diagram tabs
 });
 
 const DiagramWorkspace: React.FC = () => {
@@ -334,126 +280,48 @@ const DiagramWorkspace: React.FC = () => {
   if (!activeDiagram) {
     return (
       <WorkspaceContainer>
-        <FlowContainer>
-          {/* Floating Tab Panel - Always visible */}
-          <FloatingTabPanel elevation={3}>
-            <DiagramTabs />
-          </FloatingTabPanel>
-          
-          <EmptyState>
-            <Typography variant="h6" gutterBottom>
-              No diagram open
-            </Typography>
-            <Typography variant="body2">
-              Create a new diagram by clicking the + button in the tab bar above
-            </Typography>
-          </EmptyState>
-        </FlowContainer>
+        <FloatingTabPanel />
+        <EmptyWorkspaceState />
       </WorkspaceContainer>
     );
   }
 
   return (
     <WorkspaceContainer>
-      <FlowContainer ref={reactFlowWrapper}>
-        {/* Floating Tab Panel */}
-        <FloatingTabPanel elevation={3}>
-          <DiagramTabs />
-        </FloatingTabPanel>
+      <ReactFlowCanvas
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        onSelectionChange={onSelectionChange}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+      >
+        <FloatingTabPanel />
         
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          onSelectionChange={onSelectionChange}
-          nodeTypes={nodeTypes}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          fitView
-          proOptions={{ hideAttribution: true }}
-          deleteKeyCode="Delete"
-          multiSelectionKeyCode="Control"
-          selectionOnDrag
-          snapToGrid
-          snapGrid={[15, 15]}
-        >
-          {/* Background grid */}
-          <Background color="#aaa" gap={16} />
-          
-          {/* Mini map for navigation */}
-          <MiniMap
-            nodeStrokeColor={(n) => {
-              if (n.type === 'block') return '#0041d0';
-              if (n.type === 'sensor') return '#ff0072';
-              if (n.type === 'processor') return '#ff9500';
-              return '#0041d0';
-            }}
-            nodeColor={(n) => {
-              if (n.type === 'block') return '#e3f2fd';
-              if (n.type === 'sensor') return '#ffebee';
-              if (n.type === 'processor') return '#fff8e1';
-              return '#e3f2fd';
-            }}
-            maskColor="rgba(0, 0, 0, 0.1)"
-          />
-          
-          {/* Toolbar */}
-          <ToolbarPanel position="top-center">
-            <IconButton onClick={undo} size="small" title="Undo">
-              <UndoIcon />
-            </IconButton>
-            <IconButton onClick={redo} size="small" title="Redo">
-              <RedoIcon />
-            </IconButton>
-            <IconButton onClick={() => zoomIn()} size="small" title="Zoom In">
-              <ZoomInIcon />
-            </IconButton>
-            <IconButton onClick={() => zoomOut()} size="small" title="Zoom Out">
-              <ZoomOutIcon />
-            </IconButton>
-            <IconButton onClick={() => fitView()} size="small" title="Fit View">
-              <FitScreenIcon />
-            </IconButton>
-            <IconButton onClick={clearDiagram} size="small" title="Clear Diagram">
-              <DeleteIcon />
-            </IconButton>
-            <IconButton onClick={handleSave} size="small" title="Save Diagram">
-              <SaveIcon />
-            </IconButton>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleValidate}
-              color={validationErrors.length > 0 ? 'warning' : 'primary'}
-            >
-              {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'VALIDATE'}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleExport}
-              disabled={!isExportEnabled}
-              color="warning"
-              sx={{ minWidth: '80px' }}
-            >
-              EXPORT
-            </Button>
-          </ToolbarPanel>
-          
-          {/* Status panel */}
-          <Panel position="bottom-left">
-            <Paper sx={{ padding: '4px 8px', opacity: 0.8 }}>
-              <Typography variant="caption">
-                {activeDiagram.name} | {nodes.length} nodes | {edges.length} connections
-              </Typography>
-            </Paper>
-          </Panel>
-        </ReactFlow>
-      </FlowContainer>
+        <WorkspaceToolbar
+          onUndo={undo}
+          onRedo={redo}
+          onZoomIn={() => zoomIn()}
+          onZoomOut={() => zoomOut()}
+          onFitView={() => fitView()}
+          onClear={clearDiagram}
+          onSave={handleSave}
+          onValidate={handleValidate}
+          onExport={handleExport}
+          validationErrors={validationErrors}
+          isExportEnabled={isExportEnabled}
+        />
+        
+        <StatusPanel
+          diagramName={activeDiagram.name}
+          nodeCount={nodes.length}
+          edgeCount={edges.length}
+        />
+      </ReactFlowCanvas>
       
       {/* Properties panel */}
       {showPropertiesPanel && selectedNodeId && (
