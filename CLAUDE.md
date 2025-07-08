@@ -149,21 +149,35 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### new task
-Task: Fix Hidden 'Add Diagram' Button in Tab Bar
-Problem Description:
-The application has been updated with a tabbed interface to manage multiple diagrams. However, there is a critical layout bug. When no diagrams are open, the main workspace shows a message instructing the user to "Create a new diagram by clicking the + button in the tab bar". Unfortunately, the tab bar containing this + button is either not rendered or is hidden behind another UI element, making it impossible for a user to create their first diagram.
+Task: Light Refactoring: Dead Code and Unused Element Removal
 Goal:
-Adjust the frontend layout to ensure the DiagramTabs component, which contains the + button, is always visible above the main DiagramWorkspace.
+Streamline the codebase by identifying and safely removing all unused elements (components, functions, variables, dependencies) across the frontend and backend. This is a cleanup task, not an architectural refactor. The existing file structure and application logic must remain unchanged.
 Acceptance Criteria:
-The tab bar must be visible at all times, especially when no diagrams are open.
-The + button for adding a new diagram must be visible and clickable.
-Clicking the + button must successfully open a new, empty diagram tab.
-The layout must work correctly when multiple tabs are open, displaying them alongside the + button without any visual glitches.
-The fix should not introduce any new layout issues or break responsiveness.
-Suggested Approach & Relevant Files:
-Investigate the Layout: The issue is almost certainly a CSS layout problem (Flexbox or Grid). Examine the main application layout component that arranges the sidebar, the tab bar, and the workspace.
-Check Key Components:
-src/components/DiagramTabs.tsx: This is the component for the tab bar itself.
-src/components/DiagramWorkspace.tsx: This is the main content area that is likely overlapping the tab bar.
-App.tsx (or equivalent layout root): This is where the primary flex/grid container is likely defined.
-Fix the CSS: Adjust the CSS properties (display, flex-direction, height, z-index, etc.) of the main layout containers to ensure the DiagramTabs component is allocated its own space and is not overlapped by the workspace below it.
+The application must build and run successfully using docker-compose up --build.
+All existing functionality must remain intact. There should be no regressions in AI generation, diagram editing, the tab system, or any other feature.
+All backend tests must pass when running poetry run pytest.
+No new files or directories should be created. This task is strictly about deletion and cleanup.
+The final codebase will be smaller and cleaner, containing only actively used code and dependencies.
+Cleanup Plan
+Follow these steps in order to safely clean the repository.
+Identify and Remove Unused Frontend Files:
+Action: Systematically check the frontend/src/ directory, especially within components/, hooks/, and any utility folders. Identify .tsx, .ts, and .css files that are not imported or used anywhere in the application.
+Verification: Before deleting, use your IDE's "Find Usages" or a global search to confirm a file is truly unreferenced.
+Result: Delete the confirmed unused files.
+Clean Unused Code Within Frontend Files:
+Action: Go through the remaining components and utility files. Look for and remove:
+Unused imports at the top of files.
+Unused variables and functions (your linter should highlight these).
+State variables or actions in the Zustand store (src/store/diagramStore.ts) that are no longer used.
+Large blocks of commented-out legacy code that are no longer needed for reference.
+Audit and Prune Frontend Dependencies:
+Action: In the frontend directory, run the command npx depcheck to identify unused dependencies in package.json.
+Result: Carefully review the list from depcheck. For each library confirmed as unused, remove it from package.json and then run npm install to update the package-lock.json file.
+Clean Unused Backend Code:
+Action: Review the backend/app/ directory. Look for unused Python functions, classes, or entire modules (.py files) that are no longer imported or called.
+Focus Areas: Pay special attention to helper functions in database/ or AI/ that might have become obsolete after recent updates.
+Final Verification (Crucial Step):
+Action: After all cleanups are complete, perform a full system check to ensure nothing was broken.
+Run docker-compose down followed by docker-compose up --build to confirm the application builds and starts correctly.
+In the backend directory, run poetry run pytest to ensure all tests still pass.
+Manually test the application's key features: create a diagram with AI, switch tabs, close a tab, save a diagram.
