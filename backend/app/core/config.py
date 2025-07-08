@@ -7,10 +7,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_GENERATIVE_MODEL: str
     
+    # Application version
+    APP_VERSION: str = "1.0"
+    
     # Database settings
     DB_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/postgres"
-    DB_URL_SYNC: str = "postgresql+psycopg2://postgres:postgres@db:5432/postgres"
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@db:5432/postgres"  # Keep for compatibility
 
     class Config:
         env_file = ".env"

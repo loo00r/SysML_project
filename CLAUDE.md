@@ -116,6 +116,35 @@ DB_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
 - OpenAI embeddings use 1536-dimensional vectors
 - Diagram positioning is handled automatically by Dagre layout algorithm
 
+### Changelog Maintenance
+
+**After completing each task, you must update the changelog:**
+
+1. **Update CHANGELOG.md**: Add a summary of the changes to the `[Unreleased]` section
+2. **Increment Version**: Create a new version entry with incremented patch version (e.g., 1.1.0 → 1.1.1)
+3. **Update .env**: Update both `APP_VERSION` and `VITE_APP_VERSION` to match the new version
+4. **Categorize Changes**: Use the following categories:
+   - `Added` for new features
+   - `Changed` for changes in existing functionality
+   - `Deprecated` for soon-to-be removed features
+   - `Removed` for now removed features
+   - `Fixed` for any bug fixes
+   - `Security` for vulnerability fixes
+
+**Example workflow:**
+```markdown
+## [Unreleased]
+
+## [1.1.1] - 2025-07-08
+### Added
+- New feature implementation
+
+### Fixed  
+- Bug fix description
+```
+
+**Important**: Always follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and [Semantic Versioning](https://semver.org/) principles.
+
 ## Testing
 
 Backend tests are located in `backend/app/test/` and use pytest with async support. Run tests with `poetry run pytest` in the backend directory.
@@ -148,22 +177,3 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
-### new task
-Task: Fix Hidden 'Add Diagram' Button in Tab Bar
-Problem Description:
-The application has been updated with a tabbed interface to manage multiple diagrams. However, there is a critical layout bug. When no diagrams are open, the main workspace shows a message instructing the user to "Create a new diagram by clicking the + button in the tab bar". Unfortunately, the tab bar containing this + button is either not rendered or is hidden behind another UI element, making it impossible for a user to create their first diagram.
-Goal:
-Adjust the frontend layout to ensure the DiagramTabs component, which contains the + button, is always visible above the main DiagramWorkspace.
-Acceptance Criteria:
-The tab bar must be visible at all times, especially when no diagrams are open.
-The + button for adding a new diagram must be visible and clickable.
-Clicking the + button must successfully open a new, empty diagram tab.
-The layout must work correctly when multiple tabs are open, displaying them alongside the + button without any visual glitches.
-The fix should not introduce any new layout issues or break responsiveness.
-Suggested Approach & Relevant Files:
-Investigate the Layout: The issue is almost certainly a CSS layout problem (Flexbox or Grid). Examine the main application layout component that arranges the sidebar, the tab bar, and the workspace.
-Check Key Components:
-src/components/DiagramTabs.tsx: This is the component for the tab bar itself.
-src/components/DiagramWorkspace.tsx: This is the main content area that is likely overlapping the tab bar.
-App.tsx (or equivalent layout root): This is where the primary flex/grid container is likely defined.
-Fix the CSS: Adjust the CSS properties (display, flex-direction, height, z-index, etc.) of the main layout containers to ensure the DiagramTabs component is allocated its own space and is not overlapped by the workspace below it.

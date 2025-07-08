@@ -3,10 +3,6 @@ import json
 from typing import Dict, Any, List, Optional, Union
 from app.core.config import settings
 
-# Define the SysML element types for better structure
-class DiagramTypes:
-    BLOCK = "block"
-
 # Define positioning constants
 class DiagramPositioning:
     # Vertical spacing (y-coordinates)
