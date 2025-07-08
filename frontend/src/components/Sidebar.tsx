@@ -72,6 +72,7 @@ const ColorIndicator = styled(Box, {
 
 const Sidebar: React.FC = () => {
   const { diagramType } = useDiagramStore();
+  const version = import.meta.env.VITE_APP_VERSION || '1.0';
 
   // Handle drag start for creating new nodes
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
@@ -238,7 +239,7 @@ const Sidebar: React.FC = () => {
       <Box sx={{ mt: 'auto', p: 2 }}>
         <Divider />
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          SysML AI Modeling Tool v1.0
+          SysML AI Modeling Tool v{version}
         </Typography>
       </Box>
     </SidebarContainer>

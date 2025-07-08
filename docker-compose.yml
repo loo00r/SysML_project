@@ -18,6 +18,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        - VITE_APP_VERSION=${VITE_APP_VERSION}
     container_name: sysml_frontend
     ports:
       - "3000:80"

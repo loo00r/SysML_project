@@ -149,35 +149,19 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### new task
-Task: Light Refactoring: Dead Code and Unused Element Removal
-Goal:
-Streamline the codebase by identifying and safely removing all unused elements (components, functions, variables, dependencies) across the frontend and backend. This is a cleanup task, not an architectural refactor. The existing file structure and application logic must remain unchanged.
-Acceptance Criteria:
-The application must build and run successfully using docker-compose up --build.
-All existing functionality must remain intact. There should be no regressions in AI generation, diagram editing, the tab system, or any other feature.
-All backend tests must pass when running poetry run pytest.
-No new files or directories should be created. This task is strictly about deletion and cleanup.
-The final codebase will be smaller and cleaner, containing only actively used code and dependencies.
-Cleanup Plan
-Follow these steps in order to safely clean the repository.
-Identify and Remove Unused Frontend Files:
-Action: Systematically check the frontend/src/ directory, especially within components/, hooks/, and any utility folders. Identify .tsx, .ts, and .css files that are not imported or used anywhere in the application.
-Verification: Before deleting, use your IDE's "Find Usages" or a global search to confirm a file is truly unreferenced.
-Result: Delete the confirmed unused files.
-Clean Unused Code Within Frontend Files:
-Action: Go through the remaining components and utility files. Look for and remove:
-Unused imports at the top of files.
-Unused variables and functions (your linter should highlight these).
-State variables or actions in the Zustand store (src/store/diagramStore.ts) that are no longer used.
-Large blocks of commented-out legacy code that are no longer needed for reference.
-Audit and Prune Frontend Dependencies:
-Action: In the frontend directory, run the command npx depcheck to identify unused dependencies in package.json.
-Result: Carefully review the list from depcheck. For each library confirmed as unused, remove it from package.json and then run npm install to update the package-lock.json file.
-Clean Unused Backend Code:
-Action: Review the backend/app/ directory. Look for unused Python functions, classes, or entire modules (.py files) that are no longer imported or called.
-Focus Areas: Pay special attention to helper functions in database/ or AI/ that might have become obsolete after recent updates.
-Final Verification (Crucial Step):
-Action: After all cleanups are complete, perform a full system check to ensure nothing was broken.
-Run docker-compose down followed by docker-compose up --build to confirm the application builds and starts correctly.
-In the backend directory, run poetry run pytest to ensure all tests still pass.
-Manually test the application's key features: create a diagram with AI, switch tabs, close a tab, save a diagram.
+
+Task: Unify and Display Application Version
+Goal
+Establish a single application version (1.1) that is managed from the .env file and displayed in the user interface.
+Key Steps
+Configuration (.env):
+Add the APP_VERSION=1.1 variable to the .env file.
+For Vite compatibility, also add VITE_APP_VERSION=1.1.
+Backend (FastAPI):
+Configure the application to read APP_VERSION from .env into the Pydantic settings (app/core/config.py).
+Frontend (React):
+Create a component that reads VITE_APP_VERSION via import.meta.env and displays the version (e.g., v1.1) in a static location in the UI (e.g., bottom-right corner).
+Acceptance Criteria
+The APP_VERSION variable is successfully read by the backend.
+The version v1.1 is displayed in the application's UI.
+The single source of truth for the version for both backend and frontend is the .env file.

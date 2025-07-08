@@ -1,6 +1,11 @@
 # Build stage
 FROM node:20-alpine AS build
 WORKDIR /app
+
+# Accept build argument for app version
+ARG VITE_APP_VERSION=1.0
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .

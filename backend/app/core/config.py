@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_GENERATIVE_MODEL: str
     
+    # Application version
+    APP_VERSION: str = "1.0"
+    
     # Database settings
     DB_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/postgres"
 

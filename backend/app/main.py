@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.api_v1 import router
 from app.db.session import engine
 from app.db.base import Base
+from app.core.config import settings
 
 app = FastAPI(
     title="SysML API",
     description="API for SysML diagram generation and management",
-    version="1.0.0",
+    version=settings.APP_VERSION,
 )
 
 app.add_middleware(
