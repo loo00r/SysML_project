@@ -17,28 +17,47 @@ const TabsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   minHeight: 48,
-  overflow: 'hidden',
+  overflow: 'visible',
   padding: theme.spacing(0.5, 1),
+  maxWidth: 'calc(100vw - 400px)', // Leave space for sidebar and other UI
 }));
 
-const StyledTabs = styled(Tabs)(({ theme }) => ({
-  minHeight: 40,
-  '& .MuiTabs-indicator': {
-    backgroundColor: theme.palette.primary.main,
-  },
-  '& .MuiTab-root': {
+const StyledTabs = styled(Tabs)<{ tabCount: number }>(({ theme, tabCount }) => {
+  // Calculate adaptive width based on tab count
+  const getTabWidth = () => {
+    if (tabCount <= 6) return { minWidth: 120, maxWidth: 180 };
+    if (tabCount <= 10) return { minWidth: 90, maxWidth: 120 };
+    if (tabCount <= 14) return { minWidth: 70, maxWidth: 90 };
+    return { minWidth: 50, maxWidth: 70 };
+  };
+  
+  const { minWidth, maxWidth } = getTabWidth();
+  
+  return {
     minHeight: 40,
-    textTransform: 'none',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-    padding: theme.spacing(0.5, 0.75),
-    minWidth: 100,
-    maxWidth: 180,
-  },
-  '& .MuiTabs-flexContainer': {
-    gap: theme.spacing(0.5),
-  },
-}));
+    flex: 1,
+    '& .MuiTabs-indicator': {
+      backgroundColor: theme.palette.primary.main,
+    },
+    '& .MuiTab-root': {
+      minHeight: 40,
+      textTransform: 'none',
+      fontSize: tabCount > 14 ? '0.65rem' : '0.75rem',
+      fontWeight: 500,
+      padding: theme.spacing(0.5, 0.5),
+      minWidth: minWidth,
+      maxWidth: maxWidth,
+    },
+    '& .MuiTabs-flexContainer': {
+      gap: theme.spacing(0.25),
+    },
+    '& .MuiTabs-scrollButtons': {
+      '&.Mui-disabled': {
+        opacity: 0.3,
+      },
+    },
+  };
+});
 
 const TabContent = styled(Box)({
   display: 'flex',
@@ -142,6 +161,7 @@ const DiagramTabs: React.FC = () => {
   return (
     <TabsContainer>
       <StyledTabs
+        tabCount={openDiagrams.length}
         value={activeDiagramId || false}
         onChange={handleTabChange}
         variant="scrollable"
