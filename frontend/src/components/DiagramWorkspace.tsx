@@ -73,6 +73,7 @@ const ToolbarPanel = styled(Panel)({
   background: 'white',
   borderRadius: '4px',
   boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+  marginTop: '80px', // Move toolbar down to avoid overlap with diagram tabs
 });
 
 const DiagramWorkspace: React.FC = () => {
