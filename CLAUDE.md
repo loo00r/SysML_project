@@ -116,6 +116,35 @@ DB_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
 - OpenAI embeddings use 1536-dimensional vectors
 - Diagram positioning is handled automatically by Dagre layout algorithm
 
+### Changelog Maintenance
+
+**After completing each task, you must update the changelog:**
+
+1. **Update CHANGELOG.md**: Add a summary of the changes to the `[Unreleased]` section
+2. **Increment Version**: Create a new version entry with incremented patch version (e.g., 1.1.0 → 1.1.1)
+3. **Update .env**: Update both `APP_VERSION` and `VITE_APP_VERSION` to match the new version
+4. **Categorize Changes**: Use the following categories:
+   - `Added` for new features
+   - `Changed` for changes in existing functionality
+   - `Deprecated` for soon-to-be removed features
+   - `Removed` for now removed features
+   - `Fixed` for any bug fixes
+   - `Security` for vulnerability fixes
+
+**Example workflow:**
+```markdown
+## [Unreleased]
+
+## [1.1.1] - 2025-07-08
+### Added
+- New feature implementation
+
+### Fixed  
+- Bug fix description
+```
+
+**Important**: Always follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and [Semantic Versioning](https://semver.org/) principles.
+
 ## Testing
 
 Backend tests are located in `backend/app/test/` and use pytest with async support. Run tests with `poetry run pytest` in the backend directory.
@@ -148,20 +177,3 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
-### new task
-
-Task: Unify and Display Application Version
-Goal
-Establish a single application version (1.1) that is managed from the .env file and displayed in the user interface.
-Key Steps
-Configuration (.env):
-Add the APP_VERSION=1.1 variable to the .env file.
-For Vite compatibility, also add VITE_APP_VERSION=1.1.
-Backend (FastAPI):
-Configure the application to read APP_VERSION from .env into the Pydantic settings (app/core/config.py).
-Frontend (React):
-Create a component that reads VITE_APP_VERSION via import.meta.env and displays the version (e.g., v1.1) in a static location in the UI (e.g., bottom-right corner).
-Acceptance Criteria
-The APP_VERSION variable is successfully read by the backend.
-The version v1.1 is displayed in the application's UI.
-The single source of truth for the version for both backend and frontend is the .env file.
