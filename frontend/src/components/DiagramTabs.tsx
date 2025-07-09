@@ -17,18 +17,19 @@ const TabsContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   minHeight: 48,
-  overflow: 'visible',
+  overflow: 'hidden', // Hide overflow to prevent tabs from extending beyond container
   padding: theme.spacing(0.5, 1),
-  maxWidth: 'calc(100vw - 400px)', // Leave space for sidebar and other UI
+  width: '100%', // Take full width of parent container
 }));
 
 const StyledTabs = styled(Tabs)<{ tabCount: number }>(({ theme, tabCount }) => {
-  // Calculate adaptive width based on tab count
+  // Calculate adaptive width based on tab count - optimized for max 9 visible tabs
   const getTabWidth = () => {
-    if (tabCount <= 6) return { minWidth: 120, maxWidth: 180 };
-    if (tabCount <= 10) return { minWidth: 90, maxWidth: 120 };
-    if (tabCount <= 14) return { minWidth: 70, maxWidth: 90 };
-    return { minWidth: 50, maxWidth: 70 };
+    if (tabCount <= 5) return { minWidth: 140, maxWidth: 180 };
+    if (tabCount <= 7) return { minWidth: 110, maxWidth: 140 };
+    if (tabCount <= 9) return { minWidth: 90, maxWidth: 110 };
+    // When more than 9 tabs, use scrolling with fixed smaller width
+    return { minWidth: 80, maxWidth: 100 };
   };
   
   const { minWidth, maxWidth } = getTabWidth();
@@ -36,13 +37,14 @@ const StyledTabs = styled(Tabs)<{ tabCount: number }>(({ theme, tabCount }) => {
   return {
     minHeight: 40,
     flex: 1,
+    overflow: 'hidden', // Ensure tabs don't overflow container
     '& .MuiTabs-indicator': {
       backgroundColor: theme.palette.primary.main,
     },
     '& .MuiTab-root': {
       minHeight: 40,
       textTransform: 'none',
-      fontSize: tabCount > 14 ? '0.65rem' : '0.75rem',
+      fontSize: tabCount > 9 ? '0.65rem' : '0.75rem',
       fontWeight: 500,
       padding: theme.spacing(0.5, 0.5),
       minWidth: minWidth,
@@ -52,9 +54,13 @@ const StyledTabs = styled(Tabs)<{ tabCount: number }>(({ theme, tabCount }) => {
       gap: theme.spacing(0.25),
     },
     '& .MuiTabs-scrollButtons': {
+      width: 32,
       '&.Mui-disabled': {
         opacity: 0.3,
       },
+    },
+    '& .MuiTabs-scroller': {
+      overflow: 'hidden !important', // Force hide overflow
     },
   };
 });
@@ -164,9 +170,9 @@ const DiagramTabs: React.FC = () => {
         tabCount={openDiagrams.length}
         value={activeDiagramId || false}
         onChange={handleTabChange}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
+        variant={openDiagrams.length > 9 ? "scrollable" : "standard"}
+        scrollButtons={openDiagrams.length > 9 ? "auto" : false}
+        allowScrollButtonsMobile={openDiagrams.length > 9}
       >
         {openDiagrams.map((diagram) => (
           <Tab
