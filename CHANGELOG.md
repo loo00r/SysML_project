@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2025-07-09
+
+### Fixed
+- Fixed add tab button (+) positioning when tabs are present
+- StyledTabs now uses flex: 'none' when less than 10 tabs to allow proper inline positioning
+- Add button now appears directly adjacent to tabs instead of being pushed to the far right
+- Only uses flex: 1 when scrolling is needed (10+ tabs) to maintain proper layout with fixed positioning
+
+## [1.2.0] - 2025-07-09
+
+### Changed
+- Improved add tab button (+) behavior to match browser interface standards
+- Add button now appears inline directly after tabs when less than 10 tabs are present
+- When 10+ tabs trigger scrolling, add button automatically switches to fixed position
+- Restored original AddButton styling for inline positioning
+- Created FixedAddButton component for scrolling mode with enhanced styling
+- TabsContainer now dynamically adjusts positioning based on scrolling state
+- Enhanced user experience with contextual button positioning that adapts to tab count
+
+## [1.1.9] - 2025-07-09
+
+### Changed
+- Redesigned add tab button (+) to match browser-like interface behavior
+- Fixed add button position next to tabs with absolute positioning
+- Add button now remains in fixed position when tab scrolling is activated (10+ tabs)
+- Enhanced add button styling with background, border, and proper z-index
+- Reserved space in tabs container (48px padding-right) to prevent overlap with add button
+- Add button is now always active and accessible regardless of tab count
+
 ## [1.1.8] - 2025-07-09
 
 ### Added
@@ -109,7 +138,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
 
-[Unreleased]: https://github.com/satoro/SysML_project/compare/v1.1.8...HEAD
+[Unreleased]: https://github.com/satoro/SysML_project/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/satoro/SysML_project/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/satoro/SysML_project/compare/v1.1.9...v1.2.0
+[1.1.9]: https://github.com/satoro/SysML_project/compare/v1.1.8...v1.1.9
 [1.1.8]: https://github.com/satoro/SysML_project/compare/v1.1.7...v1.1.8
 [1.1.7]: https://github.com/satoro/SysML_project/compare/v1.1.6...v1.1.7
 [1.1.6]: https://github.com/satoro/SysML_project/compare/v1.1.5...v1.1.6
