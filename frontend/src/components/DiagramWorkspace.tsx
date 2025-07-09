@@ -501,6 +501,19 @@ const DiagramWorkspace: React.FC = () => {
             maskColor="rgba(0, 0, 0, 0.1)"
           />
           
+          {/* Status panel */}
+          <Panel position="bottom-left">
+            <Paper sx={{ 
+              padding: '4px 8px', 
+              opacity: 0.8,
+              marginLeft: '8px',
+              marginBottom: '8px',
+            }}>
+              <Typography variant="caption">
+                {activeDiagram.name} | {nodes.length} nodes | {edges.length} connections
+              </Typography>
+            </Paper>
+          </Panel>
         </ReactFlow>
       </FlowContainer>
       
