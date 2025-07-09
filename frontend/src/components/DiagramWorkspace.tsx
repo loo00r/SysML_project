@@ -75,7 +75,7 @@ const ToolbarPanel = styled(Panel)({
   background: 'white',
   borderRadius: '4px',
   boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-  marginTop: '80px', // Move toolbar down to avoid overlap with diagram tabs
+  marginBottom: '8px', // Add bottom margin to provide space above status bar
 });
 
 const DiagramWorkspace: React.FC = () => {
@@ -402,7 +402,7 @@ const DiagramWorkspace: React.FC = () => {
           />
           
           {/* Toolbar */}
-          <ToolbarPanel position="top-center">
+          <ToolbarPanel position="bottom-center">
             <IconButton onClick={undo} size="small" title="Undo">
               <UndoIcon />
             </IconButton>

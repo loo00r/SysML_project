@@ -177,3 +177,27 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
+### new task
+
+Task Type: UI/UX Improvement
+Title: Relocate Canvas Toolbar to the Bottom
+Project: AI-Powered SysML Modeling Tool
+Description
+The current toolbar for canvas management (zoom, save, validate, etc.) is located at the top of the DiagramWorkspace, directly above the diagram itself.
+Goal: To create a cleaner and more minimalist interface where the main focus is on the diagram, this toolbar needs to be moved from the top of the canvas to the bottom. The new location should be just above the status bar (where the node and connection counts are displayed).
+As a result, the functionality of all buttons on the toolbar must be fully preserved, and the interface's appearance will become more balanced and modern.
+Acceptance Criteria
+The Toolbar is visually located at the bottom of the canvas workspace, above the bottom status bar.
+The toolbar remains horizontally centered.
+All controls on the toolbar (Undo, Redo, Zoom In/Out, Fit View, Delete, Save, Validate, Export) function exactly as before.
+The position change does not break the overall layout or responsiveness of the DiagramWorkspace component.
+The change applies to all diagram tabs, not just the active one.
+Technical Implementation Details
+Primary file to modify: frontend/src/components/DiagramWorkspace.tsx. This component contains the rendering logic for the React Flow canvas and the integrated toolbar.
+Technology Stack: React, TypeScript, Material-UI, React Flow.
+Recommended Approach:
+In the DiagramWorkspace.tsx file, locate the container that wraps the toolbar and the ReactFlow component. It's most likely a Material-UI Box or Stack using display: 'flex' and flex-direction: 'column'.
+To move the toolbar down, change the order of the child elements within this flex container. The simplest way is to change the order of the JSX elements, placing the toolbar component after the ReactFlow component.
+Check that the margins and padding around the toolbar look correct in its new position. You may need to move a top margin to a bottom margin.
+Important: Ensure that the logic associated with the toolbar (e.g., functions passed via props) was not broken during the JSX code relocation.
+After completing the task, remember to update CHANGELOG.md and the version in .env according to the instructions in the CLAUDE.md file.
