@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.1] - 2025-07-09
+## [1.1.11] - 2025-07-09
 
 ### Fixed
 - Fixed add tab button (+) positioning when tabs are present
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add button now appears directly adjacent to tabs instead of being pushed to the far right
 - Only uses flex: 1 when scrolling is needed (10+ tabs) to maintain proper layout with fixed positioning
 
-## [1.2.0] - 2025-07-09
+## [1.1.10] - 2025-07-09
 
 ### Changed
 - Improved add tab button (+) behavior to match browser interface standards
@@ -138,9 +138,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
 
-[Unreleased]: https://github.com/satoro/SysML_project/compare/v1.2.1...HEAD
-[1.2.1]: https://github.com/satoro/SysML_project/compare/v1.2.0...v1.2.1
-[1.2.0]: https://github.com/satoro/SysML_project/compare/v1.1.9...v1.2.0
+[Unreleased]: https://github.com/satoro/SysML_project/compare/v1.1.11...HEAD
+[1.1.11]: https://github.com/satoro/SysML_project/compare/v1.1.10...v1.1.11
+[1.1.10]: https://github.com/satoro/SysML_project/compare/v1.1.9...v1.1.10
 [1.1.9]: https://github.com/satoro/SysML_project/compare/v1.1.8...v1.1.9
 [1.1.8]: https://github.com/satoro/SysML_project/compare/v1.1.7...v1.1.8
 [1.1.7]: https://github.com/satoro/SysML_project/compare/v1.1.6...v1.1.7
