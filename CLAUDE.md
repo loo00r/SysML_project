@@ -179,57 +179,53 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task 1: Style Refinement for IBD Icon
-Task: Refine 'View IBD' Icon Style
+Task: Enable IBD Functionality for Sensor and Processor Nodes
 Context
-The current implementation of the persistent "View IBD" icon includes a solid blue circular background. This style is visually inconsistent with the application's overall aesthetic. The desired appearance is the clean, background-less icon that is currently shown only on hover.
+The IBD creation and viewing functionality was successfully implemented for the System Block node type. However, this feature is equally relevant for other container-like nodes, such as Sensor and Processor. Currently, these nodes do not have the IBD trigger, limiting their utility.
 
 Goal
-Remove the blue background from the default state of the "View IBD" icon. The icon itself should remain, but it should be rendered on a transparent background, matching the style of other UI elements.
+Extend the exact same IBD trigger functionality to both Sensor and Processor nodes, making it a consistent feature across all relevant block types.
 
 Step-by-Step Implementation
-1. Locate the Relevant CSS Rule
-The style for this icon is likely defined in the CSS file associated with the node components (e.g., BlockNode.module.css or a global stylesheet).
+1. Identify Reusable Logic in BlockNode.tsx
+Open frontend/src/components/nodes/BlockNode.tsx.
 
-Find the CSS selector for the persistently visible icon. Based on our previous work, this is likely .ibd-indicator-icon.view-ibd.
+Identify the block of code responsible for the IBD trigger. This includes:
 
-2. Remove the Background Style
-In the identified CSS rule, find and remove or override the background or background-color property. To be explicit, you can set it to transparent.
+The useDiagramStore hook call to check if an IBD exists.
 
-Example CSS Change:
+The main wrapper div (.node-container).
 
-CSS
+The conditional rendering logic ({ibdExists ? ... : ...}) for the icon.
 
-/* Find this existing rule */
-.ibd-indicator-icon.view-ibd {
-  display: flex;
-  background-color: #3b82f6; /* This is likely the line to remove */
-  /* ... other styles ... */
-}
+2. Apply Logic to SensorNode.tsx
+Open frontend/src/components/nodes/SensorNode.tsx.
 
-/* Change it to this */
-.ibd-indicator-icon.view-ibd {
-  display: flex;
-  background-color: transparent; /* Or remove the line completely */
-  border: none; /* You might also need to remove the border */
-  /* ... other styles ... */
-}
-3. (Optional) Refine Hover Effect
-Since the icon will no longer have a background, consider adding a subtle hover effect for better user feedback.
+Replicate the structure from BlockNode.tsx:
 
-Example:
+Add the necessary imports (useDiagramStore, icons, etc.).
 
-CSS
+Implement the useDiagramStore logic to get ibdExists.
 
-.ibd-indicator-icon.view-ibd:hover {
-  transform: scale(1.1); /* Slightly enlarges the icon on hover */
-  filter: brightness(0.9); /* Slightly darkens the icon */
-}
+Wrap the component's JSX in the same .node-container structure.
+
+Paste the conditional rendering logic for the icon inside the container, as a sibling to the main node content.
+
+3. Apply Logic to ProcessorNode.tsx
+Open frontend/src/components/nodes/ProcessorNode.tsx.
+
+Repeat the exact same steps as for the SensorNode, ensuring the IBD trigger logic and structure are identical.
+
+4. (Note) Future Refactoring
+For long-term maintainability, consider refactoring this duplicated logic. A good approach would be to create a Higher-Order Component (HOC), for example withIbdTrigger(NodeComponent), that wraps any node component and provides it with the IBD functionality. This is not part of this task but is a recommended future improvement.
+
 Acceptance Criteria
-✅ The persistent "View IBD" icon no longer has a blue circular background in its default state.
+✅ Hovering over a Sensor node without an IBD displays the "Add IBD" (+) icon.
 
-✅ The icon itself (the document symbol) is still clearly visible.
+✅ Hovering over a Processor node without an IBD displays the "Add IBD" (+) icon.
 
-✅ A subtle hover effect is present on the icon for user feedback.
+✅ Clicking the + icon on these nodes correctly creates a new IBD diagram tab.
 
-✅ The "Add IBD" (+) icon's functionality and appearance are not affected.
+✅ If an IBD exists for a Sensor or Processor node, the persistent "View IBD" icon is displayed below it.
+
+✅ The functionality for the System Block node remains unchanged and fully functional.

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.15] - 2025-07-13
+
+### Added
+- Extended IBD (Internal Block Diagram) functionality to Sensor and Processor nodes
+- All container-like nodes (Block, Sensor, Processor) now support IBD creation and viewing
+- Consistent IBD trigger icons appear below all relevant node types
+- Unified hover-to-reveal behavior for Add IBD functionality across all node types
+
+### Changed
+- SensorNode and ProcessorNode components now include complete IBD logic
+- Replicated smart IBD indicator system from BlockNode to ensure consistent UX
+- Enhanced modularity by applying identical IBD patterns to all container nodes
+
 ## [1.1.14] - 2025-07-13
 
 ### Fixed
