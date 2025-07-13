@@ -163,7 +163,7 @@ const DiagramTabs: React.FC = () => {
     const newDiagramName = `Diagram ${openDiagrams.length + 1}`;
     openDiagram({
       name: newDiagramName,
-      type: 'BDD',
+      type: 'bdd',
       nodes: [],
       edges: [],
       description: ''

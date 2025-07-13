@@ -1,7 +1,9 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
-import { Paper, Typography, Box } from '@mui/material';
+import { Paper, Typography, Box, IconButton, Tooltip, Badge } from '@mui/material';
+import { ZoomIn } from '@mui/icons-material';
+import useDiagramStore from '../../store/diagramStore';
 
 const STANDARD_NODE_WIDTH = 260;
 
@@ -24,6 +26,9 @@ const BlockHeader = styled(Box)(({ theme }) => ({
   borderBottom: '1px solid #ccc',
   paddingBottom: theme.spacing(0.5),
   marginBottom: theme.spacing(1),
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
 }));
 
 const BlockTitle = styled(Typography)(({ theme }) => ({
@@ -50,9 +55,28 @@ const BlockProperties = styled(Box)(({ theme }) => ({
 // Define the BlockNode component
 const BlockNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
-    // Check if this node has any incoming connections
+  const { openNewDiagramTab, openDiagrams } = useDiagramStore();
+  
+  // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
   const hasIncomingConnections = edges.some((edge) => edge.target === id);
+  
+  // Check if there's already an IBD diagram for this block
+  const hasIBD = openDiagrams.some(diagram => 
+    diagram.type === 'ibd' && 
+    diagram.name.includes(`${label || 'Block'} - IBD`)
+  );
+  
+  const handleOpenIBD = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    openNewDiagramTab({
+      name: `${label || 'Block'} - IBD`,
+      type: 'ibd',
+      nodes: [],
+      edges: [],
+      description: `Internal Block Diagram for ${label || 'Block'}`
+    });
+  };
   
   return (
     <BlockPaper
@@ -67,9 +91,36 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
         style={{ background: '#555' }}
       />
         <BlockHeader>
-        <BlockTitle variant="subtitle1">
+        <BlockTitle variant="subtitle1" sx={{ flex: 1, textAlign: 'center' }}>
           {label || 'Unnamed Block'}
         </BlockTitle>
+        <Tooltip title={hasIBD ? "IBD exists - Click to open" : "Open Internal Block Diagram"}>
+          <Badge 
+            variant="dot" 
+            color="success" 
+            invisible={!hasIBD}
+            sx={{
+              '& .MuiBadge-dot': {
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+              }
+            }}
+          >
+            <IconButton 
+              size="small" 
+              onClick={handleOpenIBD}
+              sx={{ 
+                padding: '2px',
+                '&:hover': {
+                  backgroundColor: 'rgba(0,0,0,0.1)'
+                }
+              }}
+            >
+              <ZoomIn fontSize="small" />
+            </IconButton>
+          </Badge>
+        </Tooltip>
       </BlockHeader>
       
       {Object.keys(properties).length > 0 && (

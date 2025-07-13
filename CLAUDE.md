@@ -179,25 +179,90 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task Type: UI/UX Improvement
-Title: Relocate Canvas Toolbar to the Bottom
-Project: AI-Powered SysML Modeling Tool
-Description
-The current toolbar for canvas management (zoom, save, validate, etc.) is located at the top of the DiagramWorkspace, directly above the diagram itself.
-Goal: To create a cleaner and more minimalist interface where the main focus is on the diagram, this toolbar needs to be moved from the top of the canvas to the bottom. The new location should be just above the status bar (where the node and connection counts are displayed).
-As a result, the functionality of all buttons on the toolbar must be fully preserved, and the interface's appearance will become more balanced and modern.
-Acceptance Criteria
-The Toolbar is visually located at the bottom of the canvas workspace, above the bottom status bar.
-The toolbar remains horizontally centered.
-All controls on the toolbar (Undo, Redo, Zoom In/Out, Fit View, Delete, Save, Validate, Export) function exactly as before.
-The position change does not break the overall layout or responsiveness of the DiagramWorkspace component.
-The change applies to all diagram tabs, not just the active one.
-Technical Implementation Details
-Primary file to modify: frontend/src/components/DiagramWorkspace.tsx. This component contains the rendering logic for the React Flow canvas and the integrated toolbar.
-Technology Stack: React, TypeScript, Material-UI, React Flow.
-Recommended Approach:
-In the DiagramWorkspace.tsx file, locate the container that wraps the toolbar and the ReactFlow component. It's most likely a Material-UI Box or Stack using display: 'flex' and flex-direction: 'column'.
-To move the toolbar down, change the order of the child elements within this flex container. The simplest way is to change the order of the JSX elements, placing the toolbar component after the ReactFlow component.
-Check that the margins and padding around the toolbar look correct in its new position. You may need to move a top margin to a bottom margin.
-Important: Ensure that the logic associated with the toolbar (e.g., functions passed via props) was not broken during the JSX code relocation.
-After completing the task, remember to update CHANGELOG.md and the version in .env according to the instructions in the CLAUDE.md file.
+Task: Implement Embedded IBD Diagrams in Frontend
+
+Task: Implement Embedded IBD Diagrams in Frontend
+
+### Context
+We want to enable users to open and edit IBD (Internal Block Diagram) views nested within blocks of BDD (Block Definition Diagram) directly in the frontend. This feature allows better modularity and logical separation of internal structure.
+
+This is a purely frontend-focused task.
+
+---
+
+### Goal
+Allow users to open an IBD diagram as a new tab when clicking on a block node in the BDD diagram. Each IBD diagram should be treated as a separate diagram instance managed in the Zustand store.
+
+---
+
+### Step-by-Step Implementation
+
+#### 1. Update Diagram Types in Zustand Store
+- Open src/store/diagramStore.ts.
+- Extend DiagramInstance interface with new type:
+  
+  type DiagramInstance = {
+    id: string;
+    name: string;
+    type: 'bdd' | 'ibd';
+    nodes: Node[];
+    edges: Edge[];
+    createdAt: number;
+    updatedAt: number;
+  }
+  
+- Ensure the store allows opening and closing diagrams of both types.
+
+#### 2. Add Button in BlockNode Component
+- Open frontend/src/components/nodes/BlockNode.tsx.
+- Add a button or icon (e.g. magnifying glass) to trigger IBD open.
+- On click, dispatch a Zustand action to create a new diagram tab:
+  
+  onClick={() => openNewDiagramTab({
+    id: `ibd-${node.id}`,
+    name: `${node.data.label} - IBD`,
+    type: 'ibd',
+    nodes: [],
+    edges: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })}
+  
+
+#### 3. Render Conditional Editors Based on Diagram Type
+- Open src/components/DiagramWorkspace.tsx.
+- Modify canvas logic to render different sets of node types depending on diagram type:
+  
+  const nodeTypes = activeDiagram.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
+  
+- Use conditional rendering to support layout or styling differences.
+
+#### 4. Create Separate Node Types for IBD
+- Add components like PortNode.tsx, ConnectionNode.tsx in src/components/nodes/.
+- Register them in the ibdNodeTypes map.
+
+#### 5. Display Visual Indicator for Nested Diagram
+- In BlockNode.tsx, if an IBD already exists for a block, show a small visual indicator (e.g., a badge or dot).
+- Optional: add tooltip "Open internal diagram".
+
+---
+
+### Optional Future Work (Not in Scope)
+- Saving IBD diagrams to backend and linking to block_id
+- Generating IBD content from GPT
+
+---
+
+### Acceptance Criteria
+- Clicking a block node opens a new tab of type ibd with its own canvas.
+- Zustand correctly tracks multiple diagrams.
+- Each IBD tab is independently editable.
+- IBD tabs are distinguishable by name and type.
+- Default IBD opens empty, but logic allows restoring saved ones in the future.
+
+---
+
+### Notes
+- This task focuses only on frontend logic and UI changes.
+- Reuse as much of the current tab management system as possible.
+- UX should remain consistent with the existing diagram editor.

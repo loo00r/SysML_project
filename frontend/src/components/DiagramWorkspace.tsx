@@ -17,7 +17,7 @@ import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
-import { nodeTypes } from './nodes';
+import { bddNodeTypes, ibdNodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
@@ -135,6 +135,9 @@ const DiagramWorkspace: React.FC = () => {
 
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+  
+  // Get the appropriate node types based on diagram type
+  const nodeTypes = activeDiagram?.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -315,9 +318,17 @@ const DiagramWorkspace: React.FC = () => {
           y: y,
         });
 
-        // Create a new node with the correct type
-        const nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' ? 
-          data.type : 'block';
+        // Create a new node with the correct type based on diagram type
+        let nodeType: string;
+        if (activeDiagram?.type === 'ibd') {
+          // For IBD diagrams, prefer port and connection types
+          nodeType = data.type === 'port' || data.type === 'connection' || data.type === 'block' ? 
+            data.type : 'port';
+        } else {
+          // For BDD diagrams, use traditional types
+          nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' ? 
+            data.type : 'block';
+        }
 
         const newNode = {
           id: `${nodeType}-${Date.now()}`,

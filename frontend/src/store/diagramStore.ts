@@ -3,7 +3,7 @@ import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, apply
 import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Define node types based on SysML diagram elements
-export type NodeType = 'block' | 'sensor' | 'processor';
+export type NodeType = 'block' | 'sensor' | 'processor' | 'port' | 'connection';
 
 // Define node data structure
 export interface NodeData {
@@ -16,7 +16,7 @@ export interface NodeData {
 }
 
 // Define diagram types
-export type DiagramType = 'BDD' | 'IBD' | 'block';
+export type DiagramType = 'bdd' | 'ibd';
 
 // Define diagram instance interface
 export interface DiagramInstance {
@@ -73,6 +73,7 @@ interface DiagramState {
   
   // Multi-diagram actions
   openDiagram: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
+  openNewDiagramTab: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
   closeDiagram: (diagramId: string) => void;
   setActiveDiagram: (diagramId: string) => void;
   updateActiveDiagram: (payload: { nodes?: Node<NodeData>[], edges?: Edge[] }) => void;
@@ -129,7 +130,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodes: [],
   selectedEdges: [],
   
-  diagramType: 'BDD' as DiagramType,
+  diagramType: 'bdd' as DiagramType,
   diagramName: 'Untitled Diagram',
   diagramDescription: '',
   
@@ -167,6 +168,26 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       diagramDescription: newDiagram.description || ''
     }));
   },
+
+  openNewDiagramTab: (diagramData) => {
+    const newDiagram: DiagramInstance = {
+      id: `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      modifiedAt: new Date(),
+      ...diagramData
+    };
+    
+    set(state => ({
+      openDiagrams: [...state.openDiagrams, newDiagram],
+      activeDiagramId: newDiagram.id,
+      // Update computed state
+      nodes: newDiagram.nodes,
+      edges: newDiagram.edges,
+      diagramType: newDiagram.type,
+      diagramName: newDiagram.name,
+      diagramDescription: newDiagram.description || ''
+    }));
+  },
   
   closeDiagram: (diagramId) => {
     const state = get();
@@ -186,7 +207,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       // Update computed state
       nodes: activeDiagram?.nodes || [],
       edges: activeDiagram?.edges || [],
-      diagramType: activeDiagram?.type || 'BDD',
+      diagramType: activeDiagram?.type || 'bdd',
       diagramName: activeDiagram?.name || 'Untitled Diagram',
       diagramDescription: activeDiagram?.description || '',
       selectedNodes: [],
