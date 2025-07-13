@@ -179,90 +179,78 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Implement Embedded IBD Diagrams in Frontend
+Task: Fix CSS Hover Trap for IBD Trigger Icon
+Context
+The current implementation of the "Add IBD" icon has a significant usability issue. The icon is configured to appear on :hover of the BlockNode. However, because the icon appears outside the node's boundaries, it's impossible to click. As soon as the user moves their cursor off the node to click the icon, the :hover state is lost, and the icon disappears. This is a classic CSS "hover trap".
 
-Task: Implement Embedded IBD Diagrams in Frontend
+Goal
+Refactor the component structure and CSS to ensure the "Add IBD" icon remains visible when the user moves their cursor from the node to the icon, allowing it to be clicked successfully.
 
-### Context
-We want to enable users to open and edit IBD (Internal Block Diagram) views nested within blocks of BDD (Block Definition Diagram) directly in the frontend. This feature allows better modularity and logical separation of internal structure.
+Step-by-Step Implementation
+1. Update JSX Structure in BlockNode.tsx
+To solve the hover trap, we need to create a larger, invisible container that wraps both the node and the icon. The hover state will be applied to this new container.
 
-This is a purely frontend-focused task.
+Restructure the component's JSX by wrapping the existing content in a new div with a class like .node-container.
 
----
+Current Structure (Simplified):
 
-### Goal
-Allow users to open an IBD diagram as a new tab when clicking on a block node in the BDD diagram. Each IBD diagram should be treated as a separate diagram instance managed in the Zustand store.
+TypeScript
 
----
+<div className="node-wrapper">
+  {/* Node content */}
+  <div className="add-ibd">...</div>
+</div>
+Target Structure:
 
-### Step-by-Step Implementation
+TypeScript
 
-#### 1. Update Diagram Types in Zustand Store
-- Open src/store/diagramStore.ts.
-- Extend DiagramInstance interface with new type:
-  
-  type DiagramInstance = {
-    id: string;
-    name: string;
-    type: 'bdd' | 'ibd';
-    nodes: Node[];
-    edges: Edge[];
-    createdAt: number;
-    updatedAt: number;
-  }
-  
-- Ensure the store allows opening and closing diagrams of both types.
+// ✅ New parent container to manage hover state
+<div className="node-container">
+  // Original wrapper now only holds node content
+  <div className="node-wrapper">
+    {/* Node content (e.g., label) */}
+  </div>
 
-#### 2. Add Button in BlockNode Component
-- Open frontend/src/components/nodes/BlockNode.tsx.
-- Add a button or icon (e.g. magnifying glass) to trigger IBD open.
-- On click, dispatch a Zustand action to create a new diagram tab:
-  
-  onClick={() => openNewDiagramTab({
-    id: `ibd-${node.id}`,
-    name: `${node.data.label} - IBD`,
-    type: 'ibd',
-    nodes: [],
-    edges: [],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  })}
-  
+  // Icon is now a sibling to the node wrapper
+  <div className="add-ibd">...</div>
+</div>
+2. Update Component CSS
+Adjust the CSS to use the new .node-container as the trigger for the hover effect and to create an expanded hover area using padding.
 
-#### 3. Render Conditional Editors Based on Diagram Type
-- Open src/components/DiagramWorkspace.tsx.
-- Modify canvas logic to render different sets of node types depending on diagram type:
-  
-  const nodeTypes = activeDiagram.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
-  
-- Use conditional rendering to support layout or styling differences.
+Required CSS Changes:
 
-#### 4. Create Separate Node Types for IBD
-- Add components like PortNode.tsx, ConnectionNode.tsx in src/components/nodes/.
-- Register them in the ibdNodeTypes map.
+CSS
 
-#### 5. Display Visual Indicator for Nested Diagram
-- In BlockNode.tsx, if an IBD already exists for a block, show a small visual indicator (e.g., a badge or dot).
-- Optional: add tooltip "Open internal diagram".
+/* The new container that creates the hover area */
+.node-container {
+  position: relative; /* Essential for positioning the absolute icon */
+  /* ✅ KEY FIX: Creates an invisible hover area below the node */
+  padding-bottom: 40px; 
+}
 
----
+/* The icon's position is now relative to the new container. 
+  You might need to adjust the 'bottom' value.
+*/
+.ibd-indicator-icon {
+  position: absolute;
+  bottom: 5px; /* Adjust this value as needed */
+  left: 50%;
+  transform: translateX(-50%);
+}
 
-### Optional Future Work (Not in Scope)
-- Saving IBD diagrams to backend and linking to block_id
-- Generating IBD content from GPT
+/* ✅ THE CRITICAL CHANGE: 
+  The hover selector is now on the parent container.
+*/
+.node-container:hover .add-ibd {
+  display: flex;
+}
+Acceptance Criteria
+✅ The "Add IBD" icon appears when the user's cursor enters the BlockNode area.
 
----
+✅ The icon remains visible as the user moves the cursor from the node directly down to the icon.
 
-### Acceptance Criteria
-- Clicking a block node opens a new tab of type ibd with its own canvas.
-- Zustand correctly tracks multiple diagrams.
-- Each IBD tab is independently editable.
-- IBD tabs are distinguishable by name and type.
-- Default IBD opens empty, but logic allows restoring saved ones in the future.
+✅ The user can successfully click the "Add IBD" icon.
 
----
+✅ The behavior of the always-visible "View IBD" icon (for blocks that already have an IBD) is unaffected.
 
-### Notes
-- This task focuses only on frontend logic and UI changes.
-- Reuse as much of the current tab management system as possible.
-- UX should remain consistent with the existing diagram editor.
+✅ Node selection, dragging, and resizing functionality remain unchanged.

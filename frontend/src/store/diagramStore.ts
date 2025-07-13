@@ -73,7 +73,7 @@ interface DiagramState {
   
   // Multi-diagram actions
   openDiagram: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
-  openNewDiagramTab: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
+  openNewDiagramTab: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'> & { customId?: string }) => void;
   closeDiagram: (diagramId: string) => void;
   setActiveDiagram: (diagramId: string) => void;
   updateActiveDiagram: (payload: { nodes?: Node<NodeData>[], edges?: Edge[] }) => void;
@@ -170,11 +170,12 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   openNewDiagramTab: (diagramData) => {
+    const { customId, ...rest } = diagramData;
     const newDiagram: DiagramInstance = {
-      id: `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: customId || `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
       modifiedAt: new Date(),
-      ...diagramData
+      ...rest
     };
     
     set(state => ({

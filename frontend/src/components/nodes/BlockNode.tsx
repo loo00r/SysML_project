@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
-import { Paper, Typography, Box, IconButton, Tooltip, Badge } from '@mui/material';
-import { ZoomIn } from '@mui/icons-material';
+import { Paper, Typography, Box, IconButton } from '@mui/material';
+import { AddCircleOutline, Article } from '@mui/icons-material';
 import useDiagramStore from '../../store/diagramStore';
 
 const STANDARD_NODE_WIDTH = 260;
@@ -26,9 +26,6 @@ const BlockHeader = styled(Box)(({ theme }) => ({
   borderBottom: '1px solid #ccc',
   paddingBottom: theme.spacing(0.5),
   marginBottom: theme.spacing(1),
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
 }));
 
 const BlockTitle = styled(Typography)(({ theme }) => ({
@@ -52,117 +49,186 @@ const BlockProperties = styled(Box)(({ theme }) => ({
   },
 }));
 
+// New container that creates the hover area and prevents hover trap
+const NodeContainer = styled(Box)({
+  position: 'relative',
+  display: 'inline-block',
+  // KEY FIX: Creates an invisible hover area below the node
+  paddingBottom: '40px',
+});
+
+// Styled wrapper for the actual node content
+const NodeWrapper = styled(Box)({
+  position: 'relative',
+  display: 'inline-block',
+});
+
+// Styled component for the IBD indicator icon
+const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  bottom: '5px', // Adjusted position relative to the new container
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: theme.palette.background.paper,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: '50%',
+  width: '24px',
+  height: '24px',
+  padding: '4px',
+  boxShadow: theme.shadows[2],
+  zIndex: 1000,
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+    boxShadow: theme.shadows[4],
+  },
+  // Base styles for ADD button: hidden by default
+  '&.add-ibd': {
+    display: 'none',
+  },
+  // Style for VIEW button: always visible
+  '&.view-ibd': {
+    display: 'flex',
+    backgroundColor: theme.palette.primary.light,
+    borderColor: theme.palette.primary.main,
+    color: theme.palette.primary.main,
+    '&:hover': {
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.primary.contrastText,
+    },
+  },
+}));
+
+// THE CRITICAL CHANGE: The hover selector is now on the parent container
+const StyledNodeContainer = styled(NodeContainer)({
+  '&:hover .add-ibd': {
+    display: 'flex',
+  },
+});
+
 // Define the BlockNode component
 const BlockNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
-  const { openNewDiagramTab, openDiagrams } = useDiagramStore();
+  const { openNewDiagramTab, openDiagrams, setActiveDiagram } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
   const hasIncomingConnections = edges.some((edge) => edge.target === id);
   
   // Check if there's already an IBD diagram for this block
-  const hasIBD = openDiagrams.some(diagram => 
+  const ibdExists = openDiagrams.some(diagram => 
     diagram.type === 'ibd' && 
-    diagram.name.includes(`${label || 'Block'} - IBD`)
+    diagram.id === `ibd-${id}`
   );
   
   const handleOpenIBD = (e: React.MouseEvent) => {
     e.stopPropagation();
-    openNewDiagramTab({
-      name: `${label || 'Block'} - IBD`,
-      type: 'ibd',
-      nodes: [],
-      edges: [],
-      description: `Internal Block Diagram for ${label || 'Block'}`
-    });
+    
+    if (ibdExists) {
+      // If IBD exists, switch to that tab
+      const existingIBD = openDiagrams.find(diagram => 
+        diagram.type === 'ibd' && diagram.id === `ibd-${id}`
+      );
+      if (existingIBD) {
+        setActiveDiagram(existingIBD.id);
+      }
+    } else {
+      // Create new IBD with consistent ID pattern
+      openNewDiagramTab({
+        customId: `ibd-${id}`,
+        name: `${label || 'Block'} - IBD`,
+        type: 'ibd',
+        nodes: [],
+        edges: [],
+        description: `Internal Block Diagram for ${label || 'Block'}`
+      });
+    }
   };
   
   return (
-    <BlockPaper
-      elevation={selected ? 3 : 1}
-      sx={{
-        border: selected ? '2px solid #1976d2' : '1px solid #ccc',
-      }}
-    >      {/* Output handle at the top */}
-      <Handle
-        type="source"
-        position={Position.Top}
-        style={{ background: '#555' }}
-      />
-        <BlockHeader>
-        <BlockTitle variant="subtitle1" sx={{ flex: 1, textAlign: 'center' }}>
-          {label || 'Unnamed Block'}
-        </BlockTitle>
-        <Tooltip title={hasIBD ? "IBD exists - Click to open" : "Open Internal Block Diagram"}>
-          <Badge 
-            variant="dot" 
-            color="success" 
-            invisible={!hasIBD}
-            sx={{
-              '& .MuiBadge-dot': {
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-              }
+    <StyledNodeContainer>
+      <NodeWrapper>
+        <BlockPaper
+          elevation={selected ? 3 : 1}
+          sx={{
+            border: selected ? '2px solid #1976d2' : '1px solid #ccc',
+          }}
+        >
+          {/* Output handle at the top */}
+          <Handle
+            type="source"
+            position={Position.Top}
+            style={{ background: '#555' }}
+          />
+          
+          <BlockHeader>
+            <BlockTitle variant="subtitle1">
+              {label || 'Unnamed Block'}
+            </BlockTitle>
+          </BlockHeader>
+        
+        {Object.keys(properties).length > 0 && (
+          <BlockProperties>
+            {Object.entries(properties)
+              .filter(([key]) => key.toLowerCase() !== 'name')
+              .map(([key, value]) => (
+                <div key={key}>
+                  <Typography variant="caption" component="span" fontWeight="bold">
+                    {key}:
+                  </Typography>{' '}
+                  <Typography variant="caption" component="span">
+                    {String(value)}
+                  </Typography>
+                </div>
+              ))}
+          </BlockProperties>        )}        {/* Input handle at the bottom - positioned at the border */}        <div style={{ position: 'relative' }}>          {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
+          <Handle
+            type="target"
+            position={Position.Bottom}
+            style={{ 
+              background: '#555',
+              bottom: -10, // Розташування нижче границі блока
+              top: 'auto'
             }}
-          >
-            <IconButton 
-              size="small" 
-              onClick={handleOpenIBD}
-              sx={{ 
-                padding: '2px',
-                '&:hover': {
-                  backgroundColor: 'rgba(0,0,0,0.1)'
-                }
+          />
+          {/* Triangle arrow indicator - only shown if the node has incoming connections */}
+          {hasIncomingConnections && (            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              style={{ 
+                position: 'absolute', 
+                left: '50%', 
+                bottom: '-24px', // Розташування нижче під точкою з'єднання
+                transform: 'translateX(-50%)' 
               }}
             >
-              <ZoomIn fontSize="small" />
-            </IconButton>
-          </Badge>
-        </Tooltip>
-      </BlockHeader>
+              <polygon points="7,0 14,14 0,14" fill="#555" />
+            </svg>
+          )}        </div>
+        </BlockPaper>
+      </NodeWrapper>
       
-      {Object.keys(properties).length > 0 && (
-        <BlockProperties>
-          {Object.entries(properties)
-            .filter(([key]) => key.toLowerCase() !== 'name')
-            .map(([key, value]) => (
-              <div key={key}>
-                <Typography variant="caption" component="span" fontWeight="bold">
-                  {key}:
-                </Typography>{' '}
-                <Typography variant="caption" component="span">
-                  {String(value)}
-                </Typography>
-              </div>
-            ))}
-        </BlockProperties>      )}      {/* Input handle at the bottom - positioned at the border */}      <div style={{ position: 'relative' }}>        {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
-        <Handle
-          type="target"
-          position={Position.Bottom}
-          style={{ 
-            background: '#555',
-            bottom: -10, // Розташування нижче границі блока
-            top: 'auto'
-          }}
-        />
-        {/* Triangle arrow indicator - only shown if the node has incoming connections */}
-        {hasIncomingConnections && (          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            style={{ 
-              position: 'absolute', 
-              left: '50%', 
-              bottom: '-24px', // Розташування нижче під точкою з'єднання
-              transform: 'translateX(-50%)' 
-            }}
-          >
-            <polygon points="7,0 14,14 0,14" fill="#555" />
-          </svg>
-        )}      </div>
-    </BlockPaper>
+      {/* Smart IBD Indicator Icon - Now positioned as sibling to NodeWrapper */}
+      {ibdExists ? (
+        // State 1: IBD EXISTS. Icon is always visible.
+        <IBDIndicatorIcon 
+          className="view-ibd" 
+          onClick={handleOpenIBD}
+          title="View Internal Block Diagram"
+        >
+          <Article fontSize="small" />
+        </IBDIndicatorIcon>
+      ) : (
+        // State 2: IBD DOES NOT EXIST. Icon appears on hover.
+        <IBDIndicatorIcon 
+          className="add-ibd" 
+          onClick={handleOpenIBD}
+          title="Create Internal Block Diagram"
+        >
+          <AddCircleOutline fontSize="small" />
+        </IBDIndicatorIcon>
+      )}
+    </StyledNodeContainer>
   );
 };
 
