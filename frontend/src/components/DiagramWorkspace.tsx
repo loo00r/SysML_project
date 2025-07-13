@@ -41,19 +41,38 @@ const FlowContainer = styled(Box)({
   position: 'relative', // Important for absolute positioning of floating panel
 });
 
-const FloatingTabPanel = styled(Paper)(({ theme }) => ({
+const TopContainer = styled(Box)({
   position: 'absolute',
   top: 16,
   left: 16,
-  right: 16, // Allow panel to expand to full width
-  zIndex: 1000, // Above canvas elements
+  right: 16,
+  zIndex: 1000,
+  display: 'flex',
+  gap: '16px', // Increased space between tabs and toolbar
+  alignItems: 'flex-start',
+});
+
+const FloatingTabPanel = styled(Paper)(({ theme }) => ({
+  flex: 1,
   display: 'flex',
   alignItems: 'center',
   background: theme.palette.background.paper,
   boxShadow: theme.shadows[3],
   borderRadius: theme.shape.borderRadius,
-  overflow: 'visible', // Allow scrolling
-  maxWidth: 'calc(100vw - 32px)', // Prevent overflow beyond viewport
+  overflow: 'hidden', // Hide overflow for scrolling
+  maxWidth: 'calc(100vw - 400px)', // Leave more space for toolbar and gap
+  minWidth: 0, // Allow shrinking
+}));
+
+const ToolbarPanel = styled(Paper)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '8px 16px',
+  background: theme.palette.background.paper,
+  boxShadow: theme.shadows[3],
+  borderRadius: theme.shape.borderRadius,
+  flexShrink: 0, // Don't shrink the toolbar
 }));
 
 const EmptyState = styled(Box)(({ theme }) => ({
@@ -68,15 +87,6 @@ const EmptyState = styled(Box)(({ theme }) => ({
   padding: theme.spacing(4),
 }));
 
-const ToolbarPanel = styled(Panel)({
-  display: 'flex',
-  gap: '8px',
-  padding: '8px',
-  background: 'white',
-  borderRadius: '4px',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-  marginTop: '80px', // Move toolbar down to avoid overlap with diagram tabs
-});
 
 const DiagramWorkspace: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -335,10 +345,55 @@ const DiagramWorkspace: React.FC = () => {
     return (
       <WorkspaceContainer>
         <FlowContainer>
-          {/* Floating Tab Panel - Always visible */}
-          <FloatingTabPanel elevation={3}>
-            <DiagramTabs />
-          </FloatingTabPanel>
+          {/* Top Container with tabs and toolbar */}
+          <TopContainer>
+            <FloatingTabPanel elevation={3}>
+              <DiagramTabs />
+            </FloatingTabPanel>
+            
+            <ToolbarPanel elevation={3}>
+              <IconButton onClick={undo} size="small" title="Undo" disabled>
+                <UndoIcon />
+              </IconButton>
+              <IconButton onClick={redo} size="small" title="Redo" disabled>
+                <RedoIcon />
+              </IconButton>
+              <IconButton onClick={() => zoomIn()} size="small" title="Zoom In" disabled>
+                <ZoomInIcon />
+              </IconButton>
+              <IconButton onClick={() => zoomOut()} size="small" title="Zoom Out" disabled>
+                <ZoomOutIcon />
+              </IconButton>
+              <IconButton onClick={() => fitView()} size="small" title="Fit View" disabled>
+                <FitScreenIcon />
+              </IconButton>
+              <IconButton onClick={clearDiagram} size="small" title="Clear Diagram" disabled>
+                <DeleteIcon />
+              </IconButton>
+              <IconButton onClick={handleSave} size="small" title="Save Diagram" disabled>
+                <SaveIcon />
+              </IconButton>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleValidate}
+                disabled
+                color="primary"
+              >
+                VALIDATE
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleExport}
+                disabled
+                color="warning"
+                sx={{ minWidth: '80px' }}
+              >
+                EXPORT
+              </Button>
+            </ToolbarPanel>
+          </TopContainer>
           
           <EmptyState>
             <Typography variant="h6" gutterBottom>
@@ -356,10 +411,55 @@ const DiagramWorkspace: React.FC = () => {
   return (
     <WorkspaceContainer>
       <FlowContainer ref={reactFlowWrapper}>
-        {/* Floating Tab Panel */}
-        <FloatingTabPanel elevation={3}>
-          <DiagramTabs />
-        </FloatingTabPanel>
+        {/* Top Container with tabs and toolbar */}
+        <TopContainer>
+          <FloatingTabPanel elevation={3}>
+            <DiagramTabs />
+          </FloatingTabPanel>
+          
+          <ToolbarPanel elevation={3}>
+            <IconButton onClick={undo} size="small" title="Undo">
+              <UndoIcon />
+            </IconButton>
+            <IconButton onClick={redo} size="small" title="Redo">
+              <RedoIcon />
+            </IconButton>
+            <IconButton onClick={() => zoomIn()} size="small" title="Zoom In">
+              <ZoomInIcon />
+            </IconButton>
+            <IconButton onClick={() => zoomOut()} size="small" title="Zoom Out">
+              <ZoomOutIcon />
+            </IconButton>
+            <IconButton onClick={() => fitView()} size="small" title="Fit View">
+              <FitScreenIcon />
+            </IconButton>
+            <IconButton onClick={clearDiagram} size="small" title="Clear Diagram">
+              <DeleteIcon />
+            </IconButton>
+            <IconButton onClick={handleSave} size="small" title="Save Diagram">
+              <SaveIcon />
+            </IconButton>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleValidate}
+              color={validationErrors.length > 0 ? 'warning' : 'primary'}
+            >
+              {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'VALIDATE'}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExport}
+              disabled={!isExportEnabled}
+              color="warning"
+              sx={{ minWidth: '80px' }}
+            >
+              EXPORT
+            </Button>
+          </ToolbarPanel>
+        </TopContainer>
+        
         
         <ReactFlow
           nodes={nodes}
@@ -401,52 +501,14 @@ const DiagramWorkspace: React.FC = () => {
             maskColor="rgba(0, 0, 0, 0.1)"
           />
           
-          {/* Toolbar */}
-          <ToolbarPanel position="top-center">
-            <IconButton onClick={undo} size="small" title="Undo">
-              <UndoIcon />
-            </IconButton>
-            <IconButton onClick={redo} size="small" title="Redo">
-              <RedoIcon />
-            </IconButton>
-            <IconButton onClick={() => zoomIn()} size="small" title="Zoom In">
-              <ZoomInIcon />
-            </IconButton>
-            <IconButton onClick={() => zoomOut()} size="small" title="Zoom Out">
-              <ZoomOutIcon />
-            </IconButton>
-            <IconButton onClick={() => fitView()} size="small" title="Fit View">
-              <FitScreenIcon />
-            </IconButton>
-            <IconButton onClick={clearDiagram} size="small" title="Clear Diagram">
-              <DeleteIcon />
-            </IconButton>
-            <IconButton onClick={handleSave} size="small" title="Save Diagram">
-              <SaveIcon />
-            </IconButton>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleValidate}
-              color={validationErrors.length > 0 ? 'warning' : 'primary'}
-            >
-              {validationErrors.length > 0 ? `Validation Issues (${validationErrors.length})` : 'VALIDATE'}
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleExport}
-              disabled={!isExportEnabled}
-              color="warning"
-              sx={{ minWidth: '80px' }}
-            >
-              EXPORT
-            </Button>
-          </ToolbarPanel>
-          
           {/* Status panel */}
           <Panel position="bottom-left">
-            <Paper sx={{ padding: '4px 8px', opacity: 0.8 }}>
+            <Paper sx={{ 
+              padding: '4px 8px', 
+              opacity: 0.8,
+              marginLeft: '8px',
+              marginBottom: '8px',
+            }}>
               <Typography variant="caption">
                 {activeDiagram.name} | {nodes.length} nodes | {edges.length} connections
               </Typography>
