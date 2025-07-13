@@ -179,62 +179,55 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Improve Visibility of Adaptive IBD Icons
+Task: Realign IBD Icons to Prevent Overlapping Connection Lines
 Context
-The previous implementation of adaptive IBD icons correctly matches them to their parent block's color. However, the chosen light shades result in poor contrast against the white canvas background, making the icons difficult to see. This task aims to fix this visual issue by increasing the color saturation.
+The current IBD icons (both for "view" and "add") are centered below their parent blocks. When a connection line is drawn downwards from the block, it visually clashes with and passes through the icon. This creates a cluttered and unprofessional appearance.
 
 Goal
-Update the colors of the adaptive "View IBD" icons to be darker, more saturated shades of the parent block's color, ensuring they are clearly visible and have good contrast with the background.
+Realign both the persistent "View IBD" icon and the on-hover "Add IBD" icon to the bottom-right corner of the parent block. This will prevent them from overlapping with connection lines and result in a cleaner diagram layout.
 
 Step-by-Step Implementation
-1. Locate the Color Properties
-Navigate to the node component files where the AdaptiveIbdIcon is used: BlockNode.tsx, SensorNode.tsx, and ProcessorNode.tsx.
+1. Locate the Icon's CSS Rule
+Open the CSS file that contains the styles for the IBD trigger icons.
 
-In each file, find the color prop being passed to the <AdaptiveIbdIcon /> component.
+Find the base class selector that defines the position for the icon, which we previously named .ibd-indicator-icon.
 
-2. Update the Hex Color Values
-Replace the current light color values with darker, more saturated ones. Below are the recommended changes.
+2. Modify the Positioning Properties
+The current implementation uses left: 50% and transform: translateX(-50%) to center the icon. We will replace this with properties that align it to the right.
 
-For BlockNode.tsx (System Block):
+Current CSS (approximate):
 
-Current Color: '#dbeafe' (light blue)
+CSS
 
-New Color: '#93c5fd' (a richer blue)
+.ibd-indicator-icon {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* ... other styles */
+}
+New CSS:
 
-For SensorNode.tsx (Sensor):
+CSS
 
-Current Color: '#fee2e2' (light pink)
-
-New Color: '#fca5a5' (a richer pink/red)
-
-For ProcessorNode.tsx (Processor):
-
-Current Color: '#fef3c7' (light yellow)
-
-New Color: '#fcd34d' (a richer yellow/amber)
-
-Example code change in ProcessorNode.tsx:
-
-Before:
-
-TypeScript
-
-<AdaptiveIbdIcon color="#fef3c7" />
-After:
-
-TypeScript
-
-<AdaptiveIbdIcon color="#fcd34d" />
-3. Apply Changes to All Node Types
-Ensure you update the color value in all three node component files (BlockNode.tsx, SensorNode.tsx, ProcessorNode.tsx) to maintain consistency.
+.ibd-indicator-icon {
+  position: absolute;
+  bottom: 5px;
+  right: 10px; /* ✅ Aligns the icon 10px from the right edge */
+  
+  /* ▼ Unset old properties for clean override */
+  left: auto; 
+  transform: none; 
+  /* ... other styles */
+}
+3. Verify Hover Functionality
+After applying the CSS changes, double-check the hover behavior for adding a new IBD. The hoverable area provided by the .node-container's padding should still function correctly, ensuring the + icon appears as expected and is clickable. No changes to the JSX structure are required.
 
 Acceptance Criteria
-✅ The "View IBD" icon for System Block is a clearly visible, saturated blue.
+✅ The persistent "View IBD" icon is positioned near the bottom-right corner of its parent block.
 
-✅ The "View IBD" icon for Sensor is a clearly visible, saturated pink/red.
+✅ The on-hover "Add IBD" (+) icon appears in the exact same bottom-right position.
 
-✅ The "View IBD" icon for Processor is a clearly visible, saturated yellow/amber.
+✅ Vertical connection lines drawn from the bottom of a block no longer overlap with either IBD icon.
 
-✅ All three icons have good contrast against the white canvas.
-
-✅ The adaptive color logic and icon functionality are otherwise unaffected.
+✅ The functionality of both icons (hovering to show, clicking to open/create) remains unchanged.

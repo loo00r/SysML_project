@@ -69,8 +69,9 @@ const NodeWrapper = styled(Box)({
 const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
   bottom: '5px', // Adjusted position relative to the new container
-  left: '50%',
-  transform: 'translateX(-50%)',
+  right: '10px', // Aligns the icon 10px from the right edge
+  left: 'auto', // Unset old properties for clean override
+  transform: 'none', // Unset old properties for clean override
   background: theme.palette.background.paper,
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: '50%',

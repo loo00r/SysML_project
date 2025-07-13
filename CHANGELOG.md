@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.21] - 2025-07-13
+
+### Changed
+- Realigned IBD icons from center-bottom to bottom-right corner of parent blocks
+- Updated positioning for all three node types (Block, Sensor, Processor)
+- IBD icons now use `right: 10px` instead of `left: 50%` to prevent overlapping with connection lines
+- Removed `transform: translateX(-50%)` in favor of `transform: none` for cleaner positioning
+
+### Fixed
+- IBD icons no longer overlap with vertical connection lines drawn from bottom of blocks
+- Improved visual clarity and professional appearance of diagram layouts
+- Connection lines now have clear path without visual interference from IBD indicators
+
 ## [1.1.20] - 2025-07-13
 
 ### Changed
