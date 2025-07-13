@@ -77,6 +77,7 @@ const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
   padding: '4px',
   boxShadow: theme.shadows[2],
   zIndex: 1000,
+  transition: 'all 0.2s ease-in-out',
   '&:hover': {
     backgroundColor: theme.palette.action.hover,
     boxShadow: theme.shadows[4],
@@ -88,12 +89,14 @@ const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
   // Style for VIEW button: always visible
   '&.view-ibd': {
     display: 'flex',
-    backgroundColor: theme.palette.primary.light,
-    borderColor: theme.palette.primary.main,
+    backgroundColor: 'transparent',
+    border: 'none',
+    boxShadow: 'none',
     color: theme.palette.primary.main,
     '&:hover': {
-      backgroundColor: theme.palette.primary.main,
-      color: theme.palette.primary.contrastText,
+      filter: 'brightness(0.8)',
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+      boxShadow: theme.shadows[1],
     },
   },
 }));

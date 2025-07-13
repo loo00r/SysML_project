@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.14] - 2025-07-13
+
+### Fixed
+- Fixed hover animation that caused View IBD icon to shift position during mouse hover
+- Removed scale transform from view-ibd hover effect to keep icon stationary
+- Improved icon stability and user interaction experience
+
+## [1.1.13] - 2025-07-13
+
+### Changed
+- Refined View IBD icon visual style for better consistency with application design
+- Removed blue background and border from persistent View IBD icon 
+- Changed to transparent background with clean, minimal appearance
+- Enhanced hover effects with brightness filter and subtle background
+- Added smooth transitions for better user feedback
+
+## [1.1.12] - 2025-07-13
+
+### Added
+- Implemented embedded IBD (Internal Block Diagram) functionality in frontend
+- Added support for 'bdd' and 'ibd' diagram types in Zustand store
+- Created smart IBD indicator icon below BlockNode components
+- New IBD-specific node types: PortNode and ConnectionNode for Internal Block Diagrams
+- Conditional rendering of node types based on active diagram type (BDD vs IBD)
+
+### Changed
+- Updated diagram type system to use lowercase conventions ('bdd', 'ibd')
+- Enhanced BlockNode component with IBD trigger functionality
+- Added visual indicator showing IBD existence status with hover-to-reveal behavior
+- Fixed CSS hover trap issue preventing proper icon interaction
+- Restructured component hierarchy to support extended hover areas
+
+### Fixed
+- Resolved hover trap where IBD trigger icon disappeared before users could click it
+- Enhanced hover mechanics with proper container structure and CSS positioning
+- Improved icon accessibility and interaction reliability
+
 ## [1.1.11] - 2025-07-09
 
 ### Fixed

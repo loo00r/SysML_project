@@ -179,78 +179,57 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Fix CSS Hover Trap for IBD Trigger Icon
+Task 1: Style Refinement for IBD Icon
+Task: Refine 'View IBD' Icon Style
 Context
-The current implementation of the "Add IBD" icon has a significant usability issue. The icon is configured to appear on :hover of the BlockNode. However, because the icon appears outside the node's boundaries, it's impossible to click. As soon as the user moves their cursor off the node to click the icon, the :hover state is lost, and the icon disappears. This is a classic CSS "hover trap".
+The current implementation of the persistent "View IBD" icon includes a solid blue circular background. This style is visually inconsistent with the application's overall aesthetic. The desired appearance is the clean, background-less icon that is currently shown only on hover.
 
 Goal
-Refactor the component structure and CSS to ensure the "Add IBD" icon remains visible when the user moves their cursor from the node to the icon, allowing it to be clicked successfully.
+Remove the blue background from the default state of the "View IBD" icon. The icon itself should remain, but it should be rendered on a transparent background, matching the style of other UI elements.
 
 Step-by-Step Implementation
-1. Update JSX Structure in BlockNode.tsx
-To solve the hover trap, we need to create a larger, invisible container that wraps both the node and the icon. The hover state will be applied to this new container.
+1. Locate the Relevant CSS Rule
+The style for this icon is likely defined in the CSS file associated with the node components (e.g., BlockNode.module.css or a global stylesheet).
 
-Restructure the component's JSX by wrapping the existing content in a new div with a class like .node-container.
+Find the CSS selector for the persistently visible icon. Based on our previous work, this is likely .ibd-indicator-icon.view-ibd.
 
-Current Structure (Simplified):
+2. Remove the Background Style
+In the identified CSS rule, find and remove or override the background or background-color property. To be explicit, you can set it to transparent.
 
-TypeScript
-
-<div className="node-wrapper">
-  {/* Node content */}
-  <div className="add-ibd">...</div>
-</div>
-Target Structure:
-
-TypeScript
-
-// ✅ New parent container to manage hover state
-<div className="node-container">
-  // Original wrapper now only holds node content
-  <div className="node-wrapper">
-    {/* Node content (e.g., label) */}
-  </div>
-
-  // Icon is now a sibling to the node wrapper
-  <div className="add-ibd">...</div>
-</div>
-2. Update Component CSS
-Adjust the CSS to use the new .node-container as the trigger for the hover effect and to create an expanded hover area using padding.
-
-Required CSS Changes:
+Example CSS Change:
 
 CSS
 
-/* The new container that creates the hover area */
-.node-container {
-  position: relative; /* Essential for positioning the absolute icon */
-  /* ✅ KEY FIX: Creates an invisible hover area below the node */
-  padding-bottom: 40px; 
-}
-
-/* The icon's position is now relative to the new container. 
-  You might need to adjust the 'bottom' value.
-*/
-.ibd-indicator-icon {
-  position: absolute;
-  bottom: 5px; /* Adjust this value as needed */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-/* ✅ THE CRITICAL CHANGE: 
-  The hover selector is now on the parent container.
-*/
-.node-container:hover .add-ibd {
+/* Find this existing rule */
+.ibd-indicator-icon.view-ibd {
   display: flex;
+  background-color: #3b82f6; /* This is likely the line to remove */
+  /* ... other styles ... */
+}
+
+/* Change it to this */
+.ibd-indicator-icon.view-ibd {
+  display: flex;
+  background-color: transparent; /* Or remove the line completely */
+  border: none; /* You might also need to remove the border */
+  /* ... other styles ... */
+}
+3. (Optional) Refine Hover Effect
+Since the icon will no longer have a background, consider adding a subtle hover effect for better user feedback.
+
+Example:
+
+CSS
+
+.ibd-indicator-icon.view-ibd:hover {
+  transform: scale(1.1); /* Slightly enlarges the icon on hover */
+  filter: brightness(0.9); /* Slightly darkens the icon */
 }
 Acceptance Criteria
-✅ The "Add IBD" icon appears when the user's cursor enters the BlockNode area.
+✅ The persistent "View IBD" icon no longer has a blue circular background in its default state.
 
-✅ The icon remains visible as the user moves the cursor from the node directly down to the icon.
+✅ The icon itself (the document symbol) is still clearly visible.
 
-✅ The user can successfully click the "Add IBD" icon.
+✅ A subtle hover effect is present on the icon for user feedback.
 
-✅ The behavior of the always-visible "View IBD" icon (for blocks that already have an IBD) is unaffected.
-
-✅ Node selection, dragging, and resizing functionality remain unchanged.
+✅ The "Add IBD" (+) icon's functionality and appearance are not affected.
