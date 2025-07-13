@@ -179,53 +179,62 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Enable IBD Functionality for Sensor and Processor Nodes
+Task: Improve Visibility of Adaptive IBD Icons
 Context
-The IBD creation and viewing functionality was successfully implemented for the System Block node type. However, this feature is equally relevant for other container-like nodes, such as Sensor and Processor. Currently, these nodes do not have the IBD trigger, limiting their utility.
+The previous implementation of adaptive IBD icons correctly matches them to their parent block's color. However, the chosen light shades result in poor contrast against the white canvas background, making the icons difficult to see. This task aims to fix this visual issue by increasing the color saturation.
 
 Goal
-Extend the exact same IBD trigger functionality to both Sensor and Processor nodes, making it a consistent feature across all relevant block types.
+Update the colors of the adaptive "View IBD" icons to be darker, more saturated shades of the parent block's color, ensuring they are clearly visible and have good contrast with the background.
 
 Step-by-Step Implementation
-1. Identify Reusable Logic in BlockNode.tsx
-Open frontend/src/components/nodes/BlockNode.tsx.
+1. Locate the Color Properties
+Navigate to the node component files where the AdaptiveIbdIcon is used: BlockNode.tsx, SensorNode.tsx, and ProcessorNode.tsx.
 
-Identify the block of code responsible for the IBD trigger. This includes:
+In each file, find the color prop being passed to the <AdaptiveIbdIcon /> component.
 
-The useDiagramStore hook call to check if an IBD exists.
+2. Update the Hex Color Values
+Replace the current light color values with darker, more saturated ones. Below are the recommended changes.
 
-The main wrapper div (.node-container).
+For BlockNode.tsx (System Block):
 
-The conditional rendering logic ({ibdExists ? ... : ...}) for the icon.
+Current Color: '#dbeafe' (light blue)
 
-2. Apply Logic to SensorNode.tsx
-Open frontend/src/components/nodes/SensorNode.tsx.
+New Color: '#93c5fd' (a richer blue)
 
-Replicate the structure from BlockNode.tsx:
+For SensorNode.tsx (Sensor):
 
-Add the necessary imports (useDiagramStore, icons, etc.).
+Current Color: '#fee2e2' (light pink)
 
-Implement the useDiagramStore logic to get ibdExists.
+New Color: '#fca5a5' (a richer pink/red)
 
-Wrap the component's JSX in the same .node-container structure.
+For ProcessorNode.tsx (Processor):
 
-Paste the conditional rendering logic for the icon inside the container, as a sibling to the main node content.
+Current Color: '#fef3c7' (light yellow)
 
-3. Apply Logic to ProcessorNode.tsx
-Open frontend/src/components/nodes/ProcessorNode.tsx.
+New Color: '#fcd34d' (a richer yellow/amber)
 
-Repeat the exact same steps as for the SensorNode, ensuring the IBD trigger logic and structure are identical.
+Example code change in ProcessorNode.tsx:
 
-4. (Note) Future Refactoring
-For long-term maintainability, consider refactoring this duplicated logic. A good approach would be to create a Higher-Order Component (HOC), for example withIbdTrigger(NodeComponent), that wraps any node component and provides it with the IBD functionality. This is not part of this task but is a recommended future improvement.
+Before:
+
+TypeScript
+
+<AdaptiveIbdIcon color="#fef3c7" />
+After:
+
+TypeScript
+
+<AdaptiveIbdIcon color="#fcd34d" />
+3. Apply Changes to All Node Types
+Ensure you update the color value in all three node component files (BlockNode.tsx, SensorNode.tsx, ProcessorNode.tsx) to maintain consistency.
 
 Acceptance Criteria
-✅ Hovering over a Sensor node without an IBD displays the "Add IBD" (+) icon.
+✅ The "View IBD" icon for System Block is a clearly visible, saturated blue.
 
-✅ Hovering over a Processor node without an IBD displays the "Add IBD" (+) icon.
+✅ The "View IBD" icon for Sensor is a clearly visible, saturated pink/red.
 
-✅ Clicking the + icon on these nodes correctly creates a new IBD diagram tab.
+✅ The "View IBD" icon for Processor is a clearly visible, saturated yellow/amber.
 
-✅ If an IBD exists for a Sensor or Processor node, the persistent "View IBD" icon is displayed below it.
+✅ All three icons have good contrast against the white canvas.
 
-✅ The functionality for the System Block node remains unchanged and fully functional.
+✅ The adaptive color logic and icon functionality are otherwise unaffected.

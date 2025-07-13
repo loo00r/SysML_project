@@ -2,7 +2,9 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box, IconButton } from '@mui/material';
-import { AddCircleOutline, Article } from '@mui/icons-material';
+import { AddCircleOutline } from '@mui/icons-material';
+import { AdaptiveIbdIcon } from '../icons/AdaptiveIbdIcon';
+import { nodeColors } from '../icons/nodeColors';
 import useDiagramStore from '../../store/diagramStore';
 
 const STANDARD_NODE_WIDTH = 260;
@@ -219,7 +221,7 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
           onClick={handleOpenIBD}
           title="View Internal Block Diagram"
         >
-          <Article fontSize="small" />
+          <AdaptiveIbdIcon color={nodeColors.sensor} size={16} />
         </IBDIndicatorIcon>
       ) : (
         // State 2: IBD DOES NOT EXIST. Icon appears on hover.

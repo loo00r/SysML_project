@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.20] - 2025-07-13
+
+### Changed
+- Adjusted Sensor IBD icon color to lighter pink (#f792be) for better visual balance
+- Reduced color saturation to prevent overpowering the interface design
+- Improved overall visual harmony while maintaining sufficient visibility
+
+## [1.1.19] - 2025-07-13
+
+### Changed
+- Updated Sensor IBD icon color from red (#ef4444) to pink (#ec4899) for better visual harmony
+- Sensor IBD icons now use high visibility pink that avoids conflict with red node borders
+- Improved visual coherence between Sensor nodes and their IBD indicators
+- Block and Processor IBD icon colors remain unchanged for consistency
+
+## [1.1.18] - 2025-07-13
+
+### Improved
+- Further enhanced IBD icon visibility by increasing saturation for Block and Sensor colors
+- Block IBD icons now use highly saturated blue (#3b82f6) for optimal visibility
+- Sensor IBD icons now use highly saturated red (#ef4444) for optimal visibility  
+- Processor IBD icons remain unchanged (#fcd34d) as they already had perfect visibility
+- All IBD icons now have consistent high visibility matching the Processor standard
+
+### Changed
+- Color consistency across all node types with uniform saturation levels
+- Enhanced user experience with clearly visible IBD indicators on all node types
+
+## [1.1.17] - 2025-07-13
+
+### Improved
+- Enhanced visibility of adaptive IBD icons with darker, more saturated colors
+- Updated color palette for better contrast against white canvas background
+- Block IBD icons now use richer blue (#93c5fd) instead of light blue
+- Sensor IBD icons now use richer pink/red (#fca5a5) instead of light pink
+- Processor IBD icons now use richer yellow/amber (#fcd34d) instead of light yellow
+
+### Fixed
+- Poor contrast issue with IBD icons being too light to see clearly
+- Improved user experience with more visible icon indicators
+
+## [1.1.16] - 2025-07-13
+
+### Added
+- Created adaptive color system for 'View IBD' icons that match their parent node colors
+- New AdaptiveIbdIcon SVG component with customizable background colors
+- Node-specific color mapping (Block: light blue, Sensor: light pink, Processor: light yellow)
+
+### Changed
+- Replaced static Article icons with dynamic AdaptiveIbdIcon in all node types
+- IBD view icons now provide clear visual connection to their parent nodes
+- Enhanced visual coherence between nodes and their internal diagrams
+
+### Improved
+- Better user experience with color-coded IBD indicators
+- Consistent design language across all node types
+
 ## [1.1.15] - 2025-07-13
 
 ### Added
