@@ -138,6 +138,13 @@ const DiagramWorkspace: React.FC = () => {
   
   // Get the appropriate node types based on diagram type
   const nodeTypes = activeDiagram?.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
+  
+  // Define edge styles - same for both diagram types for consistency
+  const defaultEdgeOptions = {
+    style: { stroke: '#555', strokeWidth: 1 }, // Gray edges for both IBD and BDD
+    type: 'smoothstep' as const,
+    animated: false,
+  };
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -486,6 +493,7 @@ const DiagramWorkspace: React.FC = () => {
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}
           fitView

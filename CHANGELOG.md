@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.27] - 2025-07-14
+
+### Fixed
+- Fixed arrow visibility issues in IBD diagrams by switching to standard ReactFlow arrows
+- Unified edge styling between BDD and IBD diagrams for better consistency
+- Removed problematic custom SVG arrow markers that weren't displaying properly
+
+### Changed
+- IBD diagram edges now use the same gray color (#555) as BDD diagrams
+- Simplified edge configuration to use single style for both diagram types
+- Improved visual consistency across all diagram types
+
+## [1.1.26] - 2025-07-14
+
+### Fixed
+- Restored arrow markers on IBD diagram connections that were missing
+- Added custom SVG arrow markers for both IBD (black) and BDD (gray) diagrams
+- Fixed markerEnd configuration with proper URL references to custom arrow definitions
+- Ensured visual consistency between BDD and IBD connection arrows
+
+### Added
+- Custom SVG marker definitions for black and gray arrow heads
+- Proper markerEnd configuration in defaultEdgeOptions for both diagram types
+
+## [1.1.25] - 2025-07-14
+
+### Fixed
+- Fixed IBD block connection handles to use single centered handle per side
+- Resolved connection routing issues caused by multiple overlapping handles
+- Improved connection behavior with proper left (target) and right (source) handle positioning
+- Eliminated erratic connection paths that went in wrong directions before connecting
+
+### Changed
+- Simplified IBD block handle configuration from 4 handles to 2 handles per block
+- Left handle now serves as input (target), right handle as output (source)
+- All handles are properly centered on their respective sides
+
+## [1.1.24] - 2025-07-14
+
+### Changed
+- Improved IBD diagram readability with standardized black edge colors
+- Modified IBD blocks to use exclusive horizontal connectivity (left and right sides only)
+- Replaced top and bottom connection handles with side handles for cleaner horizontal flow
+- Enhanced IBD block design with multiple connection points per side (30% and 70% positions)
+- Added support for both source and target connections on each side of IBD blocks
+
+### Improved
+- Better visual consistency between BDD and IBD diagrams with uniform edge styling
+- Cleaner diagram layouts with horizontal connection patterns for IBD elements
+- More flexible connectivity options for complex IBD structures
+
 ## [1.1.23] - 2025-07-14
 
 ### Changed

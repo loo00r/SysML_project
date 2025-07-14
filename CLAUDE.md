@@ -179,27 +179,23 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Refine IBD Behavior and Contextual Locking
+Task: Improve IBD Readability and Connectivity
 
-This task involves refining the behavior of the newly created IBD block and implementing stricter contextual rules for diagram editing. The goal is to ensure that diagram elements are used only in their appropriate diagram types (BDD vs. IBD).
+This task focuses on improving the visual clarity and layout flexibility of Internal Block Diagrams (IBD). The goal is to standardize the connection style and modify the connection points for IBD blocks to be exclusively horizontal.
 
 Implementation Requirements
-Remove 'Create IBD' Functionality from IBD Nodes:
+Standardize Edge Color to Black:
 
-Modify the IBDNode.tsx component.
+Modify the edge styling configuration used for IBDs.
 
-The + button, which appears on hover and is used to create a new IBD from a BDD block, must be completely removed or disabled for all IBD Block instances. This feature should only be present on BDD blocks (like System Block).
+All connection arrows (edges) between IBD Block nodes must be black, matching the style used in BDDs. This ensures visual consistency and improves diagram readability.
 
-Implement Contextual Locking for BDD Elements:
+Set Exclusive Side Connection Handles for IBD Nodes:
 
-Update the logic in the sidebar component that renders the "Diagram Elements".
+Update the IBDNode.tsx component.
 
-When the active diagram's type is IBD, the following elements in the sidebar must be locked (grayed out and non-draggable):
+Remove the existing top and bottom connection points (Handles).
 
-System Block
+Add new handles exclusively to the left and right sides of the IBD Block.
 
-Sensor
-
-Processor
-
-These elements are intended for use in BDDs and should not be added to IBDs.
+These side handles must support both incoming (target) and outgoing (source) connections to allow for a clear, horizontal flow in diagrams.

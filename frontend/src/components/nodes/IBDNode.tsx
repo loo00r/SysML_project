@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps, useStore } from 'reactflow';
+import { Handle, Position, NodeProps } from 'reactflow';
 import { styled } from '@mui/material/styles';
 import { Paper, Typography, Box } from '@mui/material';
 
@@ -69,10 +69,6 @@ const StyledNodeContainer = styled(NodeContainer)({});
 const IBDNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
   
-  // Check if this node has any incoming connections
-  const edges = useStore((state) => state.edges);
-  const hasIncomingConnections = edges.some((edge) => edge.target === id);
-  
   return (
     <StyledNodeContainer>
       <NodeWrapper>
@@ -82,11 +78,20 @@ const IBDNode = ({ data, selected, id }: NodeProps) => {
             border: selected ? '2px solid #4caf50' : '1px solid #4caf50', // Green border for selection
           }}
         >
-          {/* Output handle at the top */}
+          {/* Left side handle - for inputs and outputs */}
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="left"
+            style={{ background: '#4caf50' }}
+          />
+          
+          {/* Right side handle - for inputs and outputs */}  
           <Handle
             type="source"
-            position={Position.Top}
-            style={{ background: '#4caf50' }} // Green handle
+            position={Position.Right}
+            id="right"
+            style={{ background: '#4caf50' }}
           />
           
           <IBDHeader>
@@ -109,31 +114,7 @@ const IBDNode = ({ data, selected, id }: NodeProps) => {
                   </Typography>
                 </div>
               ))}
-          </IBDProperties>        )}        {/* Input handle at the bottom - positioned at the border */}        <div style={{ position: 'relative' }}>          {/* Нижня точка з'єднання - зміщена вниз для правильного позиціонування */}
-          <Handle
-            type="target"
-            position={Position.Bottom}
-            style={{ 
-              background: '#4caf50', // Green handle
-              bottom: -10, // Розташування нижче границі блока
-              top: 'auto'
-            }}
-          />
-          {/* Triangle arrow indicator - only shown if the node has incoming connections */}
-          {hasIncomingConnections && (            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              style={{ 
-                position: 'absolute', 
-                left: '50%', 
-                bottom: '-24px', // Розташування нижче під точкою з'єднання
-                transform: 'translateX(-50%)' 
-              }}
-            >
-              <polygon points="7,0 14,14 0,14" fill="#4caf50" />
-            </svg>
-          )}        </div>
+          </IBDProperties>        )}
         </IBDPaper>
       </NodeWrapper>
     </StyledNodeContainer>
