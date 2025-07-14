@@ -465,3 +465,28 @@ body {
   opacity: 1;
   z-index: 20;
 }
+
+/* IBD Animated Edge Styles */
+.ibd-animated-edge {
+  animation: dashFlow 1.6s linear infinite;
+}
+
+@keyframes dashFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -12; /* Move the dash pattern to create flow effect */
+  }
+}
+
+/* ReactFlow edge animation override for IBD */
+.react-flow__edge.ibd-animated-edge path {
+  stroke-dasharray: 8 4;
+  animation: dashFlow 1.6s linear infinite;
+}
+
+.react-flow__edge.ibd-animated-edge path:hover {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 3px rgba(85, 85, 85, 0.3));
+}

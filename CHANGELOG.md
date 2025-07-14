@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.29] - 2025-07-14
+
+### Changed
+- Increased IBD animation speed by 25% for more dynamic visual feedback
+- Animation duration reduced from 2s to 1.6s for faster dash movement
+- Enhanced user experience with more responsive flow visualization
+
+### Improved
+- More engaging and lively animation for IBD diagram connections
+- Better visual feedback for data flow direction in real-time
+
+## [1.1.28] - 2025-07-14
+
+### Added
+- Animated dashed lines for IBD diagram connections showing flow direction
+- CSS keyframe animation `dashFlow` for moving dash pattern from left to right
+- Professional flow visualization without traditional arrow markers
+
+### Changed
+- Replaced static arrows with animated dashed lines in IBD diagrams
+- IBD edges now use thicker lines (strokeWidth: 2) with dashed pattern (8 4)
+- Enhanced visual indication of data/signal flow through animated dash movement
+
+### Improved
+- Better flow visualization in IBD diagrams with continuous animation
+- More intuitive direction indication through animated dash progression
+- Consistent gray color scheme maintained across both BDD and IBD diagrams
+
 ## [1.1.27] - 2025-07-14
 
 ### Fixed

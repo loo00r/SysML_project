@@ -139,9 +139,18 @@ const DiagramWorkspace: React.FC = () => {
   // Get the appropriate node types based on diagram type
   const nodeTypes = activeDiagram?.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
   
-  // Define edge styles - same for both diagram types for consistency
-  const defaultEdgeOptions = {
-    style: { stroke: '#555', strokeWidth: 1 }, // Gray edges for both IBD and BDD
+  // Define edge styles based on diagram type
+  const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
+    style: { 
+      stroke: '#555', 
+      strokeWidth: 2,
+      strokeDasharray: '8 4', // Dashed line pattern
+    },
+    type: 'smoothstep' as const,
+    animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
+    className: 'ibd-animated-edge',
+  } : {
+    style: { stroke: '#555', strokeWidth: 1 }, // Solid gray for BDD
     type: 'smoothstep' as const,
     animated: false,
   };
