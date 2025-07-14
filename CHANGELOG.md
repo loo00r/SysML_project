@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.23] - 2025-07-14
+
+### Changed
+- Refined IBD behavior by removing "Create IBD" functionality from IBD nodes themselves
+- IBD blocks can no longer create sub-IBD diagrams (only BDD blocks retain this capability)
+- Implemented contextual locking for BDD elements in IBD diagrams
+- System Block, Sensor, and Processor elements are now locked and grayed out in IBD diagrams
+- Enhanced sidebar tooltips to explain element availability based on diagram context
+
+### Fixed
+- Prevented inappropriate element usage across different diagram types
+- Ensured proper separation between BDD and IBD element functionality
+- Improved user experience with clear visual indicators for locked elements
+
 ## [1.1.22] - 2025-07-14
 
 ### Added

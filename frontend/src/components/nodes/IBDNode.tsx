@@ -1,11 +1,7 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
-import { Paper, Typography, Box, IconButton } from '@mui/material';
-import { AddCircleOutline } from '@mui/icons-material';
-import { AdaptiveIbdIcon } from '../icons/AdaptiveIbdIcon';
-import { nodeColors } from '../icons/nodeColors';
-import useDiagramStore from '../../store/diagramStore';
+import { Paper, Typography, Box } from '@mui/material';
 
 const STANDARD_NODE_WIDTH = 260;
 
@@ -66,90 +62,16 @@ const NodeWrapper = styled(Box)({
   display: 'inline-block',
 });
 
-// Styled component for the IBD indicator icon
-const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
-  position: 'absolute',
-  bottom: '5px', // Adjusted position relative to the new container
-  right: '10px', // Aligns the icon 10px from the right edge
-  left: 'auto', // Unset old properties for clean override
-  transform: 'none', // Unset old properties for clean override
-  background: theme.palette.background.paper,
-  border: `1px solid ${theme.palette.divider}`,
-  borderRadius: '50%',
-  width: '24px',
-  height: '24px',
-  padding: '4px',
-  boxShadow: theme.shadows[2],
-  zIndex: 1000,
-  transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    backgroundColor: theme.palette.action.hover,
-    boxShadow: theme.shadows[4],
-  },
-  // Base styles for ADD button: hidden by default
-  '&.add-ibd': {
-    display: 'none',
-  },
-  // Style for VIEW button: always visible
-  '&.view-ibd': {
-    display: 'flex',
-    backgroundColor: 'transparent',
-    border: 'none',
-    boxShadow: 'none',
-    color: theme.palette.primary.main,
-    '&:hover': {
-      filter: 'brightness(0.8)',
-      backgroundColor: 'rgba(0, 0, 0, 0.04)',
-      boxShadow: theme.shadows[1],
-    },
-  },
-}));
-
-// THE CRITICAL CHANGE: The hover selector is now on the parent container
-const StyledNodeContainer = styled(NodeContainer)({
-  '&:hover .add-ibd': {
-    display: 'flex',
-  },
-});
+// No IBD functionality for IBD nodes - they can't create sub-IBDs
+const StyledNodeContainer = styled(NodeContainer)({});
 
 // Define the IBDNode component
 const IBDNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
-  const { openNewDiagramTab, openDiagrams, setActiveDiagram } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
   const hasIncomingConnections = edges.some((edge) => edge.target === id);
-  
-  // Check if there's already an IBD diagram for this block
-  const ibdExists = openDiagrams.some(diagram => 
-    diagram.type === 'ibd' && 
-    diagram.id === `ibd-${id}`
-  );
-  
-  const handleOpenIBD = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (ibdExists) {
-      // If IBD exists, switch to that tab
-      const existingIBD = openDiagrams.find(diagram => 
-        diagram.type === 'ibd' && diagram.id === `ibd-${id}`
-      );
-      if (existingIBD) {
-        setActiveDiagram(existingIBD.id);
-      }
-    } else {
-      // Create new IBD with consistent ID pattern
-      openNewDiagramTab({
-        customId: `ibd-${id}`,
-        name: `${label || 'IBD Block'} - IBD`,
-        type: 'ibd',
-        nodes: [],
-        edges: [],
-        description: `Internal Block Diagram for ${label || 'IBD Block'}`
-      });
-    }
-  };
   
   return (
     <StyledNodeContainer>
@@ -214,27 +136,6 @@ const IBDNode = ({ data, selected, id }: NodeProps) => {
           )}        </div>
         </IBDPaper>
       </NodeWrapper>
-      
-      {/* Smart IBD Indicator Icon - Now positioned as sibling to NodeWrapper */}
-      {ibdExists ? (
-        // State 1: IBD EXISTS. Icon is always visible.
-        <IBDIndicatorIcon 
-          className="view-ibd" 
-          onClick={handleOpenIBD}
-          title="View Internal Block Diagram"
-        >
-          <AdaptiveIbdIcon color={nodeColors.block} size={16} />
-        </IBDIndicatorIcon>
-      ) : (
-        // State 2: IBD DOES NOT EXIST. Icon appears on hover.
-        <IBDIndicatorIcon 
-          className="add-ibd" 
-          onClick={handleOpenIBD}
-          title="Create Internal Block Diagram"
-        >
-          <AddCircleOutline fontSize="small" />
-        </IBDIndicatorIcon>
-      )}
     </StyledNodeContainer>
   );
 };

@@ -120,6 +120,8 @@ const Sidebar: React.FC = () => {
   const renderNodePalette = () => {
     // Check if IBD block should be locked (when diagram type is BDD)
     const isIBDLocked = activeDiagram?.type === 'bdd';
+    // Check if BDD elements should be locked (when diagram type is IBD)
+    const areBDDElementsLocked = activeDiagram?.type === 'ibd';
     
     return (
       <>
@@ -128,59 +130,83 @@ const Sidebar: React.FC = () => {
         </Typography>
         <List disablePadding>
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="System Block - Main component with inputs and outputs" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'block', {
-                    type: 'block',
-                    label: 'System Block',
-                    description: 'Main system component with inputs and outputs',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#e3f2fd" />
-                <DeviceHubIcon fontSize="small" color="primary" />
-                <Typography variant="body2">System Block</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "System Block - Not available in Internal Block Diagrams" : "System Block - Main component with inputs and outputs"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#e3f2fd" />
+                  <DeviceHubIcon fontSize="small" />
+                  <Typography variant="body2">System Block</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'block', {
+                      type: 'block',
+                      label: 'System Block',
+                      description: 'Main system component with inputs and outputs',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#e3f2fd" />
+                  <DeviceHubIcon fontSize="small" color="primary" />
+                  <Typography variant="body2">System Block</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
 
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="Sensor - Data collection component" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'sensor', {
-                    type: 'sensor',
-                    label: 'Sensor',
-                    description: 'Component that collects data from the environment',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#ffebee" />
-                <SensorsIcon fontSize="small" color="error" />
-                <Typography variant="body2">Sensor</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "Sensor - Not available in Internal Block Diagrams" : "Sensor - Data collection component"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#ffebee" />
+                  <SensorsIcon fontSize="small" />
+                  <Typography variant="body2">Sensor</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'sensor', {
+                      type: 'sensor',
+                      label: 'Sensor',
+                      description: 'Component that collects data from the environment',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#ffebee" />
+                  <SensorsIcon fontSize="small" color="error" />
+                  <Typography variant="body2">Sensor</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
 
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="Processor - Data processing component" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'processor', {
-                    type: 'processor',
-                    label: 'Processor',
-                    description: 'Component that processes data',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#fff8e1" />
-                <MemoryIcon fontSize="small" color="warning" />
-                <Typography variant="body2">Processor</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "Processor - Not available in Internal Block Diagrams" : "Processor - Data processing component"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#fff8e1" />
+                  <MemoryIcon fontSize="small" />
+                  <Typography variant="body2">Processor</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'processor', {
+                      type: 'processor',
+                      label: 'Processor',
+                      description: 'Component that processes data',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#fff8e1" />
+                  <MemoryIcon fontSize="small" color="warning" />
+                  <Typography variant="body2">Processor</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
 

@@ -179,24 +179,27 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Add IBD Block with Conditional Logic
+Task: Refine IBD Behavior and Contextual Locking
 
-The objective is to create a new "Internal Block Diagram" (IBD) block type. This new block should replicate all functionality of the existing "System Block" but with distinct visual styling and conditional availability in the UI.
+This task involves refining the behavior of the newly created IBD block and implementing stricter contextual rules for diagram editing. The goal is to ensure that diagram elements are used only in their appropriate diagram types (BDD vs. IBD).
 
-### Implementation Requirements
+Implementation Requirements
+Remove 'Create IBD' Functionality from IBD Nodes:
 
-1.  **Create IBD Node Component:**
-    * In the `frontend/src/components/nodes/` directory, duplicate the `SystemBlockNode.tsx` component and rename the copy to `IBDNode.tsx`.
-    * Ensure the new `IBDNode` inherits all functionality from the original `SystemBlockNode`.
-    * Modify the styling of the `IBDNode` component to have a distinct **green** color for its border or background.
+Modify the IBDNode.tsx component.
 
-2.  **Integrate into Sidebar:**
-    * Add the new "IBD" block to the "Diagram Elements" list in the left sidebar.
-    * It must be draggable onto the canvas, functioning identically to the "System Block".
+The + button, which appears on hover and is used to create a new IBD from a BDD block, must be completely removed or disabled for all IBD Block instances. This feature should only be present on BDD blocks (like System Block).
 
-3.  **Implement Conditional Locking:**
-    * In the sidebar component, access the active diagram's `type` from the `diagramStore` (Zustand).
-    * Implement logic to lock the "IBD" block in the sidebar when the active diagram is a **"BDD" (Block Definition Diagram)**.
-    * The locked state should be visually indicated (e.g., grayed out) and should prevent the block from being dragged onto the canvas.
-    * The "IBD" block must be enabled and fully functional for all other diagram types.
-```
+Implement Contextual Locking for BDD Elements:
+
+Update the logic in the sidebar component that renders the "Diagram Elements".
+
+When the active diagram's type is IBD, the following elements in the sidebar must be locked (grayed out and non-draggable):
+
+System Block
+
+Sensor
+
+Processor
+
+These elements are intended for use in BDDs and should not be added to IBDs.
