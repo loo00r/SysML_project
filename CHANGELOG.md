@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.33] - 2025-07-14
+
+### Fixed
+- Fixed IBD icon visibility logic in BDD blocks to persist after tab closure
+- IBD existence check now considers both open diagrams and persistent storage data
+- IBD icons now correctly show as "View IBD" state even when tab is closed
+- Added initial state saving to diagramsData when IBD is first created
+
+### Changed
+- Enhanced IBD existence detection in BlockNode, SensorNode, and ProcessorNode
+- Updated icon display logic to check diagramsData in addition to openDiagrams
+- Improved user experience by maintaining visual IBD indicators across tab operations
+
+### Improved
+- Better persistence of IBD creation state across interface operations
+- More reliable IBD icon state management independent of tab status
+
+## [1.1.32] - 2025-07-14
+
+### Fixed
+- Fixed critical IBD state persistence bug where diagrams were lost when tabs were closed
+- Added proper state saving in `closeDiagram` method for IBD diagrams before removal
+- Enhanced `setActiveDiagram` to save current IBD state before switching to another diagram
+- Improved persist middleware configuration to only save essential `diagramsData`
+- Ensured IBD diagrams maintain their state across tab closures and reopenings
+
+### Changed
+- Modified localStorage persistence to focus on `diagramsData` only, preventing conflicts
+- Enhanced diagram state management with proactive saving during tab operations
+- Improved IBD workflow reliability for better user experience
+
+## [1.1.31] - 2025-07-14
+
+### Added
+- Implemented persistent state system for IBD diagrams using Zustand store
+- Added `diagramsData` field to store diagram states (nodes, edges, viewport) with diagram ID mapping
+- Created `saveDiagramState` action for saving individual diagram states
+- Added `openIbdForBlock` action for creating/opening IBD diagrams with deterministic IDs
+- Integrated localStorage persistence using zustand persist middleware
+- Auto-save functionality triggers on diagram changes for IBD diagrams
+
+### Changed
+- Updated IBD creation logic to use persistent state with `ibd-for-{blockId}` naming pattern
+- Modified BlockNode, SensorNode, and ProcessorNode to use new `openIbdForBlock` action
+- Enhanced store with automatic state persistence for IBD diagrams between sessions
+- Improved IBD tab management with state restoration on reopening
+
+### Fixed
+- IBD diagram state now persists when tabs are closed and reopened
+- Prevented loss of user progress when switching between IBD diagrams
+- Ensured consistent IBD naming and state management across all node types
+
 ## [1.1.30] - 2025-07-14
 
 ### Fixed

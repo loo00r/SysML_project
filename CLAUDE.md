@@ -179,23 +179,38 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Improve IBD Readability and Connectivity
+New Task
+Task: Implement Persistent State for IBDs
 
-This task focuses on improving the visual clarity and layout flexibility of Internal Block Diagrams (IBD). The goal is to standardize the connection style and modify the connection points for IBD blocks to be exclusively horizontal.
+The objective is to save the state (nodes, edges, viewport) of each IBD diagram on the frontend. This will ensure that a user's progress is not lost when an IBD tab is closed and can be automatically restored when reopened. The solution will leverage the existing Zustand store and browser localStorage for persistence.
 
 Implementation Requirements
-Standardize Edge Color to Black:
+Extend Zustand Store Structure:
 
-Modify the edge styling configuration used for IBDs.
+In diagramStore.ts, add a new field to the store's state called diagramsData.
 
-All connection arrows (edges) between IBD Block nodes must be black, matching the style used in BDDs. This ensures visual consistency and improves diagram readability.
+This field should be an object that acts as a key-value map, where the key is the diagramId and the value is an object containing { nodes, edges, viewport } for that diagram.
 
-Set Exclusive Side Connection Handles for IBD Nodes:
+Implement State Management Actions:
 
-Update the IBDNode.tsx component.
+Create a new action saveDiagramState(diagramId, state) that updates the diagramsData object with the latest state for a given diagram.
 
-Remove the existing top and bottom connection points (Handles).
+Create a new action openIbdForBlock(bddBlockId). This action should:
 
-Add new handles exclusively to the left and right sides of the IBD Block.
+Generate a unique, deterministic ID for the IBD (e.g., ibd-for-${bddBlockId}).
 
-These side handles must support both incoming (target) and outgoing (source) connections to allow for a clear, horizontal flow in diagrams.
+Check diagramsData for any previously saved state for this ID.
+
+Open a new IBD tab, loading the saved state if it exists, or creating a new empty diagram if it does not.
+
+Implement Auto-Save from UI:
+
+In the main diagram workspace component (e.g., DiagramWorkspace.tsx), call the saveDiagramState action.
+
+This call should be triggered within the event handlers for diagram changes, such as onNodesChange and onEdgesChange, to save the progress in real-time as the user works.
+
+Add localStorage Persistence:
+
+Wrap the entire Zustand store creator function in the persist middleware from zustand/middleware.
+
+Configure the middleware to save the entire store's state to localStorage under a unique name (e.g., sysml-diagram-storage). This will ensure the diagramsData persists between browser sessions.

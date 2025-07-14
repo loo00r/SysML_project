@@ -114,40 +114,22 @@ const StyledNodeContainer = styled(NodeContainer)({
 // Define the BlockNode component
 const BlockNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
-  const { openNewDiagramTab, openDiagrams, setActiveDiagram } = useDiagramStore();
+  const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
   const hasIncomingConnections = edges.some((edge) => edge.target === id);
   
   // Check if there's already an IBD diagram for this block
+  const ibdId = `ibd-for-${id}`;
   const ibdExists = openDiagrams.some(diagram => 
     diagram.type === 'ibd' && 
-    diagram.id === `ibd-${id}`
-  );
+    diagram.id === ibdId
+  ) || !!diagramsData[ibdId];
   
   const handleOpenIBD = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    if (ibdExists) {
-      // If IBD exists, switch to that tab
-      const existingIBD = openDiagrams.find(diagram => 
-        diagram.type === 'ibd' && diagram.id === `ibd-${id}`
-      );
-      if (existingIBD) {
-        setActiveDiagram(existingIBD.id);
-      }
-    } else {
-      // Create new IBD with consistent ID pattern
-      openNewDiagramTab({
-        customId: `ibd-${id}`,
-        name: `${label || 'Block'} - IBD`,
-        type: 'ibd',
-        nodes: [],
-        edges: [],
-        description: `Internal Block Diagram for ${label || 'Block'}`
-      });
-    }
+    openIbdForBlock(id);
   };
   
   return (
