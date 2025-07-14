@@ -30,7 +30,7 @@ const IBDTitle = styled(Typography)(({ theme }) => ({
   fontWeight: 'bold',
   fontSize: '14px',
   textAlign: 'center',
-  color: '#2e7d32', // Dark green color for title
+  color: '#000000', // Black color for title, same as BDD blocks
 }));
 
 const IBDDescription = styled(Typography)(({ theme }) => ({

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.30] - 2025-07-14
+
+### Fixed
+- Fixed IBD block text color from green to black for consistency with BDD blocks
+- IBD block titles now use black text (#000000) instead of green (#2e7d32)
+- Enhanced visual consistency between BDD and IBD diagram elements
+
 ## [1.1.29] - 2025-07-14
 
 ### Changed
