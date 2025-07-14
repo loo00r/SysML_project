@@ -322,11 +322,15 @@ const DiagramWorkspace: React.FC = () => {
         let nodeType: string;
         if (activeDiagram?.type === 'ibd') {
           // For IBD diagrams, prefer port and connection types
-          nodeType = data.type === 'port' || data.type === 'connection' || data.type === 'block' ? 
+          nodeType = data.type === 'port' || data.type === 'connection' || data.type === 'block' || data.type === 'ibd' ? 
             data.type : 'port';
         } else {
-          // For BDD diagrams, use traditional types
-          nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' ? 
+          // For other diagrams, use traditional types (but not IBD blocks for BDD)
+          if (data.type === 'ibd' && activeDiagram?.type === 'bdd') {
+            // Don't allow IBD blocks in BDD diagrams
+            return;
+          }
+          nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' || data.type === 'ibd' ? 
             data.type : 'block';
         }
 
@@ -501,12 +505,14 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'block') return '#0041d0';
               if (n.type === 'sensor') return '#ff0072';
               if (n.type === 'processor') return '#ff9500';
+              if (n.type === 'ibd') return '#4caf50';
               return '#0041d0';
             }}
             nodeColor={(n) => {
               if (n.type === 'block') return '#e3f2fd';
               if (n.type === 'sensor') return '#ffebee';
               if (n.type === 'processor') return '#fff8e1';
+              if (n.type === 'ibd') return '#e8f5e8';
               return '#e3f2fd';
             }}
             maskColor="rgba(0, 0, 0, 0.1)"

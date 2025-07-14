@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.22] - 2025-07-14
+
+### Added
+- New IBD (Internal Block Diagram) Block node type with distinct green styling
+- IBD blocks now available in sidebar with drag-and-drop functionality
+- Conditional locking system for IBD blocks in Block Definition Diagrams (BDD)
+- Visual indicators for locked/disabled IBD blocks when diagram type is BDD
+- IBD blocks display grayed out appearance and disabled cursor when locked
+
+### Changed
+- Updated node type configuration to include IBD blocks in appropriate diagram types
+- Enhanced sidebar with IBD block component featuring green color scheme
+- Modified DiagramWorkspace to handle IBD node types in drop logic and minimap
+- Added green color support (#4caf50, #e8f5e8) throughout the application for IBD nodes
+
+### Fixed
+- IBD blocks properly prevented from being dropped onto BDD diagrams
+- Conditional rendering ensures IBD blocks are only functional in appropriate diagram contexts
+
 ## [1.1.21] - 2025-07-13
 
 ### Changed

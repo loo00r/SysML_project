@@ -179,55 +179,24 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Realign IBD Icons to Prevent Overlapping Connection Lines
-Context
-The current IBD icons (both for "view" and "add") are centered below their parent blocks. When a connection line is drawn downwards from the block, it visually clashes with and passes through the icon. This creates a cluttered and unprofessional appearance.
+Task: Add IBD Block with Conditional Logic
 
-Goal
-Realign both the persistent "View IBD" icon and the on-hover "Add IBD" icon to the bottom-right corner of the parent block. This will prevent them from overlapping with connection lines and result in a cleaner diagram layout.
+The objective is to create a new "Internal Block Diagram" (IBD) block type. This new block should replicate all functionality of the existing "System Block" but with distinct visual styling and conditional availability in the UI.
 
-Step-by-Step Implementation
-1. Locate the Icon's CSS Rule
-Open the CSS file that contains the styles for the IBD trigger icons.
+### Implementation Requirements
 
-Find the base class selector that defines the position for the icon, which we previously named .ibd-indicator-icon.
+1.  **Create IBD Node Component:**
+    * In the `frontend/src/components/nodes/` directory, duplicate the `SystemBlockNode.tsx` component and rename the copy to `IBDNode.tsx`.
+    * Ensure the new `IBDNode` inherits all functionality from the original `SystemBlockNode`.
+    * Modify the styling of the `IBDNode` component to have a distinct **green** color for its border or background.
 
-2. Modify the Positioning Properties
-The current implementation uses left: 50% and transform: translateX(-50%) to center the icon. We will replace this with properties that align it to the right.
+2.  **Integrate into Sidebar:**
+    * Add the new "IBD" block to the "Diagram Elements" list in the left sidebar.
+    * It must be draggable onto the canvas, functioning identically to the "System Block".
 
-Current CSS (approximate):
-
-CSS
-
-.ibd-indicator-icon {
-  position: absolute;
-  bottom: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-  /* ... other styles */
-}
-New CSS:
-
-CSS
-
-.ibd-indicator-icon {
-  position: absolute;
-  bottom: 5px;
-  right: 10px; /* ✅ Aligns the icon 10px from the right edge */
-  
-  /* ▼ Unset old properties for clean override */
-  left: auto; 
-  transform: none; 
-  /* ... other styles */
-}
-3. Verify Hover Functionality
-After applying the CSS changes, double-check the hover behavior for adding a new IBD. The hoverable area provided by the .node-container's padding should still function correctly, ensuring the + icon appears as expected and is clickable. No changes to the JSX structure are required.
-
-Acceptance Criteria
-✅ The persistent "View IBD" icon is positioned near the bottom-right corner of its parent block.
-
-✅ The on-hover "Add IBD" (+) icon appears in the exact same bottom-right position.
-
-✅ Vertical connection lines drawn from the bottom of a block no longer overlap with either IBD icon.
-
-✅ The functionality of both icons (hovering to show, clicking to open/create) remains unchanged.
+3.  **Implement Conditional Locking:**
+    * In the sidebar component, access the active diagram's `type` from the `diagramStore` (Zustand).
+    * Implement logic to lock the "IBD" block in the sidebar when the active diagram is a **"BDD" (Block Definition Diagram)**.
+    * The locked state should be visually indicated (e.g., grayed out) and should prevent the block from being dragged onto the canvas.
+    * The "IBD" block must be enabled and fully functional for all other diagram types.
+```

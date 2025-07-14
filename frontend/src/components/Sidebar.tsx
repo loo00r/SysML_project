@@ -21,6 +21,7 @@ import MemoryIcon from '@mui/icons-material/Memory';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import PersonIcon from '@mui/icons-material/Person';
+import DataObjectIcon from '@mui/icons-material/DataObject';
 
 import useDiagramStore from '../store/diagramStore';
 
@@ -56,6 +57,23 @@ const DraggableItem = styled(Paper)(({ theme }) => ({
   },
 }));
 
+const LockedItem = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(1),
+  marginBottom: theme.spacing(1),
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  cursor: 'not-allowed',
+  opacity: 0.5,
+  backgroundColor: theme.palette.action.disabledBackground,
+  '& .MuiSvgIcon-root': {
+    color: theme.palette.action.disabled,
+  },
+  '& .MuiTypography-root': {
+    color: theme.palette.action.disabled,
+  },
+}));
+
 interface ColorIndicatorProps {
   bgcolor: string;
 }
@@ -71,8 +89,11 @@ const ColorIndicator = styled(Box, {
 }));
 
 const Sidebar: React.FC = () => {
-  const { diagramType } = useDiagramStore();
+  const { diagramType, openDiagrams, activeDiagramId } = useDiagramStore();
   const version = import.meta.env.VITE_APP_VERSION || '1.0';
+  
+  // Get the active diagram
+  const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
 
   // Handle drag start for creating new nodes
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
@@ -97,6 +118,9 @@ const Sidebar: React.FC = () => {
 
   // Render the node palette for block diagrams
   const renderNodePalette = () => {
+    // Check if IBD block should be locked (when diagram type is BDD)
+    const isIBDLocked = activeDiagram?.type === 'bdd';
+    
     return (
       <>
         <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
@@ -157,6 +181,33 @@ const Sidebar: React.FC = () => {
                 <MemoryIcon fontSize="small" color="warning" />
                 <Typography variant="body2">Processor</Typography>
               </DraggableItem>
+            </Tooltip>
+          </ListItem>
+
+          <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+            <Tooltip title={isIBDLocked ? "IBD Block - Not available in Block Definition Diagrams" : "IBD Block - Internal Block Diagram component"} placement="right">
+              {isIBDLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#e8f5e8" />
+                  <DataObjectIcon fontSize="small" />
+                  <Typography variant="body2">IBD Block</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'ibd', {
+                      type: 'ibd',
+                      label: 'IBD Block',
+                      description: 'Internal Block Diagram component',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#e8f5e8" />
+                  <DataObjectIcon fontSize="small" sx={{ color: '#4caf50' }} />
+                  <Typography variant="body2">IBD Block</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
         </List>
