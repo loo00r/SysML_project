@@ -404,7 +404,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
       target: connection.target || '',
-      type: 'straight', // Use straight for IBD to avoid curve
+      type: isIBD ? 'straight' : 'smoothstep', // Use straight for IBD, smoothstep for BDD
       animated: isIBD,
       style: isIBD ? { 
         stroke: '#555', 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.37] - 2025-07-15
+
+### Fixed
+- Fixed edge types to use smoothstep for BDD diagrams and straight for IBD diagrams
+- Restored proper curved connections for BDD blocks while maintaining straight lines for IBD blocks
+- BDD diagrams now have proper smooth corners again while IBD keeps straight animated lines
+
 ## [1.1.36] - 2025-07-15
 
 ### Fixed
