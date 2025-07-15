@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.36] - 2025-07-15
+
+### Fixed
+- Removed white background square from center of IBD animated lines
+- Added comprehensive CSS rules to hide all background elements from IBD edge labels
+- IBD connection lines now display cleanly without any background interference
+
+## [1.1.35] - 2025-07-15
+
+### Fixed
+- Removed white background from IBD edge label text for cleaner visual appearance
+- IBD connection labels now display without background rectangle
+
+## [1.1.34] - 2025-07-15
+
+### Fixed
+- Fixed IBD connection line deviation - lines now render as perfectly straight instead of curved
+- Corrected edge type from 'smoothstep' to 'straight' for IBD diagrams to eliminate downward curve
+
+### Added
+- Added 'IBD Blocks' text label to IBD connection lines
+- Positioned label above the line with proper alignment (end of text at center)
+
+### Changed
+- Updated IBD edge creation logic to apply appropriate styling based on diagram type
+- Enhanced CSS styling for IBD edge labels with consistent positioning
+
 ## [1.1.33] - 2025-07-14
 
 ### Fixed

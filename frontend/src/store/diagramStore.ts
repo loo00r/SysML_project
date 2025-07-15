@@ -396,13 +396,23 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Save current state before connecting nodes
     get().saveToHistory();
     
+    // Get current diagram type to determine edge style
+    const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
+    const isIBD = activeDiagram?.type === 'ibd';
+    
     const newEdge: Edge = {
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
       target: connection.target || '',
-      type: 'smoothstep',
-      animated: false,
-      style: { stroke: '#555' }
+      type: 'straight', // Use straight for IBD to avoid curve
+      animated: isIBD,
+      style: isIBD ? { 
+        stroke: '#555', 
+        strokeWidth: 2,
+        strokeDasharray: '8 4'
+      } : { stroke: '#555', strokeWidth: 1 },
+      className: isIBD ? 'ibd-animated-edge' : undefined,
+      label: isIBD ? 'IBD Blocks' : undefined
     };
     
     const newEdges = [...get().edges, newEdge];

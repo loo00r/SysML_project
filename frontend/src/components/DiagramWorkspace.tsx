@@ -146,7 +146,7 @@ const DiagramWorkspace: React.FC = () => {
       strokeWidth: 2,
       strokeDasharray: '8 4', // Dashed line pattern
     },
-    type: 'smoothstep' as const,
+    type: 'straight' as const, // Use straight for IBD to avoid curve
     animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
     className: 'ibd-animated-edge',
   } : {

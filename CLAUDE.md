@@ -179,38 +179,89 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-New Task
-Task: Implement Persistent State for IBDs
+Task: Fix IBD Connection Line Deviation and Add Label
+Task Type: UI/UX Improvement
+Context
+A visual regression has been identified in IBD diagrams, likely introduced between versions 1.1.28 and 1.1.33. The connection line between two IBD Block nodes, which should be perfectly straight, now renders with a slight downward deviation.
 
-The objective is to save the state (nodes, edges, viewport) of each IBD diagram on the frontend. This will ensure that a user's progress is not lost when an IBD tab is closed and can be automatically restored when reopened. The solution will leverage the existing Zustand store and browser localStorage for persistence.
+To enhance the diagram's readability, we will also take this opportunity to add a descriptive text label to this specific type of connection.
 
-Implementation Requirements
-Extend Zustand Store Structure:
+Goal
+The primary goal is to restore the correct visual appearance of the connection line on IBD diagrams, making it straight again. Additionally, we need to improve the user's understanding of the diagram by adding a clear label to the connection between IBD blocks.
 
-In diagramStore.ts, add a new field to the store's state called diagramsData.
+Acceptance Criteria
+✅ The animated, dashed connection line between two IBD Block nodes on an IBD diagram is rendered as a perfectly straight horizontal line, removing the current downward curve.
 
-This field should be an object that acts as a key-value map, where the key is the diagramId and the value is an object containing { nodes, edges, viewport } for that diagram.
+✅ A text label with the content "IBD Blocks" appears on the connection line.
 
-Implement State Management Actions:
+✅ The label is positioned above the line.
 
-Create a new action saveDiagramState(diagramId, state) that updates the diagramsData object with the latest state for a given diagram.
+✅ The label is horizontally aligned so that the end of the text (the "s" in "Blocks") is located at the horizontal center of the connection line.
 
-Create a new action openIbdForBlock(bddBlockId). This action should:
+✅ The functionality of creating and deleting these connections remains unchanged.
 
-Generate a unique, deterministic ID for the IBD (e.g., ibd-for-${bddBlockId}).
+Technical Implementation Details
+This task involves modifications within the frontend, primarily related to the custom edge components used by React Flow.
 
-Check diagramsData for any previously saved state for this ID.
+1. Fix the Line Deviation (Bug Fix)
+File to Investigate: Locate the custom edge component responsible for rendering the connection between IBD blocks. This is likely in frontend/src/components/edges/ (e.g., AnimatedDashedEdge.tsx or a similar name).
 
-Open a new IBD tab, loading the saved state if it exists, or creating a new empty diagram if it does not.
+Probable Cause: The issue is almost certainly in the CSS or the SVG path calculation.
 
-Implement Auto-Save from UI:
+Action:
 
-In the main diagram workspace component (e.g., DiagramWorkspace.tsx), call the saveDiagramState action.
+Review the CSS properties applied to the edge's SVG path and its container. Check for any recent changes to transform, positioning, or flexbox properties that could cause this misalignment.
 
-This call should be triggered within the event handlers for diagram changes, such as onNodesChange and onEdgesChange, to save the progress in real-time as the user works.
+Inspect the getSmoothStepPath or a similar utility function from React Flow if you are using it to calculate the path. Ensure the parameters passed to it are correct and haven't been altered.
 
-Add localStorage Persistence:
+2. Add the Edge Label (Feature Enhancement)
+Adding the Label Prop:
 
-Wrap the entire Zustand store creator function in the persist middleware from zustand/middleware.
+In the logic where the edge is created (e.g., in the onConnect handler in DiagramWorkspace.tsx or a Zustand store action), modify the new edge object to include the label property.
 
-Configure the middleware to save the entire store's state to localStorage under a unique name (e.g., sysml-diagram-storage). This will ensure the diagramsData persists between browser sessions.
+Example:
+
+TypeScript
+
+const newEdge = {
+  id: `e${source}-${target}`,
+  source,
+  target,
+  type: 'animatedDashed', // or your custom type
+  animated: true,
+  label: 'IBD Blocks' // <-- Add this property
+};
+Positioning the Label:
+
+React Flow's default label position is centered. To achieve the specific "end-of-text at center" alignment, you will need to use a custom solution.
+
+Recommended Approach: Use the EdgeLabelRenderer component provided by React Flow. This gives you full control over the label's rendering and styling.
+
+Example within your custom edge component:
+
+TypeScript
+
+import { EdgeLabelRenderer, getSmoothStepPath, BaseEdge } from 'reactflow';
+
+// ... inside your custom edge component
+<>
+  <BaseEdge path={edgePath} ... />
+  <EdgeLabelRenderer>
+    <div
+      style={{
+        position: 'absolute',
+        transform: `translate(-50%, -100%) translate(-50%, -5px)`, // Center, then move up
+        // The key part is the inner transform to shift it left
+        // The exact transform might need tweaking
+        left: '50%',
+        top: '50%',
+        fontSize: 12,
+        pointerEvents: 'all',
+      }}
+      className="nodrag nopan"
+    >
+      <span style={{ transform: 'translateX(-50%)' }}>IBD Blocks</span>
+    </div>
+  </EdgeLabelRenderer>
+</>
+The key will be to find the center point of the edge and then apply a CSS transform to shift the label element appropriately to the left. transform: translateX(-100%) on an inner element often works for right-aligning text to a point. For this, you might need translateX(-50%) to shift it halfway. Experimentation will be needed.
