@@ -144,7 +144,7 @@ export const useAIGeneration = () => {
         // Open a new diagram with the generated content
         openDiagram({
           name: diagramName,
-          type: 'BDD',
+          type: 'bdd',
           nodes: result.nodes,
           edges: result.edges,
           description: shortDescription

@@ -7,6 +7,331 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.37] - 2025-07-15
+
+### Fixed
+- Fixed edge types to use smoothstep for BDD diagrams and straight for IBD diagrams
+- Restored proper curved connections for BDD blocks while maintaining straight lines for IBD blocks
+- BDD diagrams now have proper smooth corners again while IBD keeps straight animated lines
+
+## [1.1.36] - 2025-07-15
+
+### Fixed
+- Removed white background square from center of IBD animated lines
+- Added comprehensive CSS rules to hide all background elements from IBD edge labels
+- IBD connection lines now display cleanly without any background interference
+
+## [1.1.35] - 2025-07-15
+
+### Fixed
+- Removed white background from IBD edge label text for cleaner visual appearance
+- IBD connection labels now display without background rectangle
+
+## [1.1.34] - 2025-07-15
+
+### Fixed
+- Fixed IBD connection line deviation - lines now render as perfectly straight instead of curved
+- Corrected edge type from 'smoothstep' to 'straight' for IBD diagrams to eliminate downward curve
+
+### Added
+- Added 'IBD Blocks' text label to IBD connection lines
+- Positioned label above the line with proper alignment (end of text at center)
+
+### Changed
+- Updated IBD edge creation logic to apply appropriate styling based on diagram type
+- Enhanced CSS styling for IBD edge labels with consistent positioning
+
+## [1.1.33] - 2025-07-14
+
+### Fixed
+- Fixed IBD icon visibility logic in BDD blocks to persist after tab closure
+- IBD existence check now considers both open diagrams and persistent storage data
+- IBD icons now correctly show as "View IBD" state even when tab is closed
+- Added initial state saving to diagramsData when IBD is first created
+
+### Changed
+- Enhanced IBD existence detection in BlockNode, SensorNode, and ProcessorNode
+- Updated icon display logic to check diagramsData in addition to openDiagrams
+- Improved user experience by maintaining visual IBD indicators across tab operations
+
+### Improved
+- Better persistence of IBD creation state across interface operations
+- More reliable IBD icon state management independent of tab status
+
+## [1.1.32] - 2025-07-14
+
+### Fixed
+- Fixed critical IBD state persistence bug where diagrams were lost when tabs were closed
+- Added proper state saving in `closeDiagram` method for IBD diagrams before removal
+- Enhanced `setActiveDiagram` to save current IBD state before switching to another diagram
+- Improved persist middleware configuration to only save essential `diagramsData`
+- Ensured IBD diagrams maintain their state across tab closures and reopenings
+
+### Changed
+- Modified localStorage persistence to focus on `diagramsData` only, preventing conflicts
+- Enhanced diagram state management with proactive saving during tab operations
+- Improved IBD workflow reliability for better user experience
+
+## [1.1.31] - 2025-07-14
+
+### Added
+- Implemented persistent state system for IBD diagrams using Zustand store
+- Added `diagramsData` field to store diagram states (nodes, edges, viewport) with diagram ID mapping
+- Created `saveDiagramState` action for saving individual diagram states
+- Added `openIbdForBlock` action for creating/opening IBD diagrams with deterministic IDs
+- Integrated localStorage persistence using zustand persist middleware
+- Auto-save functionality triggers on diagram changes for IBD diagrams
+
+### Changed
+- Updated IBD creation logic to use persistent state with `ibd-for-{blockId}` naming pattern
+- Modified BlockNode, SensorNode, and ProcessorNode to use new `openIbdForBlock` action
+- Enhanced store with automatic state persistence for IBD diagrams between sessions
+- Improved IBD tab management with state restoration on reopening
+
+### Fixed
+- IBD diagram state now persists when tabs are closed and reopened
+- Prevented loss of user progress when switching between IBD diagrams
+- Ensured consistent IBD naming and state management across all node types
+
+## [1.1.30] - 2025-07-14
+
+### Fixed
+- Fixed IBD block text color from green to black for consistency with BDD blocks
+- IBD block titles now use black text (#000000) instead of green (#2e7d32)
+- Enhanced visual consistency between BDD and IBD diagram elements
+
+## [1.1.29] - 2025-07-14
+
+### Changed
+- Increased IBD animation speed by 25% for more dynamic visual feedback
+- Animation duration reduced from 2s to 1.6s for faster dash movement
+- Enhanced user experience with more responsive flow visualization
+
+### Improved
+- More engaging and lively animation for IBD diagram connections
+- Better visual feedback for data flow direction in real-time
+
+## [1.1.28] - 2025-07-14
+
+### Added
+- Animated dashed lines for IBD diagram connections showing flow direction
+- CSS keyframe animation `dashFlow` for moving dash pattern from left to right
+- Professional flow visualization without traditional arrow markers
+
+### Changed
+- Replaced static arrows with animated dashed lines in IBD diagrams
+- IBD edges now use thicker lines (strokeWidth: 2) with dashed pattern (8 4)
+- Enhanced visual indication of data/signal flow through animated dash movement
+
+### Improved
+- Better flow visualization in IBD diagrams with continuous animation
+- More intuitive direction indication through animated dash progression
+- Consistent gray color scheme maintained across both BDD and IBD diagrams
+
+## [1.1.27] - 2025-07-14
+
+### Fixed
+- Fixed arrow visibility issues in IBD diagrams by switching to standard ReactFlow arrows
+- Unified edge styling between BDD and IBD diagrams for better consistency
+- Removed problematic custom SVG arrow markers that weren't displaying properly
+
+### Changed
+- IBD diagram edges now use the same gray color (#555) as BDD diagrams
+- Simplified edge configuration to use single style for both diagram types
+- Improved visual consistency across all diagram types
+
+## [1.1.26] - 2025-07-14
+
+### Fixed
+- Restored arrow markers on IBD diagram connections that were missing
+- Added custom SVG arrow markers for both IBD (black) and BDD (gray) diagrams
+- Fixed markerEnd configuration with proper URL references to custom arrow definitions
+- Ensured visual consistency between BDD and IBD connection arrows
+
+### Added
+- Custom SVG marker definitions for black and gray arrow heads
+- Proper markerEnd configuration in defaultEdgeOptions for both diagram types
+
+## [1.1.25] - 2025-07-14
+
+### Fixed
+- Fixed IBD block connection handles to use single centered handle per side
+- Resolved connection routing issues caused by multiple overlapping handles
+- Improved connection behavior with proper left (target) and right (source) handle positioning
+- Eliminated erratic connection paths that went in wrong directions before connecting
+
+### Changed
+- Simplified IBD block handle configuration from 4 handles to 2 handles per block
+- Left handle now serves as input (target), right handle as output (source)
+- All handles are properly centered on their respective sides
+
+## [1.1.24] - 2025-07-14
+
+### Changed
+- Improved IBD diagram readability with standardized black edge colors
+- Modified IBD blocks to use exclusive horizontal connectivity (left and right sides only)
+- Replaced top and bottom connection handles with side handles for cleaner horizontal flow
+- Enhanced IBD block design with multiple connection points per side (30% and 70% positions)
+- Added support for both source and target connections on each side of IBD blocks
+
+### Improved
+- Better visual consistency between BDD and IBD diagrams with uniform edge styling
+- Cleaner diagram layouts with horizontal connection patterns for IBD elements
+- More flexible connectivity options for complex IBD structures
+
+## [1.1.23] - 2025-07-14
+
+### Changed
+- Refined IBD behavior by removing "Create IBD" functionality from IBD nodes themselves
+- IBD blocks can no longer create sub-IBD diagrams (only BDD blocks retain this capability)
+- Implemented contextual locking for BDD elements in IBD diagrams
+- System Block, Sensor, and Processor elements are now locked and grayed out in IBD diagrams
+- Enhanced sidebar tooltips to explain element availability based on diagram context
+
+### Fixed
+- Prevented inappropriate element usage across different diagram types
+- Ensured proper separation between BDD and IBD element functionality
+- Improved user experience with clear visual indicators for locked elements
+
+## [1.1.22] - 2025-07-14
+
+### Added
+- New IBD (Internal Block Diagram) Block node type with distinct green styling
+- IBD blocks now available in sidebar with drag-and-drop functionality
+- Conditional locking system for IBD blocks in Block Definition Diagrams (BDD)
+- Visual indicators for locked/disabled IBD blocks when diagram type is BDD
+- IBD blocks display grayed out appearance and disabled cursor when locked
+
+### Changed
+- Updated node type configuration to include IBD blocks in appropriate diagram types
+- Enhanced sidebar with IBD block component featuring green color scheme
+- Modified DiagramWorkspace to handle IBD node types in drop logic and minimap
+- Added green color support (#4caf50, #e8f5e8) throughout the application for IBD nodes
+
+### Fixed
+- IBD blocks properly prevented from being dropped onto BDD diagrams
+- Conditional rendering ensures IBD blocks are only functional in appropriate diagram contexts
+
+## [1.1.21] - 2025-07-13
+
+### Changed
+- Realigned IBD icons from center-bottom to bottom-right corner of parent blocks
+- Updated positioning for all three node types (Block, Sensor, Processor)
+- IBD icons now use `right: 10px` instead of `left: 50%` to prevent overlapping with connection lines
+- Removed `transform: translateX(-50%)` in favor of `transform: none` for cleaner positioning
+
+### Fixed
+- IBD icons no longer overlap with vertical connection lines drawn from bottom of blocks
+- Improved visual clarity and professional appearance of diagram layouts
+- Connection lines now have clear path without visual interference from IBD indicators
+
+## [1.1.20] - 2025-07-13
+
+### Changed
+- Adjusted Sensor IBD icon color to lighter pink (#f792be) for better visual balance
+- Reduced color saturation to prevent overpowering the interface design
+- Improved overall visual harmony while maintaining sufficient visibility
+
+## [1.1.19] - 2025-07-13
+
+### Changed
+- Updated Sensor IBD icon color from red (#ef4444) to pink (#ec4899) for better visual harmony
+- Sensor IBD icons now use high visibility pink that avoids conflict with red node borders
+- Improved visual coherence between Sensor nodes and their IBD indicators
+- Block and Processor IBD icon colors remain unchanged for consistency
+
+## [1.1.18] - 2025-07-13
+
+### Improved
+- Further enhanced IBD icon visibility by increasing saturation for Block and Sensor colors
+- Block IBD icons now use highly saturated blue (#3b82f6) for optimal visibility
+- Sensor IBD icons now use highly saturated red (#ef4444) for optimal visibility  
+- Processor IBD icons remain unchanged (#fcd34d) as they already had perfect visibility
+- All IBD icons now have consistent high visibility matching the Processor standard
+
+### Changed
+- Color consistency across all node types with uniform saturation levels
+- Enhanced user experience with clearly visible IBD indicators on all node types
+
+## [1.1.17] - 2025-07-13
+
+### Improved
+- Enhanced visibility of adaptive IBD icons with darker, more saturated colors
+- Updated color palette for better contrast against white canvas background
+- Block IBD icons now use richer blue (#93c5fd) instead of light blue
+- Sensor IBD icons now use richer pink/red (#fca5a5) instead of light pink
+- Processor IBD icons now use richer yellow/amber (#fcd34d) instead of light yellow
+
+### Fixed
+- Poor contrast issue with IBD icons being too light to see clearly
+- Improved user experience with more visible icon indicators
+
+## [1.1.16] - 2025-07-13
+
+### Added
+- Created adaptive color system for 'View IBD' icons that match their parent node colors
+- New AdaptiveIbdIcon SVG component with customizable background colors
+- Node-specific color mapping (Block: light blue, Sensor: light pink, Processor: light yellow)
+
+### Changed
+- Replaced static Article icons with dynamic AdaptiveIbdIcon in all node types
+- IBD view icons now provide clear visual connection to their parent nodes
+- Enhanced visual coherence between nodes and their internal diagrams
+
+### Improved
+- Better user experience with color-coded IBD indicators
+- Consistent design language across all node types
+
+## [1.1.15] - 2025-07-13
+
+### Added
+- Extended IBD (Internal Block Diagram) functionality to Sensor and Processor nodes
+- All container-like nodes (Block, Sensor, Processor) now support IBD creation and viewing
+- Consistent IBD trigger icons appear below all relevant node types
+- Unified hover-to-reveal behavior for Add IBD functionality across all node types
+
+### Changed
+- SensorNode and ProcessorNode components now include complete IBD logic
+- Replicated smart IBD indicator system from BlockNode to ensure consistent UX
+- Enhanced modularity by applying identical IBD patterns to all container nodes
+
+## [1.1.14] - 2025-07-13
+
+### Fixed
+- Fixed hover animation that caused View IBD icon to shift position during mouse hover
+- Removed scale transform from view-ibd hover effect to keep icon stationary
+- Improved icon stability and user interaction experience
+
+## [1.1.13] - 2025-07-13
+
+### Changed
+- Refined View IBD icon visual style for better consistency with application design
+- Removed blue background and border from persistent View IBD icon 
+- Changed to transparent background with clean, minimal appearance
+- Enhanced hover effects with brightness filter and subtle background
+- Added smooth transitions for better user feedback
+
+## [1.1.12] - 2025-07-13
+
+### Added
+- Implemented embedded IBD (Internal Block Diagram) functionality in frontend
+- Added support for 'bdd' and 'ibd' diagram types in Zustand store
+- Created smart IBD indicator icon below BlockNode components
+- New IBD-specific node types: PortNode and ConnectionNode for Internal Block Diagrams
+- Conditional rendering of node types based on active diagram type (BDD vs IBD)
+
+### Changed
+- Updated diagram type system to use lowercase conventions ('bdd', 'ibd')
+- Enhanced BlockNode component with IBD trigger functionality
+- Added visual indicator showing IBD existence status with hover-to-reveal behavior
+- Fixed CSS hover trap issue preventing proper icon interaction
+- Restructured component hierarchy to support extended hover areas
+
+### Fixed
+- Resolved hover trap where IBD trigger icon disappeared before users could click it
+- Enhanced hover mechanics with proper container structure and CSS positioning
+- Improved icon accessibility and interaction reliability
+
 ## [1.1.11] - 2025-07-09
 
 ### Fixed

@@ -1,9 +1,10 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Define node types based on SysML diagram elements
-export type NodeType = 'block' | 'sensor' | 'processor';
+export type NodeType = 'block' | 'sensor' | 'processor' | 'port' | 'connection';
 
 // Define node data structure
 export interface NodeData {
@@ -16,7 +17,7 @@ export interface NodeData {
 }
 
 // Define diagram types
-export type DiagramType = 'BDD' | 'IBD' | 'block';
+export type DiagramType = 'bdd' | 'ibd';
 
 // Define diagram instance interface
 export interface DiagramInstance {
@@ -37,11 +38,21 @@ export interface ValidationError {
   nodeIds?: string[];
 }
 
+// Define diagram state structure for persistence
+export interface DiagramState {
+  nodes: Node<NodeData>[];
+  edges: Edge[];
+  viewport?: { x: number; y: number; zoom: number };
+}
+
 // Define the store state
-interface DiagramState {
+interface DiagramStoreState {
   // Multi-diagram state
   openDiagrams: DiagramInstance[];
   activeDiagramId: string | null;
+  
+  // Persistent state for IBD diagrams
+  diagramsData: Record<string, DiagramState>;
   
   // Legacy compatibility - computed from active diagram
   nodes: Node<NodeData>[];
@@ -73,9 +84,14 @@ interface DiagramState {
   
   // Multi-diagram actions
   openDiagram: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'>) => void;
+  openNewDiagramTab: (diagramData: Omit<DiagramInstance, 'id' | 'createdAt' | 'modifiedAt'> & { customId?: string }) => void;
   closeDiagram: (diagramId: string) => void;
   setActiveDiagram: (diagramId: string) => void;
   updateActiveDiagram: (payload: { nodes?: Node<NodeData>[], edges?: Edge[] }) => void;
+  
+  // Persistent state actions
+  saveDiagramState: (diagramId: string, state: DiagramState) => void;
+  openIbdForBlock: (bddBlockId: string) => void;
   
   // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
@@ -118,10 +134,14 @@ interface DiagramState {
 }
 
 // Create the store
-const useDiagramStore = create<DiagramState>((set, get) => ({
+const useDiagramStore = create<DiagramStoreState>()(persist(
+  (set, get) => ({
   // Initial state
   openDiagrams: [],
   activeDiagramId: null,
+  
+  // Persistent state for IBD diagrams
+  diagramsData: {},
   
   // Computed/legacy state
   nodes: [],
@@ -129,7 +149,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodes: [],
   selectedEdges: [],
   
-  diagramType: 'BDD' as DiagramType,
+  diagramType: 'bdd' as DiagramType,
   diagramName: 'Untitled Diagram',
   diagramDescription: '',
   
@@ -167,9 +187,42 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       diagramDescription: newDiagram.description || ''
     }));
   },
+
+  openNewDiagramTab: (diagramData) => {
+    const { customId, ...rest } = diagramData;
+    const newDiagram: DiagramInstance = {
+      id: customId || `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      modifiedAt: new Date(),
+      ...rest
+    };
+    
+    set(state => ({
+      openDiagrams: [...state.openDiagrams, newDiagram],
+      activeDiagramId: newDiagram.id,
+      // Update computed state
+      nodes: newDiagram.nodes,
+      edges: newDiagram.edges,
+      diagramType: newDiagram.type,
+      diagramName: newDiagram.name,
+      diagramDescription: newDiagram.description || ''
+    }));
+  },
   
   closeDiagram: (diagramId) => {
     const state = get();
+    
+    // Find the diagram being closed
+    const diagramToClose = state.openDiagrams.find(d => d.id === diagramId);
+    
+    // If it's an IBD diagram, save its state before closing
+    if (diagramToClose && diagramToClose.type === 'ibd') {
+      get().saveDiagramState(diagramId, {
+        nodes: diagramToClose.nodes,
+        edges: diagramToClose.edges
+      });
+    }
+    
     const updatedDiagrams = state.openDiagrams.filter(d => d.id !== diagramId);
     
     let newActiveDiagramId = state.activeDiagramId;
@@ -186,7 +239,7 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       // Update computed state
       nodes: activeDiagram?.nodes || [],
       edges: activeDiagram?.edges || [],
-      diagramType: activeDiagram?.type || 'BDD',
+      diagramType: activeDiagram?.type || 'bdd',
       diagramName: activeDiagram?.name || 'Untitled Diagram',
       diagramDescription: activeDiagram?.description || '',
       selectedNodes: [],
@@ -196,6 +249,18 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
   
   setActiveDiagram: (diagramId) => {
     const state = get();
+    
+    // Save current active diagram state if it's an IBD
+    if (state.activeDiagramId && state.activeDiagramId !== diagramId) {
+      const currentDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+      if (currentDiagram && currentDiagram.type === 'ibd') {
+        get().saveDiagramState(state.activeDiagramId, {
+          nodes: state.nodes,
+          edges: state.edges
+        });
+      }
+    }
+    
     const activeDiagram = state.openDiagrams.find(d => d.id === diagramId);
     
     if (activeDiagram) {
@@ -235,6 +300,74 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       nodes: payload.nodes || state.nodes,
       edges: payload.edges || state.edges
     }));
+    
+    // Auto-save to diagramsData if this is an IBD
+    if (state.activeDiagramId) {
+      const activeDiagram = updatedDiagrams.find(d => d.id === state.activeDiagramId);
+      if (activeDiagram && activeDiagram.type === 'ibd') {
+        get().saveDiagramState(state.activeDiagramId, {
+          nodes: payload.nodes || state.nodes,
+          edges: payload.edges || state.edges
+        });
+      }
+    }
+  },
+  
+  // Persistent state actions
+  saveDiagramState: (diagramId, state) => {
+    set(currentState => ({
+      diagramsData: {
+        ...currentState.diagramsData,
+        [diagramId]: state
+      }
+    }));
+  },
+  
+  openIbdForBlock: (bddBlockId) => {
+    const ibdId = `ibd-for-${bddBlockId}`;
+    const state = get();
+    
+    // Check if this IBD is already open
+    const existingDiagram = state.openDiagrams.find(d => d.id === ibdId);
+    if (existingDiagram) {
+      // Just switch to the existing tab
+      get().setActiveDiagram(ibdId);
+      return;
+    }
+    
+    // Get previously saved state for this IBD
+    const savedState = state.diagramsData[ibdId];
+    
+    // Create new IBD diagram
+    const newDiagram: DiagramInstance = {
+      id: ibdId,
+      name: `IBD for ${bddBlockId}`,
+      type: 'ibd',
+      nodes: savedState?.nodes || [],
+      edges: savedState?.edges || [],
+      description: `Internal Block Diagram for ${bddBlockId}`,
+      createdAt: new Date(),
+      modifiedAt: new Date()
+    };
+    
+    set(currentState => ({
+      openDiagrams: [...currentState.openDiagrams, newDiagram],
+      activeDiagramId: ibdId,
+      // Update computed state
+      nodes: newDiagram.nodes,
+      edges: newDiagram.edges,
+      diagramType: 'ibd',
+      diagramName: newDiagram.name,
+      diagramDescription: newDiagram.description || ''
+    }));
+    
+    // Save initial state to diagramsData to mark IBD as created
+    if (!savedState) {
+      get().saveDiagramState(ibdId, {
+        nodes: newDiagram.nodes,
+        edges: newDiagram.edges
+      });
+    }
   },
   
   // Legacy actions
@@ -263,13 +396,23 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
     // Save current state before connecting nodes
     get().saveToHistory();
     
+    // Get current diagram type to determine edge style
+    const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
+    const isIBD = activeDiagram?.type === 'ibd';
+    
     const newEdge: Edge = {
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
       target: connection.target || '',
-      type: 'smoothstep',
-      animated: false,
-      style: { stroke: '#555' }
+      type: isIBD ? 'straight' : 'smoothstep', // Use straight for IBD, smoothstep for BDD
+      animated: isIBD,
+      style: isIBD ? { 
+        stroke: '#555', 
+        strokeWidth: 2,
+        strokeDasharray: '8 4'
+      } : { stroke: '#555', strokeWidth: 1 },
+      className: isIBD ? 'ibd-animated-edge' : undefined,
+      label: isIBD ? 'IBD Blocks' : undefined
     };
     
     const newEdges = [...get().edges, newEdge];
@@ -578,6 +721,13 @@ const useDiagramStore = create<DiagramState>((set, get) => ({
       });
     }
   }
-}));
+}),
+{
+  name: 'sysml-diagram-storage',
+  partialize: (state) => ({ 
+    diagramsData: state.diagramsData
+  })
+}
+));
 
 export default useDiagramStore;

@@ -21,6 +21,7 @@ import MemoryIcon from '@mui/icons-material/Memory';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import PersonIcon from '@mui/icons-material/Person';
+import DataObjectIcon from '@mui/icons-material/DataObject';
 
 import useDiagramStore from '../store/diagramStore';
 
@@ -56,6 +57,23 @@ const DraggableItem = styled(Paper)(({ theme }) => ({
   },
 }));
 
+const LockedItem = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(1),
+  marginBottom: theme.spacing(1),
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  cursor: 'not-allowed',
+  opacity: 0.5,
+  backgroundColor: theme.palette.action.disabledBackground,
+  '& .MuiSvgIcon-root': {
+    color: theme.palette.action.disabled,
+  },
+  '& .MuiTypography-root': {
+    color: theme.palette.action.disabled,
+  },
+}));
+
 interface ColorIndicatorProps {
   bgcolor: string;
 }
@@ -71,8 +89,11 @@ const ColorIndicator = styled(Box, {
 }));
 
 const Sidebar: React.FC = () => {
-  const { diagramType } = useDiagramStore();
+  const { diagramType, openDiagrams, activeDiagramId } = useDiagramStore();
   const version = import.meta.env.VITE_APP_VERSION || '1.0';
+  
+  // Get the active diagram
+  const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
 
   // Handle drag start for creating new nodes
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
@@ -97,6 +118,11 @@ const Sidebar: React.FC = () => {
 
   // Render the node palette for block diagrams
   const renderNodePalette = () => {
+    // Check if IBD block should be locked (when diagram type is BDD)
+    const isIBDLocked = activeDiagram?.type === 'bdd';
+    // Check if BDD elements should be locked (when diagram type is IBD)
+    const areBDDElementsLocked = activeDiagram?.type === 'ibd';
+    
     return (
       <>
         <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
@@ -104,59 +130,110 @@ const Sidebar: React.FC = () => {
         </Typography>
         <List disablePadding>
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="System Block - Main component with inputs and outputs" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'block', {
-                    type: 'block',
-                    label: 'System Block',
-                    description: 'Main system component with inputs and outputs',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#e3f2fd" />
-                <DeviceHubIcon fontSize="small" color="primary" />
-                <Typography variant="body2">System Block</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "System Block - Not available in Internal Block Diagrams" : "System Block - Main component with inputs and outputs"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#e3f2fd" />
+                  <DeviceHubIcon fontSize="small" />
+                  <Typography variant="body2">System Block</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'block', {
+                      type: 'block',
+                      label: 'System Block',
+                      description: 'Main system component with inputs and outputs',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#e3f2fd" />
+                  <DeviceHubIcon fontSize="small" color="primary" />
+                  <Typography variant="body2">System Block</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
 
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="Sensor - Data collection component" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'sensor', {
-                    type: 'sensor',
-                    label: 'Sensor',
-                    description: 'Component that collects data from the environment',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#ffebee" />
-                <SensorsIcon fontSize="small" color="error" />
-                <Typography variant="body2">Sensor</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "Sensor - Not available in Internal Block Diagrams" : "Sensor - Data collection component"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#ffebee" />
+                  <SensorsIcon fontSize="small" />
+                  <Typography variant="body2">Sensor</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'sensor', {
+                      type: 'sensor',
+                      label: 'Sensor',
+                      description: 'Component that collects data from the environment',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#ffebee" />
+                  <SensorsIcon fontSize="small" color="error" />
+                  <Typography variant="body2">Sensor</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
 
           <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-            <Tooltip title="Processor - Data processing component" placement="right">
-              <DraggableItem
-                draggable
-                onDragStart={(e) =>
-                  onDragStart(e, 'processor', {
-                    type: 'processor',
-                    label: 'Processor',
-                    description: 'Component that processes data',
-                  })
-                }
-              >
-                <ColorIndicator bgcolor="#fff8e1" />
-                <MemoryIcon fontSize="small" color="warning" />
-                <Typography variant="body2">Processor</Typography>
-              </DraggableItem>
+            <Tooltip title={areBDDElementsLocked ? "Processor - Not available in Internal Block Diagrams" : "Processor - Data processing component"} placement="right">
+              {areBDDElementsLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#fff8e1" />
+                  <MemoryIcon fontSize="small" />
+                  <Typography variant="body2">Processor</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'processor', {
+                      type: 'processor',
+                      label: 'Processor',
+                      description: 'Component that processes data',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#fff8e1" />
+                  <MemoryIcon fontSize="small" color="warning" />
+                  <Typography variant="body2">Processor</Typography>
+                </DraggableItem>
+              )}
+            </Tooltip>
+          </ListItem>
+
+          <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+            <Tooltip title={isIBDLocked ? "IBD Block - Not available in Block Definition Diagrams" : "IBD Block - Internal Block Diagram component"} placement="right">
+              {isIBDLocked ? (
+                <LockedItem>
+                  <ColorIndicator bgcolor="#e8f5e8" />
+                  <DataObjectIcon fontSize="small" />
+                  <Typography variant="body2">IBD Block</Typography>
+                </LockedItem>
+              ) : (
+                <DraggableItem
+                  draggable
+                  onDragStart={(e) =>
+                    onDragStart(e, 'ibd', {
+                      type: 'ibd',
+                      label: 'IBD Block',
+                      description: 'Internal Block Diagram component',
+                    })
+                  }
+                >
+                  <ColorIndicator bgcolor="#e8f5e8" />
+                  <DataObjectIcon fontSize="small" sx={{ color: '#4caf50' }} />
+                  <Typography variant="body2">IBD Block</Typography>
+                </DraggableItem>
+              )}
             </Tooltip>
           </ListItem>
         </List>

@@ -17,7 +17,7 @@ import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
-import { nodeTypes } from './nodes';
+import { bddNodeTypes, ibdNodeTypes } from './nodes';
 import useDiagramStore from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
@@ -135,6 +135,25 @@ const DiagramWorkspace: React.FC = () => {
 
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+  
+  // Get the appropriate node types based on diagram type
+  const nodeTypes = activeDiagram?.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
+  
+  // Define edge styles based on diagram type
+  const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
+    style: { 
+      stroke: '#555', 
+      strokeWidth: 2,
+      strokeDasharray: '8 4', // Dashed line pattern
+    },
+    type: 'straight' as const, // Use straight for IBD to avoid curve
+    animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
+    className: 'ibd-animated-edge',
+  } : {
+    style: { stroke: '#555', strokeWidth: 1 }, // Solid gray for BDD
+    type: 'smoothstep' as const,
+    animated: false,
+  };
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -315,9 +334,21 @@ const DiagramWorkspace: React.FC = () => {
           y: y,
         });
 
-        // Create a new node with the correct type
-        const nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' ? 
-          data.type : 'block';
+        // Create a new node with the correct type based on diagram type
+        let nodeType: string;
+        if (activeDiagram?.type === 'ibd') {
+          // For IBD diagrams, prefer port and connection types
+          nodeType = data.type === 'port' || data.type === 'connection' || data.type === 'block' || data.type === 'ibd' ? 
+            data.type : 'port';
+        } else {
+          // For other diagrams, use traditional types (but not IBD blocks for BDD)
+          if (data.type === 'ibd' && activeDiagram?.type === 'bdd') {
+            // Don't allow IBD blocks in BDD diagrams
+            return;
+          }
+          nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' || data.type === 'ibd' ? 
+            data.type : 'block';
+        }
 
         const newNode = {
           id: `${nodeType}-${Date.now()}`,
@@ -471,6 +502,7 @@ const DiagramWorkspace: React.FC = () => {
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={nodeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}
           fitView
@@ -490,12 +522,14 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'block') return '#0041d0';
               if (n.type === 'sensor') return '#ff0072';
               if (n.type === 'processor') return '#ff9500';
+              if (n.type === 'ibd') return '#4caf50';
               return '#0041d0';
             }}
             nodeColor={(n) => {
               if (n.type === 'block') return '#e3f2fd';
               if (n.type === 'sensor') return '#ffebee';
               if (n.type === 'processor') return '#fff8e1';
+              if (n.type === 'ibd') return '#e8f5e8';
               return '#e3f2fd';
             }}
             maskColor="rgba(0, 0, 0, 0.1)"
