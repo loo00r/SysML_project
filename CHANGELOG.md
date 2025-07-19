@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.38] - 2025-07-19
+
+### Changed
+- Updated "Diagram Types" section in sidebar to include both Block Definition Diagram (BDD) and Internal Block Diagram (IBD)
+- Added IBD description: "Shows internal structure of a block"
+- Modified "Help" section to remove keyboard shortcuts and provide clearer Delete key guidance
+- Replaced "Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)" with "Use 'Delete' key to remove selected elements"
+
 ## [1.1.37] - 2025-07-15
 
 ### Fixed

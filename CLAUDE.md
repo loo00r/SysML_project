@@ -179,89 +179,69 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Fix IBD Connection Line Deviation and Add Label
-Task Type: UI/UX Improvement
-Context
-A visual regression has been identified in IBD diagrams, likely introduced between versions 1.1.28 and 1.1.33. The connection line between two IBD Block nodes, which should be perfectly straight, now renders with a slight downward deviation.
+Task: Update Sidebar Content for "Diagram Types" and "Help" Sections
 
-To enhance the diagram's readability, we will also take this opportunity to add a descriptive text label to this specific type of connection.
+Task Type: Content Update / UI Improvement
+
+Context
+The informational panels on the left sidebar, specifically "Diagram Types" and "Help," contain outdated information. The "Diagram Types" section currently only mentions Block Definition Diagrams (BDD), but the tool also supports Internal Block Diagrams (IBD). Additionally, the "Quick Tips" in the "Help" section lists keyboard shortcuts that need to be removed to avoid user confusion.
 
 Goal
-The primary goal is to restore the correct visual appearance of the connection line on IBD diagrams, making it straight again. Additionally, we need to improve the user's understanding of the diagram by adding a clear label to the connection between IBD blocks.
+The primary goal is to update the content in these two sidebar sections to accurately reflect the application's current features and to provide clearer, more relevant help tips to the user.
 
 Acceptance Criteria
-✅ The animated, dashed connection line between two IBD Block nodes on an IBD diagram is rendered as a perfectly straight horizontal line, removing the current downward curve.
-
-✅ A text label with the content "IBD Blocks" appears on the connection line.
-
-✅ The label is positioned above the line.
-
-✅ The label is horizontally aligned so that the end of the text (the "s" in "Blocks") is located at the horizontal center of the connection line.
-
-✅ The functionality of creating and deleting these connections remains unchanged.
+✅ The "Diagram Types" section is updated to list both Block Definition Diagram (BDD) and Internal Block Diagram (IBD).
+✅ A concise description is provided for IBD, similar to the existing one for BDD.
+✅ The "Quick Tips" list in the "Help" section is modified.
+✅ The tip mentioning shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y) is completely removed.
+✅ The tip regarding the Delete key is preserved and reads: "Use 'Delete' key to remove selected elements".
 
 Technical Implementation Details
-This task involves modifications within the frontend, primarily related to the custom edge components used by React Flow.
+This task involves modifying static content within frontend components.
 
-1. Fix the Line Deviation (Bug Fix)
-File to Investigate: Locate the custom edge component responsible for rendering the connection between IBD blocks. This is likely in frontend/src/components/edges/ (e.g., AnimatedDashedEdge.tsx or a similar name).
+Locate the Sidebar Component
 
-Probable Cause: The issue is almost certainly in the CSS or the SVG path calculation.
+File to Investigate: The content is likely hardcoded within a component responsible for the sidebar. Check files like frontend/src/components/sidebar/Sidebar.tsx, or more specific child components it might render, such as DiagramTypesPanel.tsx or HelpPanel.tsx.
 
-Action:
+Update Diagram Types
 
-Review the CSS properties applied to the edge's SVG path and its container. Check for any recent changes to transform, positioning, or flexbox properties that could cause this misalignment.
+In the relevant component, find the JSX that renders the list of diagram types.
 
-Inspect the getSmoothStepPath or a similar utility function from React Flow if you are using it to calculate the path. Ensure the parameters passed to it are correct and haven't been altered.
+Add a new entry for "Internal Block Diagram (IBD)". You can use the following structure as a template:
 
-2. Add the Edge Label (Feature Enhancement)
-Adding the Label Prop:
+JavaScript
 
-In the logic where the edge is created (e.g., in the onConnect handler in DiagramWorkspace.tsx or a Zustand store action), modify the new edge object to include the label property.
+// Example structure to add
+{
+  icon: <YourIBDIcon />, // Or select an appropriate one
+  name: 'Internal Block Diagram (IBD)',
+  description: 'Shows internal structure of a block.'
+}
+Update Help Tips
 
-Example:
+Find the array of strings or list of elements that populates the "Quick Tips".
 
-TypeScript
+Locate and remove the entry for "Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)".
 
-const newEdge = {
-  id: `e${source}-${target}`,
-  source,
-  target,
-  type: 'animatedDashed', // or your custom type
-  animated: true,
-  label: 'IBD Blocks' // <-- Add this property
-};
-Positioning the Label:
+Add a new, separate entry for the delete functionality: "Use 'Delete' key to remove selected elements".
 
-React Flow's default label position is centered. To achieve the specific "end-of-text at center" alignment, you will need to use a custom solution.
+Before:
 
-Recommended Approach: Use the EdgeLabelRenderer component provided by React Flow. This gives you full control over the label's rendering and styling.
+JavaScript
 
-Example within your custom edge component:
+const tips = [
+  'Drag elements from the sidebar to the canvas',
+  'Connect nodes by dragging from one handle to another',
+  // ... other tips
+  'Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)'
+];
+After:
 
-TypeScript
+JavaScript
 
-import { EdgeLabelRenderer, getSmoothStepPath, BaseEdge } from 'reactflow';
-
-// ... inside your custom edge component
-<>
-  <BaseEdge path={edgePath} ... />
-  <EdgeLabelRenderer>
-    <div
-      style={{
-        position: 'absolute',
-        transform: `translate(-50%, -100%) translate(-50%, -5px)`, // Center, then move up
-        // The key part is the inner transform to shift it left
-        // The exact transform might need tweaking
-        left: '50%',
-        top: '50%',
-        fontSize: 12,
-        pointerEvents: 'all',
-      }}
-      className="nodrag nopan"
-    >
-      <span style={{ transform: 'translateX(-50%)' }}>IBD Blocks</span>
-    </div>
-  </EdgeLabelRenderer>
-</>
-The key will be to find the center point of the edge and then apply a CSS transform to shift the label element appropriately to the left. transform: translateX(-100%) on an inner element often works for right-aligning text to a point. For this, you might need translateX(-50%) to shift it halfway. Experimentation will be needed.
+const tips = [
+  'Drag elements from the sidebar to the canvas',
+  'Connect nodes by dragging from one handle to another',
+  // ... other tips
+  "Use 'Delete' key to remove selected elements"
+];
