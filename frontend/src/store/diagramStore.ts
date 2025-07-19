@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
 
@@ -724,9 +724,34 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
 }),
 {
   name: 'sysml-diagram-storage',
+  storage: createJSONStorage(() => localStorage),
   partialize: (state) => ({ 
+    openDiagrams: state.openDiagrams,
+    activeDiagramId: state.activeDiagramId,
     diagramsData: state.diagramsData
-  })
+  }),
+  onRehydrateStorage: () => (state) => {
+    if (state && state.activeDiagramId && state.openDiagrams) {
+      // Find the active diagram and restore computed state
+      const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+      if (activeDiagram) {
+        // Update computed state from the active diagram
+        state.nodes = activeDiagram.nodes;
+        state.edges = activeDiagram.edges;
+        state.diagramType = activeDiagram.type;
+        state.diagramName = activeDiagram.name;
+        state.diagramDescription = activeDiagram.description || '';
+        // Reset transient state
+        state.selectedNodes = [];
+        state.selectedEdges = [];
+        state.isLoading = false;
+        state.validationErrors = [];
+        state.showValidationPanel = false;
+        state.isGenerating = false;
+        state.generationPrompt = '';
+      }
+    }
+  }
 }
 ));
 

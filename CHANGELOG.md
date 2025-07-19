@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.39] - 2025-07-19
+
+### Added
+- Implemented diagram state persistence on page reload using Zustand persist middleware
+- All open diagrams, active tab, and workspace state now automatically save to localStorage
+- Complete workspace restoration after browser refresh or navigation
+- Automatic state synchronization on any diagram changes (nodes, edges, tabs)
+
+### Changed
+- Enhanced Zustand store to persist openDiagrams, activeDiagramId, and diagramsData
+- Added onRehydrateStorage handler to restore computed state from active diagram
+- Improved user experience by preventing data loss on page reload
+
 ## [1.1.38] - 2025-07-19
 
 ### Changed

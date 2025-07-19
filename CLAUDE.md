@@ -179,69 +179,85 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Update Sidebar Content for "Diagram Types" and "Help" Sections
+New Task
+Task: Implement Diagram State Persistence on Page Reload
 
-Task Type: Content Update / UI Improvement
+Task Type: Feature Enhancement
 
 Context
-The informational panels on the left sidebar, specifically "Diagram Types" and "Help," contain outdated information. The "Diagram Types" section currently only mentions Block Definition Diagrams (BDD), but the tool also supports Internal Block Diagrams (IBD). Additionally, the "Quick Tips" in the "Help" section lists keyboard shortcuts that need to be removed to avoid user confusion.
+Currently, the application does not persist the user's session. If the user creates or modifies one or more diagrams and then reloads the browser tab (e.g., by pressing F5 or navigating away and back), all work is lost. The application resets to its initial state with no open diagrams. This behavior can lead to a frustrating user experience and accidental loss of work.
 
 Goal
-The primary goal is to update the content in these two sidebar sections to accurately reflect the application's current features and to provide clearer, more relevant help tips to the user.
+To enhance usability and prevent data loss by automatically saving the diagram state to the browser's localStorage. The application should restore the user's complete workspace, including all open diagrams and the active tab, after a page reload.
 
 Acceptance Criteria
-✅ The "Diagram Types" section is updated to list both Block Definition Diagram (BDD) and Internal Block Diagram (IBD).
-✅ A concise description is provided for IBD, similar to the existing one for BDD.
-✅ The "Quick Tips" list in the "Help" section is modified.
-✅ The tip mentioning shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y) is completely removed.
-✅ The tip regarding the Delete key is preserved and reads: "Use 'Delete' key to remove selected elements".
+✅ The state of all open diagrams (nodes, edges, names, types) is successfully persisted in the browser's localStorage.
+✅ When the user reloads the page, all previously open diagrams and their tabs are restored to their last saved state.
+✅ The diagram tab that was active before the reload remains the active tab.
+✅ Any change to the diagrams (adding/deleting nodes, moving elements, closing a tab, creating a new diagram) triggers an update to the persisted state.
+✅ If no diagrams were open, the application starts with a clean slate after a reload, as expected.
 
 Technical Implementation Details
-This task involves modifying static content within frontend components.
+This task should be implemented in the frontend by leveraging middleware from the Zustand state management library.
 
-Locate the Sidebar Component
+Identify the State Store
 
-File to Investigate: The content is likely hardcoded within a component responsible for the sidebar. Check files like frontend/src/components/sidebar/Sidebar.tsx, or more specific child components it might render, such as DiagramTypesPanel.tsx or HelpPanel.tsx.
+File to Modify: The primary file to work with is the Zustand store, located at frontend/src/store/diagramStore.ts.
 
-Update Diagram Types
+Use Zustand's persist Middleware
 
-In the relevant component, find the JSX that renders the list of diagram types.
+The most effective way to achieve this is by using the built-in persist middleware from Zustand. It is designed specifically for this purpose.
 
-Add a new entry for "Internal Block Diagram (IBD)". You can use the following structure as a template:
+Action:
 
-JavaScript
+Import persist and createJSONStorage from zustand/middleware.
 
-// Example structure to add
-{
-  icon: <YourIBDIcon />, // Or select an appropriate one
-  name: 'Internal Block Diagram (IBD)',
-  description: 'Shows internal structure of a block.'
-}
-Update Help Tips
+Wrap your store's creator function with the persist middleware.
 
-Find the array of strings or list of elements that populates the "Quick Tips".
+Configure the middleware to save the desired state to localStorage.
 
-Locate and remove the entry for "Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)".
+Implementation Example
 
-Add a new, separate entry for the delete functionality: "Use 'Delete' key to remove selected elements".
+You will need to refactor the create call in diagramStore.ts to include the middleware.
 
 Before:
 
-JavaScript
+TypeScript
 
-const tips = [
-  'Drag elements from the sidebar to the canvas',
-  'Connect nodes by dragging from one handle to another',
-  // ... other tips
-  'Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)'
-];
-After:
+import { create } from 'zustand';
+// ... other imports
 
-JavaScript
+export const useDiagramStore = create<DiagramState & DiagramActions>((set, get) => ({
+  // ... your existing store logic
+  openDiagrams: [],
+  activeDiagramId: null,
+  // ... actions
+}));
+After (with persist middleware):
 
-const tips = [
-  'Drag elements from the sidebar to the canvas',
-  'Connect nodes by dragging from one handle to another',
-  // ... other tips
-  "Use 'Delete' key to remove selected elements"
-];
+TypeScript
+
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+// ... other imports
+
+export const useDiagramStore = create(
+  persist<DiagramState & DiagramActions>(
+    (set, get) => ({
+      // ... your existing store logic
+      openDiagrams: [],
+      activeDiagramId: null,
+      // ... actions
+    }),
+    {
+      name: 'sysml-diagram-storage', // Unique name for the localStorage key
+      storage: createJSONStorage(() => localStorage), // Specify localStorage
+      // Optional: select which parts of the state to persist
+      partialize: (state) => ({
+        openDiagrams: state.openDiagrams,
+        activeDiagramId: state.activeDiagramId,
+      }),
+    }
+  )
+);
+Note: The partialize function is recommended to ensure you only save what's necessary and avoid persisting transient state like loading flags or error messages. You should persist openDiagrams and activeDiagramId.
