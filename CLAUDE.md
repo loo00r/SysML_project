@@ -179,89 +179,36 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Fix IBD Connection Line Deviation and Add Label
-Task Type: UI/UX Improvement
-Context
-A visual regression has been identified in IBD diagrams, likely introduced between versions 1.1.28 and 1.1.33. The connection line between two IBD Block nodes, which should be perfectly straight, now renders with a slight downward deviation.
+New Task
+Task: Isolate RAG Context by Diagram Type to Prevent Unwanted IBD Generation
 
-To enhance the diagram's readability, we will also take this opportunity to add a descriptive text label to this specific type of connection.
+Task Type: Bug Fix / Backend Logic
+
+Context
+The current RAG implementation for AI diagram generation is retrieving context without filtering by diagram type. When a user requests a Block Definition Diagram (BDD) with a high number of blocks (e.g., 5 or more), the RAG system finds semantically similar complex diagrams in the database. If those examples happen to include linked Internal Block Diagrams (IBDs), the AI model incorrectly assumes this structure is desired and generates unwanted IBDs alongside the requested BDD. This leads to chaotic and unpredictable diagram creation.
 
 Goal
-The primary goal is to restore the correct visual appearance of the connection line on IBD diagrams, making it straight again. Additionally, we need to improve the user's understanding of the diagram by adding a clear label to the connection between IBD blocks.
+The primary goal is to refine the RAG retrieval logic to be context-aware. The system must ensure that when generating a diagram of a specific type (e.g., BDD), it only retrieves examples of that same type from the database to use as context.
 
 Acceptance Criteria
-✅ The animated, dashed connection line between two IBD Block nodes on an IBD diagram is rendered as a perfectly straight horizontal line, removing the current downward curve.
-
-✅ A text label with the content "IBD Blocks" appears on the connection line.
-
-✅ The label is positioned above the line.
-
-✅ The label is horizontally aligned so that the end of the text (the "s" in "Blocks") is located at the horizontal center of the connection line.
-
-✅ The functionality of creating and deleting these connections remains unchanged.
+✅ Generating a BDD via the AI assistant, regardless of the number of blocks, must not automatically create any associated IBDs.
+✅ The semantic search functionality of the RAG system must be modified to filter potential examples by their diagram type.
+✅ Manually creating an IBD and linking it to a BDD block should not influence future AI generations that are requested only for BDDs.
+✅ The RAG generation process for other diagram types remains functional.
 
 Technical Implementation Details
-This task involves modifications within the frontend, primarily related to the custom edge components used by React Flow.
+This is primarily a backend task.
 
-1. Fix the Line Deviation (Bug Fix)
-File to Investigate: Locate the custom edge component responsible for rendering the connection between IBD blocks. This is likely in frontend/src/components/edges/ (e.g., AnimatedDashedEdge.tsx or a similar name).
+File to Investigate: The logic for RAG-based generation is located in app/database/rag_router.py. The function responsible for querying the vector database needs modification.
 
-Probable Cause: The issue is almost certainly in the CSS or the SVG path calculation.
+Refine the Semantic Search Query:
 
-Action:
+The database query that performs the similarity search against the diagram_embeddings table must be updated.
 
-Review the CSS properties applied to the edge's SVG path and its container. Check for any recent changes to transform, positioning, or flexbox properties that could cause this misalignment.
+It should be modified to include a WHERE clause that filters results based on a diagram_type column. For example: WHERE diagram_type = 'BDD'.
 
-Inspect the getSmoothStepPath or a similar utility function from React Flow if you are using it to calculate the path. Ensure the parameters passed to it are correct and haven't been altered.
+The endpoint POST /api/v1/rag/generate-diagram-with-context/ will need to accept a parameter indicating the type of diagram to be generated so it can pass it to the search query.
 
-2. Add the Edge Label (Feature Enhancement)
-Adding the Label Prop:
+Verify Database Schema:
 
-In the logic where the edge is created (e.g., in the onConnect handler in DiagramWorkspace.tsx or a Zustand store action), modify the new edge object to include the label property.
-
-Example:
-
-TypeScript
-
-const newEdge = {
-  id: `e${source}-${target}`,
-  source,
-  target,
-  type: 'animatedDashed', // or your custom type
-  animated: true,
-  label: 'IBD Blocks' // <-- Add this property
-};
-Positioning the Label:
-
-React Flow's default label position is centered. To achieve the specific "end-of-text at center" alignment, you will need to use a custom solution.
-
-Recommended Approach: Use the EdgeLabelRenderer component provided by React Flow. This gives you full control over the label's rendering and styling.
-
-Example within your custom edge component:
-
-TypeScript
-
-import { EdgeLabelRenderer, getSmoothStepPath, BaseEdge } from 'reactflow';
-
-// ... inside your custom edge component
-<>
-  <BaseEdge path={edgePath} ... />
-  <EdgeLabelRenderer>
-    <div
-      style={{
-        position: 'absolute',
-        transform: `translate(-50%, -100%) translate(-50%, -5px)`, // Center, then move up
-        // The key part is the inner transform to shift it left
-        // The exact transform might need tweaking
-        left: '50%',
-        top: '50%',
-        fontSize: 12,
-        pointerEvents: 'all',
-      }}
-      className="nodrag nopan"
-    >
-      <span style={{ transform: 'translateX(-50%)' }}>IBD Blocks</span>
-    </div>
-  </EdgeLabelRenderer>
-</>
-The key will be to find the center point of the edge and then apply a CSS transform to shift the label element appropriately to the left. transform: translateX(-100%) on an inner element often works for right-aligning text to a point. For this, you might need translateX(-50%) to shift it halfway. Experimentation will be needed.
+Ensure that the diagram_embeddings table in app/database/models.py has a column to store the diagram type (e.g., diagram_type: Mapped[str]). If not, a database migration will be required to add it. You will need to use poetry run alembic revision --autogenerate -m "Add diagram_type to embeddings" and then poetry run alembic upgrade head to apply the migration.

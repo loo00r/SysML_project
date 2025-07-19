@@ -114,18 +114,20 @@ const StyledNodeContainer = styled(NodeContainer)({
 // Define the BlockNode component
 const BlockNode = ({ data, selected, id }: NodeProps) => {
   const { label, description, properties = {} } = data;
-  const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData } = useDiagramStore();
+  const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
   const hasIncomingConnections = edges.some((edge) => edge.target === id);
   
-  // Check if there's already an IBD diagram for this block
-  const ibdId = `ibd-for-${id}`;
-  const ibdExists = openDiagrams.some(diagram => 
-    diagram.type === 'ibd' && 
-    diagram.id === ibdId
-  ) || !!diagramsData[ibdId];
+  // Check if there's already an IBD diagram for this block in the current diagram context
+  const ibdId = activeDiagramId ? `ibd-for-${activeDiagramId}-${id}` : null;
+  const ibdExists = ibdId && (
+    openDiagrams.some(diagram => 
+      diagram.type === 'ibd' && 
+      diagram.id === ibdId
+    ) || !!diagramsData[ibdId]
+  );
   
   const handleOpenIBD = (e: React.MouseEvent) => {
     e.stopPropagation();

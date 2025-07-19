@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
 
@@ -43,6 +43,7 @@ export interface DiagramState {
   nodes: Node<NodeData>[];
   edges: Edge[];
   viewport?: { x: number; y: number; zoom: number };
+  source?: 'ai' | 'manual'; // Track how this diagram was created
 }
 
 // Define the store state
@@ -324,8 +325,16 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   },
   
   openIbdForBlock: (bddBlockId) => {
-    const ibdId = `ibd-for-${bddBlockId}`;
     const state = get();
+    
+    // Create IBD ID that's unique per parent diagram and block
+    const parentDiagramId = state.activeDiagramId;
+    if (!parentDiagramId) {
+      console.error('Cannot create IBD: no active diagram');
+      return;
+    }
+    
+    const ibdId = `ibd-for-${parentDiagramId}-${bddBlockId}`;
     
     // Check if this IBD is already open
     const existingDiagram = state.openDiagrams.find(d => d.id === ibdId);
@@ -345,7 +354,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       type: 'ibd',
       nodes: savedState?.nodes || [],
       edges: savedState?.edges || [],
-      description: `Internal Block Diagram for ${bddBlockId}`,
+      description: `Internal Block Diagram for ${bddBlockId} in ${state.openDiagrams.find(d => d.id === parentDiagramId)?.name || 'diagram'}`,
       createdAt: new Date(),
       modifiedAt: new Date()
     };
@@ -361,11 +370,12 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       diagramDescription: newDiagram.description || ''
     }));
     
-    // Save initial state to diagramsData to mark IBD as created
+    // Save initial state to diagramsData to mark IBD as created (with source tracking)
     if (!savedState) {
       get().saveDiagramState(ibdId, {
         nodes: newDiagram.nodes,
-        edges: newDiagram.edges
+        edges: newDiagram.edges,
+        source: 'manual' // Mark as manually created
       });
     }
   },
@@ -724,9 +734,34 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
 }),
 {
   name: 'sysml-diagram-storage',
+  storage: createJSONStorage(() => sessionStorage),
   partialize: (state) => ({ 
+    openDiagrams: state.openDiagrams,
+    activeDiagramId: state.activeDiagramId,
     diagramsData: state.diagramsData
-  })
+  }),
+  onRehydrateStorage: () => (state) => {
+    if (state && state.activeDiagramId && state.openDiagrams) {
+      // Find the active diagram and restore computed state
+      const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+      if (activeDiagram) {
+        // Update computed state from the active diagram
+        state.nodes = activeDiagram.nodes;
+        state.edges = activeDiagram.edges;
+        state.diagramType = activeDiagram.type;
+        state.diagramName = activeDiagram.name;
+        state.diagramDescription = activeDiagram.description || '';
+        // Reset transient state
+        state.selectedNodes = [];
+        state.selectedEdges = [];
+        state.isLoading = false;
+        state.validationErrors = [];
+        state.showValidationPanel = false;
+        state.isGenerating = false;
+        state.generationPrompt = '';
+      }
+    }
+  }
 }
 ));
 

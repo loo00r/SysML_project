@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.43] - 2025-07-19
+
+### Fixed
+- Fixed IBD cross-contamination between independent diagrams by implementing diagram-specific IBD storage keys
+- IBD diagrams are now isolated per parent diagram using `ibd-for-{parentDiagramId}-{blockId}` format
+- Manual IBDs no longer appear on other diagrams with similar block IDs
+
+### Added
+- Added source tracking ('ai' | 'manual') to IBD creation for better data management
+- Enhanced IBD existence checking to use parent diagram context for proper isolation
+- Improved RAG cleaning to distinguish between manual and AI-created IBD content
+
+### Changed
+- Updated all node components (BlockNode, SensorNode, ProcessorNode) to use diagram-scoped IBD checking
+- Modified `openIbdForBlock` function to create diagram-specific IBD instances
+- Enhanced `cleanDiagramForRAG` to filter only manual IBDs while preserving future AI-created IBDs
+
+## [1.1.42] - 2025-07-19
+
+### Fixed
+- Fixed RAG contamination where manually created IBD data was influencing AI diagram generation
+- Implemented diagram cleaning function to remove IBD-specific content before saving to RAG database
+- Added filtering to exclude IBD blocks, IBD edges, and IBD-related properties from RAG context
+- AI generation now maintains clean BDD-only examples regardless of manual IBD creation
+
+### Changed
+- Enhanced diagram saving logic to always store clean BDD diagrams in RAG database
+- Updated RAG storage to force 'bdd' diagram type for consistency
+- Improved IBD isolation by preventing IBD contamination of training data
+
+## [1.1.41] - 2025-07-19
+
+### Fixed
+- Fixed AI Diagram Generator incorrectly setting diagram_type for RAG requests 
+- Changed persistence storage from localStorage to sessionStorage for session-only data retention
+- AI Generator now correctly requests 'bdd' diagram type instead of complex conditional logic
+- Diagrams now clear when browser is fully closed and reopened, maintaining clean state between sessions
+
+### Changed
+- Updated useAIGeneration to always generate BDD diagrams with correct diagram_type parameter
+- Enhanced data persistence to use sessionStorage for better session management
+- Improved user experience by preventing unwanted IBD creation from AI Generator
+
+## [1.1.40] - 2025-07-19
+
+### Fixed
+- Isolated RAG context by diagram type to prevent unwanted IBD generation when requesting BDD diagrams
+- Removed fallback logic in RAG system that would search all diagram types when specific type wasn't found
+- Enhanced semantic search to strictly enforce diagram type filtering without compromising type isolation
+- BDD generation with RAG now only uses BDD examples as context, preventing automatic IBD creation
+
+### Changed
+- Updated find_similar_diagrams function to enforce strict diagram type filtering
+- Modified RAG router to maintain type isolation instead of falling back to cross-type searches
+- Improved logging for better debugging of RAG type filtering behavior
+
+## [1.1.39] - 2025-07-19
+
+### Added
+- Implemented diagram state persistence on page reload using Zustand persist middleware
+- All open diagrams, active tab, and workspace state now automatically save to localStorage
+- Complete workspace restoration after browser refresh or navigation
+- Automatic state synchronization on any diagram changes (nodes, edges, tabs)
+
+### Changed
+- Enhanced Zustand store to persist openDiagrams, activeDiagramId, and diagramsData
+- Added onRehydrateStorage handler to restore computed state from active diagram
+- Improved user experience by preventing data loss on page reload
+
+## [1.1.38] - 2025-07-19
+
+### Changed
+- Updated "Diagram Types" section in sidebar to include both Block Definition Diagram (BDD) and Internal Block Diagram (IBD)
+- Added IBD description: "Shows internal structure of a block"
+- Modified "Help" section to remove keyboard shortcuts and provide clearer Delete key guidance
+- Replaced "Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)" with "Use 'Delete' key to remove selected elements"
+
 ## [1.1.37] - 2025-07-15
 
 ### Fixed

@@ -29,8 +29,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       },
       body: JSON.stringify({
         text: options.prompt,
-        diagram_type: options.style === 'technical' ? 'block' : 
-                      options.complexity === 'complex' ? 'activity' : 'usecase',
+        diagram_type: 'bdd', // Always generate BDD diagrams
         use_rag: true // Enable RAG by default
       }),
     });

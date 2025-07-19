@@ -271,14 +271,20 @@ const Sidebar: React.FC = () => {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" paragraph>
-              This tool supports Block Definition Diagrams (BDD):
+              This tool supports the following diagram types:
             </Typography>
             <List dense disablePadding>
               <ListItem>
                 <ListItemIcon sx={{ minWidth: 36 }}>
                   <DeviceHubIcon fontSize="small" color="primary" />
                 </ListItemIcon>
-                <ListItemText primary="Block Diagram" secondary="Structure and components" />
+                <ListItemText primary="Block Definition Diagram (BDD)" secondary="Structure and components" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <DataObjectIcon fontSize="small" sx={{ color: '#4caf50' }} />
+                </ListItemIcon>
+                <ListItemText primary="Internal Block Diagram (IBD)" secondary="Shows internal structure of a block" />
               </ListItem>
             </List>
           </AccordionDetails>
@@ -306,7 +312,7 @@ const Sidebar: React.FC = () => {
                 <ListItemText primary="Click on a node to edit its properties" />
               </ListItem>
               <ListItem>
-                <ListItemText primary="Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)" />
+                <ListItemText primary="Use 'Delete' key to remove selected elements" />
               </ListItem>
             </List>
           </AccordionDetails>

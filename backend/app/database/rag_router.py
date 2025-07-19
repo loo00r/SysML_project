@@ -103,14 +103,8 @@ async def generate_diagram_with_context(
             )
             
             if not similar_diagrams:
-                print(f"No diagrams of type '{diagram_type}' found, searching for any diagram type")
-                similar_diagrams = await find_similar_diagrams(
-                    db=db, 
-                    query_text=text, 
-                    limit=1,
-                    diagram_type=None,  # No type filter
-                    include_scores=True
-                )
+                print(f"No diagrams of type '{diagram_type}' found, will proceed without RAG context")
+                # Do not fall back to searching other diagram types - maintain strict type isolation
             
             if similar_diagrams:
                 best_match = similar_diagrams[0]

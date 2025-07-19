@@ -200,6 +200,73 @@ const DiagramWorkspace: React.FC = () => {
     setNotification({ ...notification, open: false });
   };
 
+  // Clean diagram data for RAG storage (remove only manual IBD-specific information)
+  const cleanDiagramForRAG = (nodes: any[], edges: any[]) => {
+    const { diagramsData } = useDiagramStore.getState();
+    
+    // Only include BDD elements - filter out IBD blocks and manual IBD-related content
+    const cleanNodes = nodes
+      .filter(node => node.type !== 'ibd') // Remove IBD block nodes
+      .map(node => {
+        // Create a clean copy of the node data
+        const cleanNode = {
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: {
+            label: node.data.label,
+            description: node.data.description,
+            type: node.data.type,
+            // Only include basic properties, exclude manual IBD-related metadata
+            properties: node.data.properties ? 
+              Object.fromEntries(
+                Object.entries(node.data.properties).filter(([key, value]) => 
+                  !key.toLowerCase().includes('ibd') && 
+                  !key.toLowerCase().includes('internal') &&
+                  (typeof value === 'string' || typeof value === 'number')
+                )
+              ) : {}
+          }
+        };
+        return cleanNode;
+      });
+    
+    // Filter edges to exclude manual IBD edges but allow AI-created IBD edges in the future
+    const cleanEdges = edges
+      .filter(edge => {
+        // Always exclude edges with IBD labels (these are manual)
+        if (edge.label?.includes('IBD')) return false;
+        if (edge.id?.includes('ibd')) return false;
+        
+        // For straight edges (IBD style), check if they're from manual creation
+        if (edge.type === 'straight') {
+          // This would be from manual IBD creation, exclude it
+          return false;
+        }
+        
+        return true;
+      })
+      .map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        label: edge.label
+      }));
+    
+    // Also clean the current diagramsData to only include AI-created IBDs in the future
+    const cleanDiagramsData = Object.fromEntries(
+      Object.entries(diagramsData).filter(([key, value]) => 
+        value.source === 'ai' // Only keep AI-created IBDs for RAG
+      )
+    );
+    
+    console.log(`Cleaned diagram: ${nodes.length} -> ${cleanNodes.length} nodes, ${edges.length} -> ${cleanEdges.length} edges`);
+    console.log(`Filtered manual IBDs from diagramsData: ${Object.keys(diagramsData).length} -> ${Object.keys(cleanDiagramsData).length} IBDs`);
+    
+    return { nodes: cleanNodes, edges: cleanEdges };
+  };
+
   // Handle diagram save
   const handleSave = async () => {
     if (!activeDiagram) return;
@@ -209,8 +276,8 @@ const DiagramWorkspace: React.FC = () => {
       localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
       localStorage.setItem('sysml-diagram-timestamp', Date.now().toString());
       
-      // Get diagram type from nodes (default to 'block' if not found)
-      const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type : 'block';
+      // Always save as BDD diagram type for RAG consistency
+      const diagramType = 'bdd';
       
       // Generate a description from the diagram
       const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
@@ -220,6 +287,9 @@ const DiagramWorkspace: React.FC = () => {
       
       // Use the original generation prompt if available, otherwise use diagram description or a default
       const originalText = generationPrompt || diagramDescription || description;
+      
+      // Clean the diagram data to remove IBD contamination from RAG
+      const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
       
       // Save to backend and update RAG database
       const response = await fetch('/api/v1/rag/diagrams/', {
@@ -232,7 +302,7 @@ const DiagramWorkspace: React.FC = () => {
           description: description,
           raw_text: originalText,
           diagram_type: diagramType,
-          diagram_json: { nodes, edges }
+          diagram_json: cleanDiagramData
         }),
       });
       
