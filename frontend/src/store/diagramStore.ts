@@ -43,6 +43,7 @@ export interface DiagramState {
   nodes: Node<NodeData>[];
   edges: Edge[];
   viewport?: { x: number; y: number; zoom: number };
+  source?: 'ai' | 'manual'; // Track how this diagram was created
 }
 
 // Define the store state
@@ -324,8 +325,16 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   },
   
   openIbdForBlock: (bddBlockId) => {
-    const ibdId = `ibd-for-${bddBlockId}`;
     const state = get();
+    
+    // Create IBD ID that's unique per parent diagram and block
+    const parentDiagramId = state.activeDiagramId;
+    if (!parentDiagramId) {
+      console.error('Cannot create IBD: no active diagram');
+      return;
+    }
+    
+    const ibdId = `ibd-for-${parentDiagramId}-${bddBlockId}`;
     
     // Check if this IBD is already open
     const existingDiagram = state.openDiagrams.find(d => d.id === ibdId);
@@ -345,7 +354,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       type: 'ibd',
       nodes: savedState?.nodes || [],
       edges: savedState?.edges || [],
-      description: `Internal Block Diagram for ${bddBlockId}`,
+      description: `Internal Block Diagram for ${bddBlockId} in ${state.openDiagrams.find(d => d.id === parentDiagramId)?.name || 'diagram'}`,
       createdAt: new Date(),
       modifiedAt: new Date()
     };
@@ -361,11 +370,12 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       diagramDescription: newDiagram.description || ''
     }));
     
-    // Save initial state to diagramsData to mark IBD as created
+    // Save initial state to diagramsData to mark IBD as created (with source tracking)
     if (!savedState) {
       get().saveDiagramState(ibdId, {
         nodes: newDiagram.nodes,
-        edges: newDiagram.edges
+        edges: newDiagram.edges,
+        source: 'manual' // Mark as manually created
       });
     }
   },

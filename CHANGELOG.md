@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.43] - 2025-07-19
+
+### Fixed
+- Fixed IBD cross-contamination between independent diagrams by implementing diagram-specific IBD storage keys
+- IBD diagrams are now isolated per parent diagram using `ibd-for-{parentDiagramId}-{blockId}` format
+- Manual IBDs no longer appear on other diagrams with similar block IDs
+
+### Added
+- Added source tracking ('ai' | 'manual') to IBD creation for better data management
+- Enhanced IBD existence checking to use parent diagram context for proper isolation
+- Improved RAG cleaning to distinguish between manual and AI-created IBD content
+
+### Changed
+- Updated all node components (BlockNode, SensorNode, ProcessorNode) to use diagram-scoped IBD checking
+- Modified `openIbdForBlock` function to create diagram-specific IBD instances
+- Enhanced `cleanDiagramForRAG` to filter only manual IBDs while preserving future AI-created IBDs
+
+## [1.1.42] - 2025-07-19
+
+### Fixed
+- Fixed RAG contamination where manually created IBD data was influencing AI diagram generation
+- Implemented diagram cleaning function to remove IBD-specific content before saving to RAG database
+- Added filtering to exclude IBD blocks, IBD edges, and IBD-related properties from RAG context
+- AI generation now maintains clean BDD-only examples regardless of manual IBD creation
+
+### Changed
+- Enhanced diagram saving logic to always store clean BDD diagrams in RAG database
+- Updated RAG storage to force 'bdd' diagram type for consistency
+- Improved IBD isolation by preventing IBD contamination of training data
+
 ## [1.1.41] - 2025-07-19
 
 ### Fixed
