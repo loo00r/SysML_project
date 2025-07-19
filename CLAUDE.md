@@ -180,84 +180,35 @@ The application now features a **tabbed interface** for managing multiple diagra
 ### new task
 
 New Task
-Task: Implement Diagram State Persistence on Page Reload
+Task: Isolate RAG Context by Diagram Type to Prevent Unwanted IBD Generation
 
-Task Type: Feature Enhancement
+Task Type: Bug Fix / Backend Logic
 
 Context
-Currently, the application does not persist the user's session. If the user creates or modifies one or more diagrams and then reloads the browser tab (e.g., by pressing F5 or navigating away and back), all work is lost. The application resets to its initial state with no open diagrams. This behavior can lead to a frustrating user experience and accidental loss of work.
+The current RAG implementation for AI diagram generation is retrieving context without filtering by diagram type. When a user requests a Block Definition Diagram (BDD) with a high number of blocks (e.g., 5 or more), the RAG system finds semantically similar complex diagrams in the database. If those examples happen to include linked Internal Block Diagrams (IBDs), the AI model incorrectly assumes this structure is desired and generates unwanted IBDs alongside the requested BDD. This leads to chaotic and unpredictable diagram creation.
 
 Goal
-To enhance usability and prevent data loss by automatically saving the diagram state to the browser's localStorage. The application should restore the user's complete workspace, including all open diagrams and the active tab, after a page reload.
+The primary goal is to refine the RAG retrieval logic to be context-aware. The system must ensure that when generating a diagram of a specific type (e.g., BDD), it only retrieves examples of that same type from the database to use as context.
 
 Acceptance Criteria
-✅ The state of all open diagrams (nodes, edges, names, types) is successfully persisted in the browser's localStorage.
-✅ When the user reloads the page, all previously open diagrams and their tabs are restored to their last saved state.
-✅ The diagram tab that was active before the reload remains the active tab.
-✅ Any change to the diagrams (adding/deleting nodes, moving elements, closing a tab, creating a new diagram) triggers an update to the persisted state.
-✅ If no diagrams were open, the application starts with a clean slate after a reload, as expected.
+✅ Generating a BDD via the AI assistant, regardless of the number of blocks, must not automatically create any associated IBDs.
+✅ The semantic search functionality of the RAG system must be modified to filter potential examples by their diagram type.
+✅ Manually creating an IBD and linking it to a BDD block should not influence future AI generations that are requested only for BDDs.
+✅ The RAG generation process for other diagram types remains functional.
 
 Technical Implementation Details
-This task should be implemented in the frontend by leveraging middleware from the Zustand state management library.
+This is primarily a backend task.
 
-Identify the State Store
+File to Investigate: The logic for RAG-based generation is located in app/database/rag_router.py. The function responsible for querying the vector database needs modification.
 
-File to Modify: The primary file to work with is the Zustand store, located at frontend/src/store/diagramStore.ts.
+Refine the Semantic Search Query:
 
-Use Zustand's persist Middleware
+The database query that performs the similarity search against the diagram_embeddings table must be updated.
 
-The most effective way to achieve this is by using the built-in persist middleware from Zustand. It is designed specifically for this purpose.
+It should be modified to include a WHERE clause that filters results based on a diagram_type column. For example: WHERE diagram_type = 'BDD'.
 
-Action:
+The endpoint POST /api/v1/rag/generate-diagram-with-context/ will need to accept a parameter indicating the type of diagram to be generated so it can pass it to the search query.
 
-Import persist and createJSONStorage from zustand/middleware.
+Verify Database Schema:
 
-Wrap your store's creator function with the persist middleware.
-
-Configure the middleware to save the desired state to localStorage.
-
-Implementation Example
-
-You will need to refactor the create call in diagramStore.ts to include the middleware.
-
-Before:
-
-TypeScript
-
-import { create } from 'zustand';
-// ... other imports
-
-export const useDiagramStore = create<DiagramState & DiagramActions>((set, get) => ({
-  // ... your existing store logic
-  openDiagrams: [],
-  activeDiagramId: null,
-  // ... actions
-}));
-After (with persist middleware):
-
-TypeScript
-
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-// ... other imports
-
-export const useDiagramStore = create(
-  persist<DiagramState & DiagramActions>(
-    (set, get) => ({
-      // ... your existing store logic
-      openDiagrams: [],
-      activeDiagramId: null,
-      // ... actions
-    }),
-    {
-      name: 'sysml-diagram-storage', // Unique name for the localStorage key
-      storage: createJSONStorage(() => localStorage), // Specify localStorage
-      // Optional: select which parts of the state to persist
-      partialize: (state) => ({
-        openDiagrams: state.openDiagrams,
-        activeDiagramId: state.activeDiagramId,
-      }),
-    }
-  )
-);
-Note: The partialize function is recommended to ensure you only save what's necessary and avoid persisting transient state like loading flags or error messages. You should persist openDiagrams and activeDiagramId.
+Ensure that the diagram_embeddings table in app/database/models.py has a column to store the diagram type (e.g., diagram_type: Mapped[str]). If not, a database migration will be required to add it. You will need to use poetry run alembic revision --autogenerate -m "Add diagram_type to embeddings" and then poetry run alembic upgrade head to apply the migration.

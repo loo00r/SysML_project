@@ -222,13 +222,12 @@ async def find_similar_diagrams(
             type_count = type_check_result.scalar()
             print(f"Found {type_count} diagrams of type '{diagram_type}'")
             
-            if type_count > 0:
-                # Only apply the filter if we have diagrams of this type
-                stmt = stmt.filter(DiagramEmbedding.diagram_type == diagram_type)
-                print(f"Filtering by diagram type: {diagram_type}")
-            else:
-                print(f"WARNING: No diagrams found with type '{diagram_type}', will search without type filter")
-                # We don't apply any filter, so we'll search all diagrams
+            # Always apply the filter when diagram_type is provided - strict type isolation
+            stmt = stmt.filter(DiagramEmbedding.diagram_type == diagram_type)
+            print(f"Applying strict filtering by diagram type: {diagram_type}")
+            
+            if type_count == 0:
+                print(f"No diagrams found with type '{diagram_type}', will return empty results to maintain type isolation")
         
         # Order by cosine similarity and limit results
         # This uses pgvector's cosine distance operator <-> for similarity search

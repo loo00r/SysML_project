@@ -724,7 +724,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
 }),
 {
   name: 'sysml-diagram-storage',
-  storage: createJSONStorage(() => localStorage),
+  storage: createJSONStorage(() => sessionStorage),
   partialize: (state) => ({ 
     openDiagrams: state.openDiagrams,
     activeDiagramId: state.activeDiagramId,

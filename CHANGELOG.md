@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.41] - 2025-07-19
+
+### Fixed
+- Fixed AI Diagram Generator incorrectly setting diagram_type for RAG requests 
+- Changed persistence storage from localStorage to sessionStorage for session-only data retention
+- AI Generator now correctly requests 'bdd' diagram type instead of complex conditional logic
+- Diagrams now clear when browser is fully closed and reopened, maintaining clean state between sessions
+
+### Changed
+- Updated useAIGeneration to always generate BDD diagrams with correct diagram_type parameter
+- Enhanced data persistence to use sessionStorage for better session management
+- Improved user experience by preventing unwanted IBD creation from AI Generator
+
+## [1.1.40] - 2025-07-19
+
+### Fixed
+- Isolated RAG context by diagram type to prevent unwanted IBD generation when requesting BDD diagrams
+- Removed fallback logic in RAG system that would search all diagram types when specific type wasn't found
+- Enhanced semantic search to strictly enforce diagram type filtering without compromising type isolation
+- BDD generation with RAG now only uses BDD examples as context, preventing automatic IBD creation
+
+### Changed
+- Updated find_similar_diagrams function to enforce strict diagram type filtering
+- Modified RAG router to maintain type isolation instead of falling back to cross-type searches
+- Improved logging for better debugging of RAG type filtering behavior
+
 ## [1.1.39] - 2025-07-19
 
 ### Added
