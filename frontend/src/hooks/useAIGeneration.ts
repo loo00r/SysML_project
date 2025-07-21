@@ -7,6 +7,7 @@ interface AIGenerationOptions {
   complexity?: 'simple' | 'medium' | 'complex';
   includeRelationships?: boolean;
   style?: 'technical' | 'conceptual';
+  isEnhanced?: boolean;
 }
 
 interface AIGenerationResult {
@@ -18,8 +19,16 @@ interface AIGenerationResult {
 // Call the backend API to generate a diagram
 const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
   try {
-    // Determine which endpoint to use - RAG or standard
+    // Always use the unified RAG endpoint
     const endpoint = '/api/v1/rag/generate-diagram-with-context/';
+    
+    // Simplified request body - always leverage RAG
+    const requestBody = {
+      text: options.prompt,
+      diagram_type: options.isEnhanced ? 'bdd_enhanced' : 'bdd', // The only part that changes
+      use_rag: true, // Always leverage RAG
+      name: 'AI Generated Diagram'
+    };
     
     // Call the backend API
     const response = await fetch(endpoint, {
@@ -27,11 +36,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        text: options.prompt,
-        diagram_type: 'bdd', // Always generate BDD diagrams
-        use_rag: true // Enable RAG by default
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -55,7 +60,9 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
           name: element.name,
           ...element.properties
         },
-        type: element.type
+        type: element.type,
+        // Include the has_ibd flag from backend response for enhanced diagrams
+        has_ibd: element.data?.has_ibd || false
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
@@ -143,7 +150,7 @@ export const useAIGeneration = () => {
         // Open a new diagram with the generated content
         openDiagram({
           name: diagramName,
-          type: 'bdd',
+          type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
           nodes: result.nodes,
           edges: result.edges,
           description: shortDescription

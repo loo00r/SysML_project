@@ -7,6 +7,253 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.55] - 2025-07-21
+
+### Fixed
+- Critical data structure mismatch between API and ReactFlow causing "Cannot destructure property 'label'" error
+- IBD nodes crashing application due to undefined data properties in React components
+- API response format incompatibility where backend returned `name` field but frontend expected `data.label`
+- Unsafe destructuring in all node components causing crashes when data was undefined
+
+### Changed
+- Added data transformation layer in openIbdForBlock to convert API format to ReactFlow format
+- Enhanced all node components with safe destructuring and fallback values
+- API nodes with `name` field now properly mapped to ReactFlow `data.label` structure
+- Improved error handling with detailed logging for IBD opening process
+
+### Added
+- Comprehensive data transformation for IBD nodes from backend API format to ReactFlow format
+- Safe destructuring patterns with fallback values in all node components (Block, Sensor, Processor, Port, Connection, IBD)
+- Detailed logging of API data structure and transformation process for debugging
+- Proper IBD edge formatting with animated dashed lines and IBD-specific styling
+
+### Improved
+- IBD diagrams now open successfully without "Something went wrong" errors
+- All node types now handle undefined or malformed data gracefully
+- Better user experience with meaningful fallback labels when data is missing
+- Enhanced robustness of ReactFlow integration with backend-generated diagram data
+
+## [1.1.54] - 2025-07-21
+
+### Fixed
+- Critical frontend nodeTypes registration bug causing IBD nodes to render as white blocks
+- Race condition in conditional nodeTypes logic that crashed application when interacting with IBD nodes  
+- Type mapping mismatch where backend generated `ibd_block` type nodes but frontend only registered `ibd` key
+- ReactFlow rendering failures for IBD diagrams due to missing node component mappings
+
+### Changed
+- Unified nodeTypes object now includes all node components (Block, Sensor, Processor, Port, Connection, IBD)
+- Removed conditional nodeTypes switching logic that caused race conditions between diagram types
+- Added proper mapping of both `ibd` and `ibd_block` types to IBDNode component for backend compatibility
+- Enhanced nodeTypes registration to prevent white block rendering issues
+
+### Improved
+- IBD nodes now render consistently with proper green styling and interactive functionality
+- Eliminated application crashes when clicking or interacting with IBD nodes
+- Better ReactFlow stability with unified component registration approach
+- Enhanced compatibility between frontend node rendering and backend IBD generation
+
+## [1.1.53] - 2025-07-21
+
+### Fixed
+- Critical IBD retrieval bug caused by duplicate block IDs in database from repeated AI testing
+- Internal Server Error (500) when accessing IBD endpoint with duplicated parent_block_id records
+- Empty IBD displays in UI due to failed API calls from database constraint violations
+- CRUD function now resilient to duplicate data by retrieving most recent record for any given block ID
+
+### Changed
+- Updated `get_ibd_by_block_id` function to use `ORDER BY created_at DESC` with `first()` instead of `scalar_one_or_none()`
+- Enhanced database query to handle multiple records gracefully by selecting the most recent IBD
+- Improved error handling for IBD retrieval to prevent 500 errors from database duplicates
+
+### Improved
+- IBD endpoint now returns 200 OK with populated data even when duplicate block IDs exist in database  
+- UI now properly displays populated IBDs instead of empty diagrams
+- System stability enhanced with resilient database query patterns for duplicate scenarios
+- Better handling of test data artifacts without affecting production functionality
+
+## [1.1.52] - 2025-07-21
+
+### Added
+- Strengthened AI prompt with mandatory IBD population rule to eliminate empty internal diagrams
+- Non-negotiable constraint (Rule #8) requiring populated nodes array when internal_diagram is created
+- Enhanced AI instruction clarity to overcome hesitation in generating nested IBD content
+
+### Fixed
+- Empty IBD generation eliminated through explicit prompt engineering requiring at least one relevant component
+- AI now consistently populates internal_diagram nodes based on user description content
+- Enhanced diagram generation reliability with mandatory internal structure population
+
+### Improved
+- More reliable enhanced diagram generation with guaranteed populated IBDs when internal complexity is detected
+- Consistent BDD connection generation between external components and complex blocks
+- Better AI compliance with internal diagram creation requirements through explicit rule enforcement
+
+### Changed
+- BDD_ENHANCED_PROMPT_TEMPLATE now includes strict rule mandating non-empty IBD nodes arrays
+- AI generation behavior now requires populated internal structures when creating internal_diagram objects
+- Enhanced prompt engineering to ensure IBD content matches user description requirements
+
+## [1.1.51] - 2025-07-21
+
+### Added
+- Refined RAG seeding system with exclusive ibd_block node typing for internal block diagrams
+- Enhanced AI training examples that enforce consistent IBD visual design (green ibd_block styling)
+- Flexible IBD component naming system that adapts to user prompt context
+
+### Fixed
+- IBD visual consistency by ensuring all internal components use ibd_block type instead of mixed types
+- AI generation now properly follows established design patterns with green IBD block styling
+- Context-aware component naming that reflects user descriptions (CPU, Memory Module, AI Decision Maker, etc.)
+
+### Changed
+- Refined seeding strategy to teach AI proper IBD structure with universal ibd_block typing
+- Enhanced RAG examples now demonstrate flexible naming with consistent visual presentation
+- Improved AI learning pattern for generating contextually appropriate IBD component names
+
+### Improved
+- Enhanced diagrams now generate visually consistent IBDs with proper green styling across all components
+- Better semantic accuracy in IBD component naming based on user prompts
+- Maintained functional correctness while achieving visual design consistency
+
+## [1.1.50] - 2025-07-21
+
+### Added
+- RAG database seeding capability for enhanced diagram generation
+- Temporary hardcoded example injection system for bootstrapping enhanced diagrams
+- Successful seeding of first high-quality bdd_enhanced example into RAG database
+
+### Fixed
+- Chicken-and-egg problem where enhanced diagrams lacked populated IBD content due to missing RAG examples
+- Enhanced diagram generation now produces properly populated internal block diagrams with meaningful components and connections
+- RAG system now has quality examples for future enhanced diagram generation requests
+
+### Changed
+- Enhanced diagrams now benefit from seeded RAG examples, producing richer internal structures
+- Post-seeding generations create complex IBDs with multiple interconnected components (processors, sensors, communication modules, power management units)
+- Improved AI generation quality through strategic example seeding approach
+
+## [1.1.49] - 2025-07-21
+
+### Added
+- Unified RAG endpoint supporting both 'bdd' and 'bdd_enhanced' diagram types
+- Complete IBD parsing and storage logic integrated into RAG generation workflow
+- Enhanced semantic search that leverages BDD examples for improved enhanced generation
+- Single endpoint architecture eliminating duplicate generation logic
+
+### Changed
+- Simplified frontend to always use unified `/api/v1/rag/generate-diagram-with-context/` endpoint
+- Enhanced RAG endpoint now handles both simple and complex diagram requests with contextual examples
+- Improved AI generation consistency by using RAG context for all diagram types
+- Streamlined request flow with unified parameter structure
+
+### Removed
+- Dependency on separate `/api/v1/create-diagram/` endpoint for enhanced generation
+- Conditional endpoint selection logic in frontend useAIGeneration hook
+- Code duplication between RAG and non-RAG generation paths
+
+### Fixed
+- Enhanced diagrams now properly benefit from RAG context, resulting in better populated nested IBDs
+- Consistent diagram generation experience regardless of diagram complexity
+- Unified error handling and response format across all generation types
+
+## [1.1.48] - 2025-07-21
+
+### Added
+- Async IBD fetching functionality for AI-generated blocks with `has_ibd` flags
+- Complete end-to-end IBD retrieval from backend API when blocks contain nested diagrams
+- API-driven IBD loading with automatic fallback to manual creation if needed
+- Enhanced IBD existence checking incorporating both manual creation and AI-generated flags
+
+### Changed
+- Updated `openIbdForBlock` function in diagramStore to be async and support API fetching
+- Modified all node components (BlockNode, SensorNode, ProcessorNode) to handle async IBD operations
+- Enhanced IBD detection logic to check both manual existence and `has_ibd` API flags
+- Improved IBD opening workflow with priority: existing tabs > local storage > API fetch > manual creation
+
+### Fixed
+- TypeScript compilation issues with async function implementations
+- Proper error handling for API calls during IBD fetching
+- Fallback mechanisms when API endpoints return 404 for expected IBDs
+- Integration between frontend IBD display and backend IBD storage
+
+## [1.1.47] - 2025-07-21
+
+### Added
+- Enhanced BDD generation flow in frontend with "Generate with Internal Diagrams" toggle switch
+- Material-UI Switch control in AIGeneratorPanel for enabling enhanced generation
+- Support for `has_ibd` flag recognition in all node components (BlockNode, SensorNode, ProcessorNode)
+- Automatic "View IBD" indicator display for AI-generated blocks with nested IBDs
+
+### Changed
+- Updated useAIGeneration hook to support both 'bdd' and 'bdd_enhanced' diagram types
+- Enhanced API call logic to use new create-diagram endpoint for enhanced generation
+- Modified node components to check both manual IBD existence and API-provided has_ibd flag
+- AIGenerationOptions interface extended to include isEnhanced parameter
+
+### Improved
+- Seamless integration between enhanced AI generation and existing IBD functionality
+- Better user experience with clear indication of blocks containing generated IBDs
+- Maintained backward compatibility with existing manual IBD creation workflow
+- Enhanced visual feedback for generated diagrams with nested internal structures
+
+## [1.1.46] - 2025-07-21
+
+### Added
+- Complete API endpoints for BDD+IBD generation and retrieval
+- New CRUD operations for Internal Block Diagrams in `app/crud/crud_ibd.py`
+- Enhanced POST `/api/v1/create-diagram/` endpoint supporting both 'bdd' and 'bdd_enhanced' types
+- New GET `/api/v1/diagrams/ibd/{parent_block_id}` endpoint for IBD retrieval
+- Automatic parsing and separation of nested IBD data from AI responses
+- Database storage of IBDs linked to parent BDD diagrams via foreign keys
+
+### Changed
+- Updated create_diagram endpoint to handle enhanced AI generation with nested IBDs
+- Enhanced diagram parsing logic to extract internal_diagram objects and mark blocks with `has_ibd: true`
+- DiagramRequest model now supports diagram_type parameter and diagram naming
+- DiagramResponse model includes diagram_id for referencing stored diagrams
+
+### Improved
+- End-to-end flow for generating, parsing, storing, and retrieving enhanced diagrams
+- Automatic positioning applied to both BDD and retrieved IBD diagrams
+- Complete separation between BDD storage and IBD storage in database
+- Enhanced error handling and database transaction management
+
+## [1.1.45] - 2025-07-21
+
+### Added
+- New enhanced AI generation logic for BDD+IBD diagrams
+- BDD_ENHANCED_PROMPT_TEMPLATE for comprehensive system diagrams with nested Internal Block Diagrams
+- Support for 'bdd_enhanced' diagram type that can include internal_diagram structures within blocks
+- Raw JSON response handling without automatic positioning for complex nested structures
+
+### Changed
+- Refactored generate_diagram function into generate_sysml_diagram with diagram_type parameter
+- Enhanced AI prompt selection logic to choose appropriate template based on diagram_type ('bdd' or 'bdd_enhanced')
+- Updated generation flow to return raw diagram data for later processing at API layer
+- Maintained backward compatibility with legacy generate_diagram function
+
+### Improved
+- Better separation of concerns between AI generation and diagram processing
+- More flexible AI generation system supporting both simple and complex diagram structures
+- Enhanced prompt engineering for nested IBD creation within BDD context
+
+## [1.1.44] - 2025-07-21
+
+### Added
+- New database schema for nested Internal Block Diagrams (IBDs)
+- InternalBlockDiagram SQLAlchemy model with foreign key relationship to parent BDD diagrams
+- Database table `internal_block_diagrams` for relational IBD storage
+- Support for parent-child relationship between BDD diagrams and their IBDs via `parent_bdd_diagram_id`
+- Block-specific IBD identification using `parent_block_id` field
+- Source tracking for IBDs (AI-generated vs manual creation)
+- Pydantic models (InternalBlockDiagramCreate, InternalBlockDiagramResponse) for API validation
+
+### Changed
+- Enhanced database architecture to avoid storing large JSON objects in parent diagrams
+- Updated configuration to include DB_URL_SYNC for Alembic migrations
+- Database schema now supports proper relational structure for nested diagram storage
+
 ## [1.1.43] - 2025-07-19
 
 ### Fixed

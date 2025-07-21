@@ -179,36 +179,64 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-New Task
-Task: Isolate RAG Context by Diagram Type to Prevent Unwanted IBD Generation
+New Task (Final Frontend Fix)
+Task: Unify Node Type Registration to Fix IBD Rendering Crash
 
-Task Type: Bug Fix / Backend Logic
+Task Type: Frontend Bug Fix
 
 Context
-The current RAG implementation for AI diagram generation is retrieving context without filtering by diagram type. When a user requests a Block Definition Diagram (BDD) with a high number of blocks (e.g., 5 or more), the RAG system finds semantically similar complex diagrams in the database. If those examples happen to include linked Internal Block Diagrams (IBDs), the AI model incorrectly assumes this structure is desired and generates unwanted IBDs alongside the requested BDD. This leads to chaotic and unpredictable diagram creation.
+When an AI-generated IBD is opened in a new tab, the application fails to register the IbdBlockNode component in time for the initial render. As a result, React Flow receives nodes of type ibd_block but doesn't have the corresponding component, causing it to render default unstyled rectangles. Interacting with these "ghost" nodes leads to a full application crash. This is caused by conditionally swapping nodeTypes based on the active diagram type.
 
 Goal
-The primary goal is to refine the RAG retrieval logic to be context-aware. The system must ensure that when generating a diagram of a specific type (e.g., BDD), it only retrieves examples of that same type from the database to use as context.
+To fix the rendering crash and ensure IBD nodes are always styled correctly by providing a single, unified nodeTypes object to React Flow that includes all components at all times.
 
 Acceptance Criteria
-✅ Generating a BDD via the AI assistant, regardless of the number of blocks, must not automatically create any associated IBDs.
-✅ The semantic search functionality of the RAG system must be modified to filter potential examples by their diagram type.
-✅ Manually creating an IBD and linking it to a BDD block should not influence future AI generations that are requested only for BDDs.
-✅ The RAG generation process for other diagram types remains functional.
+✅ A single, static nodeTypes object is created, containing BlockNode, SensorNode, ProcessorNode, and IbdBlockNode.
+✅ This unified object is passed to the main <ReactFlow /> component's nodeTypes prop.
+✅ When opening an AI-generated IBD, the tab now correctly displays the populated, green, styled IBD Block nodes.
+✅ Clicking or interacting with these nodes does not cause the application to crash.
+✅ The existing logic for locking/disabling nodes in different diagram types (e.g., graying out System Block in an IBD) remains functional.
 
 Technical Implementation Details
-This is primarily a backend task.
 
-File to Investigate: The logic for RAG-based generation is located in app/database/rag_router.py. The function responsible for querying the vector database needs modification.
+Unify the nodeTypes Object:
 
-Refine the Semantic Search Query:
+File to modify: The component that contains your main <ReactFlow /> instance, likely frontend/src/components/DiagramWorkspace.tsx.
 
-The database query that performs the similarity search against the diagram_embeddings table must be updated.
+Action: Instead of building the nodeTypes object conditionally inside the component, define it once, statically, outside the component. This object must include all your custom node components.
 
-It should be modified to include a WHERE clause that filters results based on a diagram_type column. For example: WHERE diagram_type = 'BDD'.
+TypeScript
 
-The endpoint POST /api/v1/rag/generate-diagram-with-context/ will need to accept a parameter indicating the type of diagram to be generated so it can pass it to the search query.
+// In frontend/src/components/DiagramWorkspace.tsx
 
-Verify Database Schema:
+import BlockNode from './nodes/BlockNode';
+import SensorNode from './nodes/SensorNode';
+import ProcessorNode from './nodes/ProcessorNode';
+import IbdBlockNode from './nodes/IbdBlockNode'; // Make sure this is imported
 
-Ensure that the diagram_embeddings table in app/database/models.py has a column to store the diagram type (e.g., diagram_type: Mapped[str]). If not, a database migration will be required to add it. You will need to use poetry run alembic revision --autogenerate -m "Add diagram_type to embeddings" and then poetry run alembic upgrade head to apply the migration.
+// Define the unified node types object ONCE, outside the component.
+const unifiedNodeTypes = {
+  block: BlockNode,
+  sensor: SensorNode,
+  processor: ProcessorNode,
+  ibd_block: IbdBlockNode,
+};
+
+const DiagramWorkspace = () => {
+  // ... your existing hooks and logic ...
+
+  // Remove any conditional logic that was previously creating nodeTypes here.
+
+  return (
+    <div /* ... */>
+      <ReactFlow
+        // ... other props ...
+        nodeTypes={unifiedNodeTypes} // Pass the single, unified object here
+      >
+        {/* ... panels, controls, etc. ... */}
+      </ReactFlow>
+    </div>
+  );
+};
+
+export default DiagramWorkspace;

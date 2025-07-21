@@ -42,7 +42,12 @@ const PortType = styled(Typography)(({ theme }) => ({
 
 // Define the PortNode component
 const PortNode = ({ data, selected, id }: NodeProps) => {
-  const { label, type = 'port', description } = data;
+  // Safe destructuring with fallbacks
+  const { 
+    label = 'Unnamed Port', 
+    type = 'port', 
+    description = '' 
+  } = data || {};
   
   return (
     <PortPaper

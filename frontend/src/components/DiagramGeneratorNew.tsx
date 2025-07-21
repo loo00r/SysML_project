@@ -14,7 +14,8 @@ import {
   InputLabel,
   Stack,
   Divider,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Switch
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -93,6 +94,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const [diagramType, setDiagramType] = useState('block');
   const [includeRelationships, setIncludeRelationships] = useState(true);
   const [diagramStyle, setDiagramStyle] = useState('technical');
+  const [generateEnhanced, setGenerateEnhanced] = useState(false);
   
   // Use our custom AI generation hook
   const { generateDiagram, isGenerating, progress, error } = useAIGeneration();
@@ -107,7 +109,8 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
         prompt: text,
         complexity: 'medium',
         includeRelationships,
-        style: diagramStyle as 'technical' | 'conceptual'
+        style: diagramStyle as 'technical' | 'conceptual',
+        isEnhanced: generateEnhanced
       });
       
       // Reset the form after successful generation
@@ -219,6 +222,17 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                   />
                 }
                 label="Include Relationships"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={generateEnhanced}
+                    onChange={(e) => setGenerateEnhanced(e.target.checked)}
+                    disabled={isGenerating}
+                    name="generateEnhanced"
+                  />
+                }
+                label="Generate with Internal Diagrams"
               />
             </Stack>
             <TextField

@@ -14,10 +14,11 @@ export interface NodeData {
   properties?: Record<string, string>;
   inputs?: string[];
   outputs?: string[];
+  has_ibd?: boolean; // Flag for AI-generated IBDs
 }
 
 // Define diagram types
-export type DiagramType = 'bdd' | 'ibd';
+export type DiagramType = 'bdd' | 'bdd_enhanced' | 'ibd';
 
 // Define diagram instance interface
 export interface DiagramInstance {
@@ -92,7 +93,7 @@ interface DiagramStoreState {
   
   // Persistent state actions
   saveDiagramState: (diagramId: string, state: DiagramState) => void;
-  openIbdForBlock: (bddBlockId: string) => void;
+  openIbdForBlock: (bddBlockId: string) => Promise<void>;
   
   // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
@@ -324,59 +325,148 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     }));
   },
   
-  openIbdForBlock: (bddBlockId) => {
-    const state = get();
-    
-    // Create IBD ID that's unique per parent diagram and block
-    const parentDiagramId = state.activeDiagramId;
-    if (!parentDiagramId) {
-      console.error('Cannot create IBD: no active diagram');
+  openIbdForBlock: async (bddBlockId) => {
+    console.log('🚀 [IBD] Starting openIbdForBlock for blockId:', bddBlockId);
+    const { openDiagrams, diagramsData, activeDiagramId, openNewDiagramTab, setActiveDiagram } = get();
+
+    if (!activeDiagramId) {
+      console.error('❌ [IBD] Cannot create IBD: no active diagram');
       return;
     }
+
+    const ibdId = `ibd-for-${activeDiagramId}-${bddBlockId}`;
+    console.log('📍 [IBD] Generated IBD ID:', ibdId);
     
-    const ibdId = `ibd-for-${parentDiagramId}-${bddBlockId}`;
+    const parentDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+    console.log('📊 [IBD] Parent diagram found:', !!parentDiagram, 'name:', parentDiagram?.name);
     
-    // Check if this IBD is already open
-    const existingDiagram = state.openDiagrams.find(d => d.id === ibdId);
-    if (existingDiagram) {
-      // Just switch to the existing tab
-      get().setActiveDiagram(ibdId);
+    const parentNode = parentDiagram?.nodes.find(n => n.id === bddBlockId);
+    console.log('🔍 [IBD] Parent node found:', !!parentNode, 'has_ibd flag:', parentNode?.data?.has_ibd);
+
+    // 1. Check if the IBD tab is already open
+    if (openDiagrams.some(d => d.id === ibdId)) {
+      console.log('✅ [IBD] IBD tab already open, switching to it');
+      setActiveDiagram(ibdId);
       return;
     }
-    
-    // Get previously saved state for this IBD
-    const savedState = state.diagramsData[ibdId];
-    
-    // Create new IBD diagram
-    const newDiagram: DiagramInstance = {
-      id: ibdId,
-      name: `IBD for ${bddBlockId}`,
-      type: 'ibd',
-      nodes: savedState?.nodes || [],
-      edges: savedState?.edges || [],
-      description: `Internal Block Diagram for ${bddBlockId} in ${state.openDiagrams.find(d => d.id === parentDiagramId)?.name || 'diagram'}`,
-      createdAt: new Date(),
-      modifiedAt: new Date()
-    };
-    
-    set(currentState => ({
-      openDiagrams: [...currentState.openDiagrams, newDiagram],
-      activeDiagramId: ibdId,
-      // Update computed state
-      nodes: newDiagram.nodes,
-      edges: newDiagram.edges,
-      diagramType: 'ibd',
-      diagramName: newDiagram.name,
-      diagramDescription: newDiagram.description || ''
-    }));
-    
-    // Save initial state to diagramsData to mark IBD as created (with source tracking)
-    if (!savedState) {
-      get().saveDiagramState(ibdId, {
-        nodes: newDiagram.nodes,
-        edges: newDiagram.edges,
-        source: 'manual' // Mark as manually created
+
+    // 2. Check if the IBD data is already stored locally (from a previous session or manual creation)
+    if (diagramsData[ibdId]) {
+      console.log('💾 [IBD] Found locally stored IBD data, opening from cache');
+      const savedData = diagramsData[ibdId];
+      console.log('📋 [IBD] Cached data - nodes:', savedData.nodes?.length || 0, 'edges:', savedData.edges?.length || 0);
+      
+      try {
+        openNewDiagramTab({
+          name: `IBD for ${bddBlockId}`,
+          type: 'ibd',
+          nodes: savedData.nodes,
+          edges: savedData.edges,
+          description: `Internal Block Diagram for ${bddBlockId}`,
+          customId: ibdId
+        });
+        console.log('✅ [IBD] Successfully opened IBD from local cache');
+      } catch (error) {
+        console.error('❌ [IBD] Error opening IBD from cache:', error);
+        throw error;
+      }
+      return;
+    }
+
+    // 3. NEW LOGIC: If the node has the has_ibd flag, fetch from the backend
+    if (parentNode?.data?.has_ibd) {
+      console.log('🌐 [IBD] Node has has_ibd flag, attempting API fetch');
+      try {
+        const apiUrl = `/api/v1/diagrams/ibd/${bddBlockId}`;
+        console.log('📡 [IBD] Making API request to:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        console.log('📡 [IBD] API response status:', response.status, response.statusText);
+
+        if (response.ok) {
+          console.log('✅ [IBD] API request successful, parsing response');
+          const ibdDataFromApi = await response.json();
+          console.log('📋 [IBD] API data - nodes:', ibdDataFromApi.nodes?.length || 0, 'edges:', ibdDataFromApi.edges?.length || 0);
+          console.log('🔍 [IBD] Node types in API data:', ibdDataFromApi.nodes?.map(n => n.type).join(', ') || 'none');
+          console.log('📊 [IBD] Raw API node structure:', ibdDataFromApi.nodes?.[0]);
+          
+          // Transform API nodes to ReactFlow format
+          const transformedNodes = ibdDataFromApi.nodes?.map((apiNode: any) => ({
+            id: apiNode.id,
+            type: apiNode.type || 'ibd_block',
+            position: apiNode.position || { x: 0, y: 0 },
+            data: {
+              label: apiNode.name || apiNode.label || 'Unnamed IBD Component',
+              description: apiNode.description || '',
+              type: apiNode.type || 'ibd_block',
+              properties: apiNode.properties || {}
+            }
+          })) || [];
+          
+          // Transform API edges to ReactFlow format 
+          const transformedEdges = ibdDataFromApi.edges?.map((apiEdge: any) => ({
+            id: apiEdge.id,
+            source: apiEdge.source,
+            target: apiEdge.target,
+            type: 'straight',
+            animated: true,
+            style: { 
+              stroke: '#555', 
+              strokeWidth: 2,
+              strokeDasharray: '8 4'
+            },
+            className: 'ibd-animated-edge',
+            label: apiEdge.label || 'IBD Connection'
+          })) || [];
+          
+          console.log('🔄 [IBD] Transformed nodes:', transformedNodes.length, 'first node data:', transformedNodes[0]?.data);
+          console.log('🔄 [IBD] Transformed edges:', transformedEdges.length);
+          
+          try {
+            openNewDiagramTab({
+              name: `IBD for ${bddBlockId}`,
+              type: 'ibd',
+              nodes: transformedNodes,
+              edges: transformedEdges,
+              description: `Internal Block Diagram for ${bddBlockId}`,
+              customId: ibdId
+            });
+            console.log('✅ [IBD] Successfully opened IBD from API data');
+          } catch (tabError) {
+            console.error('❌ [IBD] Error opening new tab with API data:', tabError);
+            throw tabError;
+          }
+          return;
+        }
+
+        if (response.status === 404) {
+           console.log("⚠️ [IBD] has_ibd flag was true, but no IBD found on backend (404). Falling back to manual creation.");
+        } else {
+          console.error('❌ [IBD] API request failed with status:', response.status, 'Response text:', await response.text());
+        }
+
+      } catch (error) {
+        console.error("❌ [IBD] Failed to fetch IBD from backend:", error);
+      }
+    } else {
+      console.log('ℹ️ [IBD] Node does not have has_ibd flag, proceeding to manual creation');
+    }
+
+    // 4. Fallback: If all else fails, create a new, empty IBD (original behavior for manual creation)
+    console.log('🔧 [IBD] Creating new empty IBD (fallback)');
+    try {
+      openNewDiagramTab({
+        name: `IBD for ${bddBlockId}`,
+        type: 'ibd',
+        nodes: [],
+        edges: [],
+        description: `Internal Block Diagram for ${bddBlockId}`,
+        customId: ibdId
       });
+      console.log('✅ [IBD] Successfully created new empty IBD');
+    } catch (error) {
+      console.error('❌ [IBD] Error creating new empty IBD:', error);
+      throw error;
     }
   },
   

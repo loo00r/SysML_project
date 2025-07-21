@@ -65,9 +65,14 @@ const NodeWrapper = styled(Box)({
 // No IBD functionality for IBD nodes - they can't create sub-IBDs
 const StyledNodeContainer = styled(NodeContainer)({});
 
-// Define the IBDNode component
+// Define the IBDNode component  
 const IBDNode = ({ data, selected, id }: NodeProps) => {
-  const { label, description, properties = {} } = data;
+  // Safe destructuring with fallbacks
+  const { 
+    label = 'Unnamed IBD Block', 
+    description = '', 
+    properties = {} 
+  } = data || {};
   
   return (
     <StyledNodeContainer>

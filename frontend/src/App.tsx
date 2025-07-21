@@ -6,6 +6,7 @@ import { ReactFlowProvider } from 'reactflow';
 import DiagramWorkspace from './components/DiagramWorkspace';
 import Sidebar from './components/Sidebar';
 import DiagramGeneratorNew from './components/DiagramGeneratorNew';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Create a theme instance
 const theme = createTheme({
@@ -62,35 +63,6 @@ const LoadingFallback = muiStyled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '20px', color: '#ff4d4f' }}>
-          Something went wrong. Please refresh the page.
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 const App: React.FC = () => {
   return (

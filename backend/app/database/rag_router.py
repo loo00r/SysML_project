@@ -9,7 +9,8 @@ from app.database.models import (
     DiagramEmbeddingResponse, 
     TemplateResponse,
     ComponentResponse, 
-    SimilarDiagramRequest
+    SimilarDiagramRequest,
+    InternalBlockDiagramCreate
 )
 from app.database.embeddings import (
     store_diagram_with_embedding, 
@@ -17,7 +18,8 @@ from app.database.embeddings import (
     get_template_by_type,
     get_components_by_type
 )
-from app.AI.diagram_generation import generate_diagram
+from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, DiagramPositioning
+from app.crud import crud_ibd
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -80,12 +82,14 @@ async def get_components(
 @router.post("/generate-diagram-with-context/")
 async def generate_diagram_with_context(
     text: str = Body(..., embed=True),
-    diagram_type: str = Body("block", embed=True),
+    diagram_type: str = Body("bdd", embed=True),
     use_rag: bool = Body(True, embed=True),
+    name: str = Body("Generated Diagram", embed=True),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Generate a diagram using context from the database if use_rag is True
+    Generate a diagram using context from the database if use_rag is True.
+    Supports both 'bdd' and 'bdd_enhanced' diagram types with full IBD parsing.
     """
     one_shot_examples = []
     
@@ -94,17 +98,18 @@ async def generate_diagram_with_context(
     
     if use_rag:
         try:
+            # For enhanced diagrams, search for both bdd and bdd_enhanced examples
+            search_type = diagram_type if diagram_type != "bdd_enhanced" else "bdd"
             similar_diagrams = await find_similar_diagrams(
                 db=db, 
                 query_text=text, 
                 limit=1,  
-                diagram_type=diagram_type,
+                diagram_type=search_type,
                 include_scores=True
             )
             
             if not similar_diagrams:
-                print(f"No diagrams of type '{diagram_type}' found, will proceed without RAG context")
-                # Do not fall back to searching other diagram types - maintain strict type isolation
+                print(f"No diagrams of type '{search_type}' found, will proceed without RAG context")
             
             if similar_diagrams:
                 best_match = similar_diagrams[0]
@@ -126,13 +131,74 @@ async def generate_diagram_with_context(
             print(f"Error during RAG context retrieval: {str(e)}")
             use_rag = False
     
-    enhanced_prompt = f"Generate a {diagram_type} diagram for the following system description:\n\n{text}"
-    
-    result = generate_diagram(enhanced_prompt, one_shot_examples=one_shot_examples)
-    
-    if "diagram" in result and "error" not in result:
-        result["saved_to_rag"] = False
-        result["used_rag"] = use_rag and len(one_shot_examples) > 0
-        result["examples_count"] = len(one_shot_examples)
-    
-    return result
+    try:
+        # Use the new generation function that supports enhanced diagrams
+        generation_result = generate_sysml_diagram(
+            prompt=text,
+            diagram_type=diagram_type,
+            one_shot_examples=one_shot_examples
+        )
+        
+        if "error" in generation_result:
+            return {"error": generation_result["error"]}
+        
+        raw_diagram = generation_result["diagram_raw"]
+        
+        # Handle enhanced diagrams with IBD parsing
+        ibd_to_create = []
+        if diagram_type == "bdd_enhanced" and "elements" in raw_diagram:
+            for element in raw_diagram["elements"]:
+                if "internal_diagram" in element:
+                    # Mark the element as having an IBD for the frontend
+                    if "data" not in element:
+                        element["data"] = {}
+                    element["data"]["has_ibd"] = True
+                    
+                    # Prepare IBD for creation later
+                    ibd_data = element.pop("internal_diagram")  # Remove IBD from main diagram
+                    ibd_to_create.append({
+                        "parent_block_id": element["id"],
+                        "nodes": ibd_data.get("nodes", []),
+                        "edges": ibd_data.get("edges", []),
+                    })
+        
+        # Apply positioning to the clean diagram
+        positioned_diagram = DiagramPositioning.apply_positioning(raw_diagram)
+        
+        # Save the main diagram to get its ID
+        db_diagram = await store_diagram_with_embedding(
+            db=db,
+            name=name,
+            description=f"Generated {diagram_type} diagram",
+            raw_text=text,
+            diagram_type="bdd",  # Always save as 'bdd' for RAG consistency
+            diagram_json=positioned_diagram
+        )
+        
+        # Save parsed IBDs with the parent BDD ID
+        for ibd_data in ibd_to_create:
+            new_ibd = InternalBlockDiagramCreate(
+                parent_bdd_diagram_id=db_diagram.id,
+                parent_block_id=ibd_data["parent_block_id"],
+                nodes=ibd_data["nodes"],
+                edges=ibd_data["edges"],
+                source="ai"
+            )
+            await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+        
+        # Return in the expected format
+        result = {
+            "diagram": positioned_diagram,
+            "raw_text": text,
+            "model_used": generation_result["model_used"],
+            "saved_to_rag": True,
+            "used_rag": use_rag and len(one_shot_examples) > 0,
+            "examples_count": len(one_shot_examples),
+            "diagram_id": db_diagram.id
+        }
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in unified RAG generation: {str(e)}")
+        return {"error": str(e)}

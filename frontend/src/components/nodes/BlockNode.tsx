@@ -113,7 +113,12 @@ const StyledNodeContainer = styled(NodeContainer)({
 
 // Define the BlockNode component
 const BlockNode = ({ data, selected, id }: NodeProps) => {
-  const { label, description, properties = {} } = data;
+  // Safe destructuring with fallbacks
+  const { 
+    label = 'Unnamed Block', 
+    description = '', 
+    properties = {} 
+  } = data || {};
   const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
   
   // Check if this node has any incoming connections
@@ -122,16 +127,33 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
   
   // Check if there's already an IBD diagram for this block in the current diagram context
   const ibdId = activeDiagramId ? `ibd-for-${activeDiagramId}-${id}` : null;
-  const ibdExists = ibdId && (
+  const ibdExistsManually = ibdId && (
     openDiagrams.some(diagram => 
       diagram.type === 'ibd' && 
       diagram.id === ibdId
     ) || !!diagramsData[ibdId]
   );
   
-  const handleOpenIBD = (e: React.MouseEvent) => {
+  // The key change: check for the new flag from the node's data prop
+  const hasIbd = ibdExistsManually || data.has_ibd;
+  
+  const handleOpenIBD = async (e: React.MouseEvent) => {
+    console.log('🖱️ [BlockNode] IBD button clicked for block:', id);
+    console.log('📊 [BlockNode] Current state - hasIbd:', hasIbd, 'has_ibd flag:', data.has_ibd, 'ibdExistsManually:', ibdExistsManually);
+    
     e.stopPropagation();
-    openIbdForBlock(id);
+    
+    try {
+      console.log('📞 [BlockNode] Calling openIbdForBlock...');
+      await openIbdForBlock(id);
+      console.log('✅ [BlockNode] openIbdForBlock completed successfully');
+    } catch (error) {
+      console.error('❌ [BlockNode] Error in openIbdForBlock:', error);
+      console.error('❌ [BlockNode] Error stack:', error instanceof Error ? error.stack : 'No stack available');
+      
+      // Re-throw to let React error boundary handle it
+      throw error;
+    }
   };
   
   return (
@@ -199,7 +221,7 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
       </NodeWrapper>
       
       {/* Smart IBD Indicator Icon - Now positioned as sibling to NodeWrapper */}
-      {ibdExists ? (
+      {hasIbd ? (
         // State 1: IBD EXISTS. Icon is always visible.
         <IBDIndicatorIcon 
           className="view-ibd" 

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     
     # Database settings
     DB_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/postgres"
+    DB_URL_SYNC: str = "postgresql+psycopg2://postgres:postgres@db:5432/postgres"
 
     class Config:
         env_file = ".env"
