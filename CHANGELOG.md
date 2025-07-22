@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.56] - 2025-07-22
+
+### Fixed
+- Critical IBD edges not displaying in UI due to API response formatting bug
+- IBD router incorrectly processing edges as relationships instead of preserving edges data
+- Missing animated connections between IBD components despite correct AI generation and database storage
+- DiagramPositioning incorrectly handling IBD edges through relationships field
+
+### Changed
+- IBD API endpoint now returns edges directly from database without transformation
+- Removed incorrect edges-to-relationships mapping in IBD positioning logic
+- Enhanced AI prompt with mandatory IBD connection rules and detailed examples
+- Added bootstrap RAG examples with properly connected IBD components
+
+### Added
+- Comprehensive AI prompt rules for generating connected IBD components (Rules 8-12)
+- Bootstrap seeding examples with 3-component IBD structures and multiple edge connections
+- Debug logging for AI generation to track edges through the entire pipeline
+- Enhanced one-shot examples demonstrating proper IBD edge structure
+
+### Improved
+- IBD diagrams now display animated dashed lines connecting internal components
+- AI consistently generates 2-3 interconnected IBD components with meaningful connections
+- Enhanced AI understanding of internal component relationships and data flow
+- Better semantic accuracy in connection labels (Data Bus, Control Signals, Memory Access)
+
 ## [1.1.55] - 2025-07-21
 
 ### Fixed

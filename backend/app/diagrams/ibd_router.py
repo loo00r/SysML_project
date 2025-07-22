@@ -26,11 +26,11 @@ async def read_ibd_by_block_id(
     if db_ibd is None:
         raise HTTPException(status_code=404, detail="Internal Block Diagram not found")
     
-    # Apply positioning to the IBD nodes/edges
+    # Apply positioning to the IBD nodes only (edges don't need positioning)
     ibd_diagram_data = {
         "diagram_type": "ibd", 
         "elements": db_ibd.nodes,
-        "relationships": db_ibd.edges
+        "relationships": []  # IBD doesn't use relationships, only edges
     }
     positioned_ibd = DiagramPositioning.apply_positioning(ibd_diagram_data)
     
@@ -40,7 +40,7 @@ async def read_ibd_by_block_id(
         parent_bdd_diagram_id=db_ibd.parent_bdd_diagram_id,
         parent_block_id=db_ibd.parent_block_id,
         nodes=positioned_ibd.get("elements", []),
-        edges=positioned_ibd.get("relationships", []),
+        edges=db_ibd.edges,  # Use edges directly from database
         source=db_ibd.source,
         created_at=db_ibd.created_at
     )

@@ -96,6 +96,44 @@ async def generate_diagram_with_context(
     print(f"\n==== Generating {diagram_type} diagram with RAG: {use_rag} ====")
     print(f"Input text: {text[:100]}...")
     
+    # TEMPORARY: Bootstrap example with connected IBD components for better AI training
+    if diagram_type == "bdd_enhanced":
+        bootstrap_example = {
+            "input": "Create a UAV flight controller with CPU and memory connected internally, plus GPS sensor",
+            "output": {
+                "diagram_type": "bdd",
+                "elements": [
+                    {
+                        "id": "flight-controller",
+                        "type": "block", 
+                        "name": "Flight Controller",
+                        "internal_diagram": {
+                            "nodes": [
+                                {"id": "cpu-unit", "type": "ibd_block", "name": "Central Processing Unit"},
+                                {"id": "memory-unit", "type": "ibd_block", "name": "Memory Module"},
+                                {"id": "io-unit", "type": "ibd_block", "name": "I/O Controller"}
+                            ],
+                            "edges": [
+                                {"id": "cpu-memory-bus", "source": "cpu-unit", "target": "memory-unit", "label": "Data Bus"},
+                                {"id": "cpu-io-control", "source": "cpu-unit", "target": "io-unit", "label": "Control Signals"},
+                                {"id": "memory-io-access", "source": "memory-unit", "target": "io-unit", "label": "Memory Access"}
+                            ]
+                        }
+                    },
+                    {
+                        "id": "gps-sensor",
+                        "type": "sensor",
+                        "name": "GPS"
+                    }
+                ],
+                "relationships": [
+                    {"source_id": "gps-sensor", "target_id": "flight-controller", "name": "Provides data"}
+                ]
+            }
+        }
+        one_shot_examples.append(bootstrap_example)
+        print(f"Added bootstrap example with {len(bootstrap_example['output']['elements'][0]['internal_diagram']['edges'])} connected IBD edges")
+    
     if use_rag:
         try:
             # For enhanced diagrams, search for both bdd and bdd_enhanced examples
@@ -156,10 +194,19 @@ async def generate_diagram_with_context(
                     
                     # Prepare IBD for creation later
                     ibd_data = element.pop("internal_diagram")  # Remove IBD from main diagram
+                    
+                    # DEBUG: Log what edges were found in the AI response
+                    edges_found = ibd_data.get("edges", [])
+                    print(f"DEBUG: IBD for block {element['id']} has {len(edges_found)} edges in AI response")
+                    if edges_found:
+                        print(f"DEBUG: Edges content: {edges_found}")
+                    else:
+                        print(f"DEBUG: No edges found in internal_diagram for {element['id']}")
+                    
                     ibd_to_create.append({
                         "parent_block_id": element["id"],
                         "nodes": ibd_data.get("nodes", []),
-                        "edges": ibd_data.get("edges", []),
+                        "edges": edges_found,
                     })
         
         # Apply positioning to the clean diagram
