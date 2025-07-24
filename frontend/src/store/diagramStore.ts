@@ -408,7 +408,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
             id: apiEdge.id,
             source: apiEdge.source,
             target: apiEdge.target,
-            type: 'straight',
+            // Use dynamic edge type: straight for 2 nodes or fewer, smoothstep for 3+ nodes
+            type: (ibdDataFromApi.nodes?.length || 0) <= 2 ? 'straight' : 'smoothstep',
             animated: true,
             style: { 
               stroke: '#555', 
@@ -496,15 +497,17 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Save current state before connecting nodes
     get().saveToHistory();
     
-    // Get current diagram type to determine edge style
+    // Get current diagram type and node count to determine edge style
     const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
     const isIBD = activeDiagram?.type === 'ibd';
+    const currentNodes = get().nodes;
     
     const newEdge: Edge = {
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
       target: connection.target || '',
-      type: isIBD ? 'straight' : 'smoothstep', // Use straight for IBD, smoothstep for BDD
+      // For IBD: use straight for 2 nodes, smoothstep for 3+ nodes. For BDD: always smoothstep
+      type: isIBD ? (currentNodes.length <= 2 ? 'straight' : 'smoothstep') : 'smoothstep',
       animated: isIBD,
       style: isIBD ? { 
         stroke: '#555', 

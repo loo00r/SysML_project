@@ -148,14 +148,15 @@ const DiagramWorkspace: React.FC = () => {
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
   
-  // Define edge styles based on diagram type
+  // Define edge styles based on diagram type and node count
   const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
     style: { 
       stroke: '#555', 
       strokeWidth: 2,
       strokeDasharray: '8 4', // Dashed line pattern
     },
-    type: 'straight' as const, // Use straight for IBD to avoid curve
+    // Use straight lines for 2 nodes, smoothstep (angled) for 3+ nodes
+    type: nodes.length <= 2 ? 'straight' : 'smoothstep',
     animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
     className: 'ibd-animated-edge',
   } : {

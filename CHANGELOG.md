@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.59] - 2025-07-24
+
+### Fixed
+- Fixed AI-generated IBD edges that were hardcoded to use straight lines regardless of node count
+- AI-generated IBD diagrams now properly use dynamic edge routing (straight for ≤2 nodes, angled for 3+ nodes)
+- IBD edge type logic now works consistently for both manual connections and AI-generated diagrams
+
+### Changed
+- Updated AI edge transformation logic in diagramStore.ts to use dynamic type selection
+- Enhanced consistency between manual and AI-generated IBD connection styles
+
+## [1.1.58] - 2025-07-24
+
+### Changed
+- Implemented dynamic edge routing for IBD diagrams based on node count
+- IBD connections now use straight lines when there are 2 nodes or fewer
+- IBD connections automatically switch to angled lines (smoothstep) when there are 3 or more nodes
+- Enhanced visual layout management for complex IBD diagrams with multiple components
+
+### Improved
+- Better connection routing that adapts to diagram complexity
+- Cleaner visual appearance for simple 2-node IBD connections
+- More organized layout for complex multi-node IBD diagrams
+
+## [1.1.57] - 2025-07-24
+
+### Fixed
+- Fixed IBD rendering crash caused by conditional nodeTypes registration
+- IBD nodes now always render with proper green styling instead of default white rectangles
+- Eliminated application crashes when interacting with AI-generated IBD nodes
+- ReactFlow now receives unified nodeTypes object with all components registered at all times
+
+### Changed
+- Unified nodeTypes object now statically includes BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, and IBDNode
+- Removed conditional nodeTypes logic that caused race conditions between diagram types
+- Enhanced IBD node type mapping with both 'ibd' and 'ibd_block' keys pointing to IBDNode component
+
 ## [1.1.56] - 2025-07-22
 
 ### Fixed
