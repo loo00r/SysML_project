@@ -423,12 +423,17 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
           console.log('🔄 [IBD] Transformed nodes:', transformedNodes.length, 'first node data:', transformedNodes[0]?.data);
           console.log('🔄 [IBD] Transformed edges:', transformedEdges.length);
           
+          // Apply simple Dagre layout with Left-to-Right direction for IBD horizontal connections
+          console.log('🌀 [IBD] Applying Dagre layout (LR)...');
+          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(transformedNodes, transformedEdges, 'LR');
+          console.log('✅ [IBD] Dagre layout (LR) applied successfully');
+          
           try {
             openNewDiagramTab({
               name: `IBD for ${bddBlockId}`,
               type: 'ibd',
-              nodes: transformedNodes,
-              edges: transformedEdges,
+              nodes: layoutedNodes,
+              edges: layoutedEdges,
               description: `Internal Block Diagram for ${bddBlockId}`,
               customId: ibdId
             });
@@ -677,7 +682,10 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       }));
       
       // Застосовуємо автоматичне позиціонування за допомогою Dagre
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, 'TB');
+      // IBD діаграми використовують LR (горизонтальний), BDD діаграми TB (вертикальний)
+      const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
+      console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, direction);
       
       set({
         nodes: layoutedNodes,

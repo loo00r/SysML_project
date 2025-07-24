@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.61] - 2025-07-24
+
+### Changed
+- Updated IBD diagrams to use horizontal Left-to-Right (LR) Dagre layout instead of vertical Top-to-Bottom (TB)
+- IBD blocks now arrange horizontally to align with their left-to-right connection handles
+- Enhanced layout logic to automatically select LR direction for IBD diagrams and TB direction for BDD diagrams
+- Improved visual consistency between IBD block connections and their horizontal positioning
+
+### Fixed
+- IBD diagrams now properly utilize horizontal space with left-to-right component arrangement
+- Better alignment between IBD block connection handles (left/right sides) and automatic positioning
+
+## [1.1.60] - 2025-07-24
+
+### Fixed
+- Restored original simple Dagre positioning approach for AI-generated diagrams
+- Eliminated chaotic positioning by reverting to proven Dagre TB (Top-Bottom) layout algorithm
+- Applied consistent Dagre layout to both AI-generated and API-retrieved IBD diagrams
+- Enhanced IBD edge label positioning to display near source blocks instead of center
+
+### Changed
+- Updated diagramStore.ts openIbdForBlock function to apply Dagre layout to API-retrieved IBDs
+- Simplified positioning logic by removing complex semicircle algorithms in favor of clean vertical layouts
+- Enhanced IBD edge labels with translateX(-30px) translateY(-15px) positioning and text-anchor: start
+
+### Improved
+- Clean vertical hierarchical layouts in all AI-generated diagrams
+- Better visual organization with proper top-to-bottom element arrangement
+- Consistent positioning approach across all diagram generation methods
+
 ## [1.1.59] - 2025-07-24
 
 ### Fixed
