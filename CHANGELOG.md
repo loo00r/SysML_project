@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.63] - 2025-07-26
+
+### Changed
+- Radically increased horizontal spacing (rankSep: 350) for IBD diagrams to prevent node overlap
+- Repositioned IBD edge labels to the start of connection lines instead of center position
+- Enhanced edge label positioning with CSS transform for cleaner visual presentation
+
+### Fixed
+- Eliminated edge label overlap with nodes in IBD diagrams through aggressive horizontal spacing
+- Improved label readability by moving labels away from the center of connection lines
+- Better visual separation in complex IBD layouts with multiple interconnected components
+
+## [1.1.62] - 2025-07-26
+
+### Added
+- Configurable spacing options for Dagre layout engine through applyDagreLayout function
+- Enhanced spacing control with nodeSep and rankSep parameters for better IBD readability
+
+### Changed  
+- IBD diagrams now use increased spacing (nodeSep: 150, rankSep: 250) for better visual separation
+- Updated dagreLayout.ts to accept spacing configuration options for flexible layout customization
+- Enhanced IBD edge labels with solid background for improved readability and contrast
+
+### Fixed
+- IBD edge label overlap issues by adding solid background matching canvas color
+- Text visibility improvements for IBD connection labels with enhanced contrast
+- Better visual separation between IBD nodes preventing cluttered appearance
+
 ## [1.1.61] - 2025-07-24
 
 ### Changed

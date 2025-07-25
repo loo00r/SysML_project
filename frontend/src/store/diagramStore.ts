@@ -416,7 +416,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
               strokeWidth: 2,
               strokeDasharray: '8 4'
             },
-            className: 'ibd-animated-edge',
+            className: 'ibd-animated-edge ibd-edge',
             label: apiEdge.label || 'IBD Connection'
           })) || [];
           
@@ -425,7 +425,10 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
           
           // Apply simple Dagre layout with Left-to-Right direction for IBD horizontal connections
           console.log('🌀 [IBD] Applying Dagre layout (LR)...');
-          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(transformedNodes, transformedEdges, 'LR');
+          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(transformedNodes, transformedEdges, 'LR', {
+            nodeSep: 150,  // Vertical distance can be smaller
+            rankSep: 350   // Radically increased horizontal distance
+          });
           console.log('✅ [IBD] Dagre layout (LR) applied successfully');
           
           try {
@@ -519,7 +522,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         strokeWidth: 2,
         strokeDasharray: '8 4'
       } : { stroke: '#555', strokeWidth: 1 },
-      className: isIBD ? 'ibd-animated-edge' : undefined,
+      className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
       label: isIBD ? 'IBD Blocks' : undefined
     };
     
@@ -685,7 +688,12 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       // IBD діаграми використовують LR (горизонтальний), BDD діаграми TB (вертикальний)
       const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
       console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, direction);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, direction, 
+        get().diagramType === 'ibd' ? {
+          nodeSep: 150,  // Vertical distance can be smaller
+          rankSep: 350   // Radically increased horizontal distance
+        } : undefined
+      );
       
       set({
         nodes: layoutedNodes,

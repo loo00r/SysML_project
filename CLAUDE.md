@@ -179,3 +179,68 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
+Task: Optimize IBD Layout and Reposition Edge Labels to Prevent Overlap
+
+Task Type: Frontend / Layout & CSS Fix
+
+Context
+The current IBD layout logic, even with increased spacing, is not sufficient to prevent edge labels from overlapping with nodes. This is because the labels are centered on the edge path by default. The definitive solution is to combine a more aggressive horizontal spacing with a CSS rule that repositions the labels near the source of the connection.
+
+Goal
+To permanently solve the edge label overlap issue in IBDs by implementing a combination of significantly increased layout spacing and CSS-based label repositioning.
+
+Acceptance Criteria
+✅ The horizontal spacing between columns of nodes in IBDs is significantly increased.
+✅ IBD edge labels are now positioned near the start (source) of the connection line, not in the center.
+✅ Text labels do not overlap with any node blocks in any tested scenarios.
+✅ The layout and labels for BDD diagrams remain completely unaffected.
+
+Technical Implementation Details
+
+Aggressively Increase Layout Spacing:
+
+File: frontend/src/store/diagramStore.ts.
+
+Action: Find the two places where applyDagreLayout is called for IBD diagrams. Update the spacing options to use a much larger rankSep to create horizontal space.
+
+Change this:
+
+TypeScript
+
+// Inside the applyDagreLayout call for IBDs
+{
+  nodeSep: 280,
+  rankSep: 200 
+}
+To this:
+
+TypeScript
+
+// Inside the applyDagreLayout call for IBDs
+{
+  nodeSep: 150,  // Vertical distance can be smaller
+  rankSep: 350   // Radically increased horizontal distance
+}
+Reposition Labels with CSS:
+
+File: frontend/src/store/diagramStore.ts.
+
+Action 1 (Assign Class): Ensure that in the onConnect function (for manual edges) and in the openIbdForBlock function (for AI-generated edges), all IBD edges have the className: 'ibd-edge' property.
+
+File: Your main stylesheet (e.g., frontend/src/index.css).
+
+Action 2 (Add Repositioning CSS): Add the following CSS rule. This moves the label to the start of the line and then slightly offsets it for a clean look.
+
+CSS
+
+/* In your main CSS file */
+
+/* Targets the text label for our custom IBD edges */
+.ibd-edge .react-flow__edge-text {
+  /* Changes the text's alignment point from its center to its start */
+  text-anchor: start;
+  /* Moves the label slightly right and up from the connection point */
+  transform: translate(15px, -15px);
+  font-size: 12px;
+  fill: #333;
+}

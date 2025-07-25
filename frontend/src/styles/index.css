@@ -516,3 +516,20 @@ body {
 .react-flow__edge.ibd-animated-edge > g > rect {
   display: none !important;
 }
+
+/* Enhanced IBD edge label styling with solid background for better readability */
+.ibd-edge .react-flow__edge-textbg {
+  fill: #fafafa; /* Canvas background color */
+  stroke: #fafafa;
+  stroke-width: 4px;
+}
+
+/* Styles the text itself for better contrast and repositions it */
+.ibd-edge .react-flow__edge-text {
+  /* Changes the text's alignment point from its center to its start */
+  text-anchor: start;
+  /* Moves the label slightly right and up from the connection point */
+  transform: translate(15px, -15px);
+  font-size: 12px;
+  fill: #333;
+}
