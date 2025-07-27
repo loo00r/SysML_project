@@ -408,8 +408,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
             id: apiEdge.id,
             source: apiEdge.source,
             target: apiEdge.target,
-            // Use dynamic edge type: straight for 2 nodes or fewer, smoothstep for 3+ nodes
-            type: (ibdDataFromApi.nodes?.length || 0) <= 2 ? 'straight' : 'smoothstep',
+            // Use consistent orthogonal lines for all IBD diagrams
+            type: 'smoothstep',
             animated: true,
             style: { 
               stroke: '#555', 
@@ -514,8 +514,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       id: `e-${connection.source}-${connection.target}`,
       source: connection.source || '',
       target: connection.target || '',
-      // For IBD: use straight for 2 nodes, smoothstep for 3+ nodes. For BDD: always smoothstep
-      type: isIBD ? (currentNodes.length <= 2 ? 'straight' : 'smoothstep') : 'smoothstep',
+      // For IBD: always use smoothstep (orthogonal lines). For BDD: always smoothstep
+      type: 'smoothstep',
       animated: isIBD,
       style: isIBD ? { 
         stroke: '#555', 

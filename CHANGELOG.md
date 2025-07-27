@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.64] - 2025-07-27
+
+### Fixed
+- Removed dynamic edge routing logic from IBD diagrams that caused inconsistent connection styles
+- All IBD connections now use consistent orthogonal (smoothstep) lines regardless of node count
+- Eliminated conditional edge type selection that switched between straight and angled lines based on node count
+
+### Changed
+- Unified IBD edge styling to always use smoothstep type for consistent visual appearance
+- Updated both manual connection creation (onConnect) and API-driven IBD generation to use consistent edge types
+- Simplified edge type logic by removing node count-based conditional styling
+
+### Improved
+- Better visual consistency across all IBD diagrams with uniform connection styles
+- Eliminated potential layout issues caused by mixed edge types in same diagram
+- More predictable IBD connection behavior for users regardless of diagram complexity
+
 ## [1.1.63] - 2025-07-26
 
 ### Changed
