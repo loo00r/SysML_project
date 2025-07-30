@@ -179,68 +179,51 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Optimize IBD Layout and Reposition Edge Labels to Prevent Overlap
+New Task
+Task: Position IBD Edge Labels Above Line with Opaque Background
 
-Task Type: Frontend / Layout & CSS Fix
+Task Type: Frontend / CSS / UI Refinement
 
 Context
-The current IBD layout logic, even with increased spacing, is not sufficient to prevent edge labels from overlapping with nodes. This is because the labels are centered on the edge path by default. The definitive solution is to combine a more aggressive horizontal spacing with a CSS rule that repositions the labels near the source of the connection.
+The final desired style for IBD edge labels is a combination of the last two approaches. The label should be positioned above the connection line to avoid interfering with the visual flow, and it should simultaneously have an opaque background to ensure it is perfectly readable against any underlying grid or edge lines.
 
 Goal
-To permanently solve the edge label overlap issue in IBDs by implementing a combination of significantly increased layout spacing and CSS-based label repositioning.
+To implement a hybrid style for IBD edge labels that positions them vertically above the connection path while retaining a solid, opaque background for maximum clarity.
 
 Acceptance Criteria
-✅ The horizontal spacing between columns of nodes in IBDs is significantly increased.
-✅ IBD edge labels are now positioned near the start (source) of the connection line, not in the center.
-✅ Text labels do not overlap with any node blocks in any tested scenarios.
-✅ The layout and labels for BDD diagrams remain completely unaffected.
+✅ IBD edge labels are positioned vertically above their connection line.
+✅ The labels have a fully opaque background that matches the canvas color.
+✅ The combination of the offset and the background ensures the label is perfectly readable and does not overlap the line itself.
+✅ BDD edge labels remain unaffected.
 
 Technical Implementation Details
 
-Aggressively Increase Layout Spacing:
+Modify the IBD Edge CSS:
 
-File: frontend/src/store/diagramStore.ts.
+File to modify: frontend/src/styles/index.css.
 
-Action: Find the two places where applyDagreLayout is called for IBD diagrams. Update the spacing options to use a much larger rankSep to create horizontal space.
-
-Change this:
-
-TypeScript
-
-// Inside the applyDagreLayout call for IBDs
-{
-  nodeSep: 280,
-  rankSep: 200 
-}
-To this:
-
-TypeScript
-
-// Inside the applyDagreLayout call for IBDs
-{
-  nodeSep: 150,  // Vertical distance can be smaller
-  rankSep: 350   // Radically increased horizontal distance
-}
-Reposition Labels with CSS:
-
-File: frontend/src/store/diagramStore.ts.
-
-Action 1 (Assign Class): Ensure that in the onConnect function (for manual edges) and in the openIbdForBlock function (for AI-generated edges), all IBD edges have the className: 'ibd-edge' property.
-
-File: Your main stylesheet (e.g., frontend/src/index.css).
-
-Action 2 (Add Repositioning CSS): Add the following CSS rule. This moves the label to the start of the line and then slightly offsets it for a clean look.
+Action: Replace any existing CSS rules for .react-flow__edge.ibd-edge with the definitive, combined version below.
 
 CSS
 
-/* In your main CSS file */
+/* In your main CSS file (e.g., index.css) */
 
-/* Targets the text label for our custom IBD edges */
-.ibd-edge .react-flow__edge-text {
-  /* Changes the text's alignment point from its center to its start */
-  text-anchor: start;
-  /* Moves the label slightly right and up from the connection point */
-  transform: translate(15px, -15px);
+/* --- Final IBD Edge Label Styling --- */
+
+/* Styles the background of IBD edge labels to be solid and opaque */
+.react-flow__edge.ibd-edge .react-flow__edge-textbg {
+  fill: #fafafa;      /* Canvas background color */
+  stroke: #fafafa;    /* Stroke of the same color creates a padding effect */
+  stroke-width: 4px;
+  opacity: 1;         /* Ensures the background is fully opaque */
+  /* Also apply the same vertical transform as the text to move them together */
+  transform: translateY(-15px);
+}
+
+/* Positions IBD edge labels above the connection line */
+.react-flow__edge.ibd-edge .react-flow__edge-text {
   font-size: 12px;
   fill: #333;
+  /* Moves the label up by 15px from the center of the line */
+  transform: translateY(-15px);
 }

@@ -7,6 +7,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.72] - 2025-07-28
+
+### Changed
+- Implemented hybrid IBD edge label styling combining above-line positioning with opaque background
+- IBD edge labels now positioned 15px above connection lines using translateY(-15px) transform
+- Both label text and background moved together synchronously for perfect visual alignment
+- Enhanced readability through combination of vertical offset and solid background
+
+### Improved
+- Optimal IBD label positioning that avoids interference with visual flow while maintaining perfect readability
+- Synchronized movement of text and background elements preventing misalignment issues
+- Clean appearance with labels floating above connection lines with solid opaque backgrounds
+- Maximum clarity against any underlying grid or edge lines through hybrid approach
+
+### Fixed
+- Label positioning that combines the best aspects of above-line placement and opaque background coverage
+- Consistent visual separation between labels and connection paths in all IBD diagrams
+- Maintained stroke-width: 4px padding effect while adding vertical positioning transform
+
+## [1.1.71] - 2025-07-28
+
+### Changed
+- Finalized IBD edge label styling with centered positioning and fully opaque background
+- IBD edge labels now use ReactFlow's default centering for consistent placement on all connection orientations
+- Enhanced background opacity with stroke-width: 4px for improved padding effect around label text
+- Implemented clean "cutout" effect that completely obscures connection lines and background grid
+
+### Fixed
+- Consistent IBD label positioning that works for both horizontal and vertical connection lines
+- Robust visual clarity through fully opaque background matching canvas color (#fafafa)
+- Professional appearance with definitive styling that replaces all previous experimental approaches
+
+### Improved
+- Final, production-ready IBD edge label implementation with optimal readability
+- Enhanced visual separation between label text and underlying diagram elements
+- Maintained BDD label styling unchanged while perfecting IBD-specific appearance
+
+## [1.1.70] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels to start near source nodes instead of above connection lines
+- IBD edge labels now use text-anchor: start alignment for better readability in complex diagrams
+- Updated label positioning with translate(15px, -15px) to position near connection handle without overlapping nodes
+- Enhanced label-to-source relationship for clearer visual association with originating components
+
+### Improved
+- Better readability for IBD diagrams with multiple outgoing edges from single nodes
+- Reduced visual clutter by anchoring labels to their source nodes
+- Professional appearance with clear source-to-target relationship indication
+- Eliminated label overlap issues in complex multi-connection IBD layouts
+
+## [1.1.69] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels above connection lines instead of centered within them
+- Removed opaque background from IBD edge labels for cleaner visual appearance
+- IBD edge labels now display 15px above connection paths using CSS transform
+- Enhanced label positioning with transparent background eliminating "cutout" effect
+
+### Improved
+- Cleaner aesthetic for IBD diagrams with labels positioned cleanly above connection lines
+- Better visual separation between text labels and connection paths
+- Maintained BDD label styling unchanged while updating only IBD edge labels
+- Enhanced readability through improved label-to-line relationship
+
+## [1.1.68] - 2025-07-27
+
+### Fixed
+- Made IBD edge label backgrounds fully opaque to eliminate faint visibility of connection lines and grid through background
+- Added opacity: 1 to IBD edge label background CSS ensuring complete visual cutout effect
+
+### Improved
+- Clean and distinct "cutout" effect for IBD edge labels with no background bleeding
+- Enhanced visual clarity by completely obscuring connection lines behind label backgrounds
+- Professional appearance with solid white backgrounds that properly interrupt edge paths
+- Maintained selective application only to IBD labels while preserving BDD label styling
+
+## [1.1.67] - 2025-07-27
+
+### Fixed
+- Resolved IBD edge label text misalignment with its opaque background
+- Removed overly specific CSS positioning rules that conflicted with ReactFlow's internal SVG text positioning
+- IBD edge label text now perfectly centers within its background using ReactFlow's default mechanism
+
+### Changed
+- Simplified IBD edge label CSS by removing !important flags and explicit positioning attributes
+- Removed transform: none, text-anchor: middle, and dominant-baseline: middle from IBD text styling
+- Enhanced background styling with stroke-width: 2px for improved "padding" effect around text
+
+### Improved
+- Perfect horizontal and vertical centering of IBD edge label text within opaque backgrounds
+- Clean "cutout" effect with text and background properly interrupting edge lines
+- Better compatibility with ReactFlow's SVG text rendering system
+- Eliminated text offset issues that made labels appear broken
+
+## [1.1.66] - 2025-07-27
+
+### Fixed
+- Resolved CSS specificity conflict preventing IBD edge labels from centering on connection lines
+- Removed conflicting CSS rules that positioned IBD labels above lines instead of in center
+- IBD edge labels now properly render in the center of connection paths with opaque backgrounds
+
+### Changed  
+- Updated IBD edge label CSS selectors to use higher specificity (.react-flow__edge.ibd-edge)
+- Added !important flags to ensure IBD label positioning rules take precedence
+- Enhanced IBD label positioning with transform: none, text-anchor: middle, and dominant-baseline: middle
+
+### Removed
+- Conflicting CSS rules (.react-flow__edge.ibd-animated-edge .react-flow__edge-text) with translateY(-15px)
+- Old background hiding rules that interfered with new opaque background implementation
+
+### Improved
+- IBD edge labels now correctly display in center of connection lines with cutout effect
+- Better visual integration of labels with connection paths
+- Eliminated positioning conflicts between old and new CSS rules
+
+## [1.1.65] - 2025-07-27
+
+### Changed
+- Centered IBD edge labels for improved readability and professional appearance
+- IBD edge labels now render in the center of connection paths instead of offset positioning
+- Added opaque background (#fafafa) to IBD edge labels creating "cutout" effect on connection lines
+
+### Removed
+- Previous CSS transform rules that positioned IBD edge labels above connection lines
+- text-anchor: start and transform: translate(15px, -15px) positioning for IBD edge labels
+
+### Improved
+- Enhanced visual integration of IBD edge labels with diagram flow
+- Better text legibility through opaque backgrounds matching canvas color
+- Cleaner, more professional appearance of IBD connection labels
+- Connection lines now appear visually "interrupted" by label backgrounds for clear text readability
+
 ## [1.1.64] - 2025-07-27
 
 ### Fixed
