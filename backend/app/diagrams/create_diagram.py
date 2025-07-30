@@ -82,16 +82,34 @@ async def create_diagram_endpoint(
             diagram_json=positioned_diagram  # Save the positioned, clean diagram
         )
         
-        # 5. Save the parsed IBDs with the parent BDD ID
+        # 5. Save the parsed IBDs with the parent BDD ID - New Upsert Logic
         for ibd_data in ibd_to_create:
-            new_ibd = InternalBlockDiagramCreate(
-                parent_bdd_diagram_id=db_diagram.id,
-                parent_block_id=ibd_data["parent_block_id"],
-                nodes=ibd_data["nodes"],
-                edges=ibd_data["edges"],
-                source="ai"
+            existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
+                db=db,
+                parent_bdd_id=db_diagram.id,
+                block_id=ibd_data["parent_block_id"]
             )
-            await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+
+            if existing_ibd:
+                # IBD already exists -> UPDATE it
+                print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
+                await crud_ibd.update_ibd(
+                    db=db,
+                    db_ibd=existing_ibd,
+                    nodes=ibd_data["nodes"],
+                    edges=ibd_data["edges"]
+                )
+            else:
+                # IBD does not exist -> CREATE it
+                print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
+                new_ibd = InternalBlockDiagramCreate(
+                    parent_bdd_diagram_id=db_diagram.id,
+                    parent_block_id=ibd_data["parent_block_id"],
+                    nodes=ibd_data["nodes"],
+                    edges=ibd_data["edges"],
+                    source="ai"
+                )
+                await crud_ibd.create_ibd(db=db, ibd=new_ibd)
         
         # Return the response in the expected DiagramResponse format
         return DiagramResponse(

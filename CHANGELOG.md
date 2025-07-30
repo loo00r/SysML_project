@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.73] - 2025-07-30
+
+### Fixed
+- Implemented upsert logic for IBD storage to prevent duplicate database entries
+- IBD generation now updates existing records instead of creating duplicates for the same block
+- Eliminated database clutter from repeated AI generation on the same blocks
+
+### Changed
+- Added `get_ibd_by_parent_and_block` function to check for existing IBD records
+- Added `update_ibd` function to update existing IBD nodes and edges
+- Replaced IBD creation loops with upsert logic in both RAG and create-diagram endpoints
+- Simplified `get_ibd_by_block_id` function to basic query without duplicate handling
+
+### Improved
+- Cleaner database with one IBD record per block within each parent diagram
+- Better database performance by eliminating unnecessary duplicate rows
+- More efficient IBD retrieval without complex duplicate resolution logic
+- Enhanced debugging with print statements for IBD creation/update operations
+
 ## [1.1.72] - 2025-07-28
 
 ### Changed

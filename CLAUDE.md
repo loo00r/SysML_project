@@ -179,51 +179,125 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-New Task
-Task: Position IBD Edge Labels Above Line with Opaque Background
+Task: Implement Upsert Logic for IBD Storage to Prevent Duplicates
 
-Task Type: Frontend / CSS / UI Refinement
+Task Type: Backend / Database Logic
 
 Context
-The final desired style for IBD edge labels is a combination of the last two approaches. The label should be positioned above the connection line to avoid interfering with the visual flow, and it should simultaneously have an opaque background to ensure it is perfectly readable against any underlying grid or edge lines.
+The current system creates a new row in the internal_block_diagrams table for every AI generation, which can lead to a cluttered database with multiple entries for the same block. The desired behavior is to maintain only one IBD record per block within a parent diagram. If a record already exists, it should be updated with the new data; otherwise, a new record should be created.
 
 Goal
-To implement a hybrid style for IBD edge labels that positions them vertically above the connection path while retaining a solid, opaque background for maximum clarity.
+To refactor the IBD saving mechanism to perform an "upsert" (update or insert) operation, ensuring that the database remains clean and free of duplicate IBD records for the same block.
 
 Acceptance Criteria
-✅ IBD edge labels are positioned vertically above their connection line.
-✅ The labels have a fully opaque background that matches the canvas color.
-✅ The combination of the offset and the background ensures the label is perfectly readable and does not overlap the line itself.
-✅ BDD edge labels remain unaffected.
+✅ When the AI generates an IBD for a block that does not already have one, a new row is created in the internal_block_diagrams table.
+✅ When the AI generates an IBD for a block that already has an entry in the table, the existing row is updated with the new nodes and edges, and no new row is created.
+✅ The get_ibd_by_block_id function is reverted to its simpler, original form, as duplicates will no longer be possible.
 
 Technical Implementation Details
 
-Modify the IBD Edge CSS:
+Update the IBD CRUD Module:
 
-File to modify: frontend/src/styles/index.css.
+File to modify: backend/app/crud/crud_ibd.py.
 
-Action: Replace any existing CSS rules for .react-flow__edge.ibd-edge with the definitive, combined version below.
+Action: We need to add functions to check for an existing IBD and to update it. Replace the entire content of the file with the code below, which includes the new logic and reverts the old fix.
 
-CSS
+Python
 
-/* In your main CSS file (e.g., index.css) */
+# In backend/app/crud/crud_ibd.py
 
-/* --- Final IBD Edge Label Styling --- */
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, desc
+from app.database import models
+from app.database.models import InternalBlockDiagramCreate
+from typing import List, Dict, Any
 
-/* Styles the background of IBD edge labels to be solid and opaque */
-.react-flow__edge.ibd-edge .react-flow__edge-textbg {
-  fill: #fafafa;      /* Canvas background color */
-  stroke: #fafafa;    /* Stroke of the same color creates a padding effect */
-  stroke-width: 4px;
-  opacity: 1;         /* Ensures the background is fully opaque */
-  /* Also apply the same vertical transform as the text to move them together */
-  transform: translateY(-15px);
-}
+async def get_ibd_by_parent_and_block(db: AsyncSession, parent_bdd_id: int, block_id: str):
+    """Checks if an IBD exists for a specific block in a specific parent diagram."""
+    stmt = select(models.InternalBlockDiagram).filter_by(
+        parent_bdd_diagram_id=parent_bdd_id,
+        parent_block_id=block_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
-/* Positions IBD edge labels above the connection line */
-.react-flow__edge.ibd-edge .react-flow__edge-text {
-  font-size: 12px;
-  fill: #333;
-  /* Moves the label up by 15px from the center of the line */
-  transform: translateY(-15px);
-}
+async def create_ibd(db: AsyncSession, ibd: InternalBlockDiagramCreate) -> models.InternalBlockDiagram:
+    """Creates a new IBD record."""
+    db_ibd = models.InternalBlockDiagram(**ibd.model_dump())
+    db.add(db_ibd)
+    await db.commit()
+    await db.refresh(db_ibd)
+    return db_ibd
+
+async def update_ibd(db: AsyncSession, db_ibd: models.InternalBlockDiagram, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
+    """Updates an existing IBD's nodes and edges."""
+    db_ibd.nodes = nodes
+    db_ibd.edges = edges
+    await db.commit()
+    await db.refresh(db_ibd)
+    return db_ibd
+
+async def get_ibd_by_block_id(db: AsyncSession, block_id: str):
+    """
+    Gets an IBD by its parent block ID. Reverted to simpler logic
+    as duplicates are no longer expected.
+    """
+    # Note: This will fail if multiple diagrams reuse the same block_id.
+    # The long-term fix would be to query by parent_diagram_id AND block_id.
+    stmt = select(models.InternalBlockDiagram).filter_by(parent_block_id=block_id)
+    result = await db.execute(stmt)
+    # Assuming one diagram is worked on at a time, we take the newest if somehow duplicates still occur.
+    return result.scalars().first()
+Implement the Upsert Logic in the API Endpoint:
+
+File to modify: backend/app/database/rag_router.py.
+
+Action: Find the loop where IBDs are saved (for ibd_data in ibd_to_create:). Replace that entire loop with the new logic below, which checks for existence and then decides whether to create or update.
+
+Current Code (to be replaced):
+
+Python
+
+# for ibd_data in ibd_to_create:
+#     new_ibd = InternalBlockDiagramCreate(
+#         parent_bdd_diagram_id=db_diagram.id,
+#         parent_block_id=ibd_data["parent_block_id"],
+#         nodes=ibd_data["nodes"],
+#         edges=ibd_data["edges"],
+#         source="ai"
+#     )
+#     await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+New Code (to replace the block above):
+
+Python
+
+# In backend/app/database/rag_router.py
+
+# --- New Upsert Logic ---
+for ibd_data in ibd_to_create:
+    existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
+        db=db,
+        parent_bdd_id=db_diagram.id,
+        block_id=ibd_data["parent_block_id"]
+    )
+
+    if existing_ibd:
+        # IBD already exists -> UPDATE it
+        print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
+        await crud_ibd.update_ibd(
+            db=db,
+            db_ibd=existing_ibd,
+            nodes=ibd_data["nodes"],
+            edges=ibd_data["edges"]
+        )
+    else:
+        # IBD does not exist -> CREATE it
+        print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
+        new_ibd = InternalBlockDiagramCreate(
+            parent_bdd_diagram_id=db_diagram.id,
+            parent_block_id=ibd_data["parent_block_id"],
+            nodes=ibd_data["nodes"],
+            edges=ibd_data["edges"],
+            source="ai"
+        )
+        await crud_ibd.create_ibd(db=db, ibd=new_ibd)
