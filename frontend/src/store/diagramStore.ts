@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from 'reactflow';
+import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Define node types based on SysML diagram elements
@@ -30,6 +30,8 @@ export interface DiagramInstance {
   description?: string;
   createdAt: Date;
   modifiedAt: Date;
+  viewport?: Viewport; // Add viewport state for each diagram
+  needsCentering?: boolean; // Flag to trigger fitView for new diagrams
 }
 
 // Define validation error structure
@@ -90,6 +92,10 @@ interface DiagramStoreState {
   closeDiagram: (diagramId: string) => void;
   setActiveDiagram: (diagramId: string) => void;
   updateActiveDiagram: (payload: { nodes?: Node<NodeData>[], edges?: Edge[] }) => void;
+  
+  // Viewport management
+  onViewportChange: (viewport: Viewport) => void;
+  clearCenteringFlag: (diagramId: string) => void;
   
   // Persistent state actions
   saveDiagramState: (diagramId: string, state: DiagramState) => void;
@@ -315,6 +321,31 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     }
   },
   
+  // Viewport management
+  onViewportChange: (viewport: Viewport) => {
+    const { activeDiagramId, openDiagrams } = get();
+    if (!activeDiagramId) return;
+    
+    set({
+      openDiagrams: openDiagrams.map((diagram) =>
+        diagram.id === activeDiagramId
+          ? { ...diagram, viewport }
+          : diagram
+      ),
+    });
+  },
+  
+  clearCenteringFlag: (diagramId: string) => {
+    const { openDiagrams } = get();
+    set({
+      openDiagrams: openDiagrams.map((diagram) =>
+        diagram.id === diagramId
+          ? { ...diagram, needsCentering: false }
+          : diagram
+      ),
+    });
+  },
+  
   // Persistent state actions
   saveDiagramState: (diagramId, state) => {
     set(currentState => ({
@@ -363,7 +394,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
           nodes: savedData.nodes,
           edges: savedData.edges,
           description: `Internal Block Diagram for ${bddBlockId}`,
-          customId: ibdId
+          customId: ibdId,
+          needsCentering: true // Center IBD diagrams from cache
         });
         console.log('✅ [IBD] Successfully opened IBD from local cache');
       } catch (error) {
@@ -438,7 +470,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
               nodes: layoutedNodes,
               edges: layoutedEdges,
               description: `Internal Block Diagram for ${bddBlockId}`,
-              customId: ibdId
+              customId: ibdId,
+              needsCentering: true // Center IBD diagrams from API
             });
             console.log('✅ [IBD] Successfully opened IBD from API data');
           } catch (tabError) {
@@ -470,7 +503,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         nodes: [],
         edges: [],
         description: `Internal Block Diagram for ${bddBlockId}`,
-        customId: ibdId
+        customId: ibdId,
+        needsCentering: true // Center empty IBD diagrams
       });
       console.log('✅ [IBD] Successfully created new empty IBD');
     } catch (error) {

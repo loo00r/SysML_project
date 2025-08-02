@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.77] - 2025-08-02
+
+### Added
+- Smart conditional centering system for new diagrams vs user-modified viewport states
+- `needsCentering` flag to DiagramInstance interface for distinguishing auto-generated content
+- `clearCenteringFlag` action to reset centering flag after fitView execution
+
+### Fixed
+- New AI-generated diagrams now properly center on canvas while preserving user viewport changes
+- IBD diagrams from API and cache now automatically center when first opened
+- Empty fallback IBD diagrams center correctly for better user experience
+
+### Changed
+- Enhanced diagram creation workflow with conditional fitView logic
+- Added useEffect in DiagramWorkspace to handle smart centering with proper cleanup
+- Updated AI generation and IBD creation to set needsCentering flag
+
+### Improved
+- Perfect balance between automatic centering for new content and viewport persistence for user modifications
+- Better user experience with predictable diagram positioning behavior
+- Clean separation of centering logic from viewport management
+
+## [1.1.76] - 2025-08-02
+
+### Fixed
+- Removed automatic viewport centering when switching between diagram tabs
+- Fixed ReactFlow TypeScript compatibility by reverting to supported API props
+- Eliminated fitView auto-centering that was resetting user's custom zoom/pan positions
+
+### Changed
+- Reverted from `viewport`/`onViewportChange` to `defaultViewport`/`onMove` props for ReactFlow v11 compatibility
+- Removed `fitView` prop to preserve user-defined viewport positions across tab switches
+
+### Improved
+- True viewport persistence - zoom and pan positions remain exactly as set when switching tabs
+- Better user experience with preserved custom viewport states
+- Enhanced diagram navigation workflow without unexpected viewport resets
+
+## [1.1.75] - 2025-08-02
+
+### Fixed
+- Enforced strict viewport isolation with controlled React Flow component state
+- Eliminated remaining viewport sharing between diagram tabs
+- Fixed minimap sync issues with per-diagram viewport states
+
+### Changed
+- Converted React Flow from uncontrolled to controlled component pattern
+- Replaced `defaultViewport` and `onMove` with `viewport` and `onViewportChange` props
+- Enhanced viewport state management for instant and reliable restoration
+
+### Improved
+- Complete viewport isolation between BDD and IBD diagrams
+- More reliable pan and zoom state persistence across tab switches
+- Better React Flow component performance with controlled state pattern
+
+## [1.1.74] - 2025-08-02
+
+### Fixed
+- Decoupled canvas viewport state between BDD and IBD diagrams
+- Each diagram tab now maintains its own unique pan and zoom position
+- Fixed issue where panning/zooming in one diagram affected all other open diagrams
+
+### Changed
+- Added `viewport` property to `DiagramInstance` interface for per-diagram viewport storage
+- Added `onViewportChange` action to Zustand store for viewport state management
+- Updated `DiagramWorkspace` component to use individual viewport states with React Flow key-based remounting
+
+### Improved
+- Better user experience with isolated viewport controls for each diagram
+- Viewport state is now persisted and restored when switching between tabs
+- Enhanced tabbed interface with proper viewport isolation
+
 ## [1.1.73] - 2025-07-30
 
 ### Fixed

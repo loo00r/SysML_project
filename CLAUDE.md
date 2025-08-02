@@ -179,125 +179,76 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Implement Upsert Logic for IBD Storage to Prevent Duplicates
+Task: Enforce Strict Viewport Isolation with Controlled State
 
-Task Type: Backend / Database Logic
+Task Type: Frontend / State Management Bug Fix
 
 Context
-The current system creates a new row in the internal_block_diagrams table for every AI generation, which can lead to a cluttered database with multiple entries for the same block. The desired behavior is to maintain only one IBD record per block within a parent diagram. If a record already exists, it should be updated with the new data; otherwise, a new record should be created.
+Despite implementing per-diagram viewport storage and a key-based re-mount, the React Flow canvas state is still being shared between tabs. This indicates that the defaultViewport prop is not sufficient to force a state reset on tab switch. The more robust solution is to use React Flow's controlled component pattern by managing the viewport and onViewportChange props directly.
 
 Goal
-To refactor the IBD saving mechanism to perform an "upsert" (update or insert) operation, ensuring that the database remains clean and free of duplicate IBD records for the same block.
+To achieve complete viewport isolation by converting the React Flow component to a fully controlled component, ensuring each diagram's pan and zoom state is explicitly loaded and saved.
 
 Acceptance Criteria
-✅ When the AI generates an IBD for a block that does not already have one, a new row is created in the internal_block_diagrams table.
-✅ When the AI generates an IBD for a block that already has an entry in the table, the existing row is updated with the new nodes and edges, and no new row is created.
-✅ The get_ibd_by_block_id function is reverted to its simpler, original form, as duplicates will no longer be possible.
+✅ Panning and zooming in one diagram tab has zero effect on the viewport of any other tab.
+✅ The minimap for each diagram correctly reflects its unique viewport.
+✅ Switching to a tab correctly and instantly restores its last saved pan and zoom position.
 
 Technical Implementation Details
 
-Update the IBD CRUD Module:
+Modify the DiagramWorkspace.tsx Component:
 
-File to modify: backend/app/crud/crud_ibd.py.
+File: frontend/src/components/DiagramWorkspace.tsx.
 
-Action: We need to add functions to check for an existing IBD and to update it. Replace the entire content of the file with the code below, which includes the new logic and reverts the old fix.
-
-Python
-
-# In backend/app/crud/crud_ibd.py
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, desc
-from app.database import models
-from app.database.models import InternalBlockDiagramCreate
-from typing import List, Dict, Any
-
-async def get_ibd_by_parent_and_block(db: AsyncSession, parent_bdd_id: int, block_id: str):
-    """Checks if an IBD exists for a specific block in a specific parent diagram."""
-    stmt = select(models.InternalBlockDiagram).filter_by(
-        parent_bdd_diagram_id=parent_bdd_id,
-        parent_block_id=block_id
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
-
-async def create_ibd(db: AsyncSession, ibd: InternalBlockDiagramCreate) -> models.InternalBlockDiagram:
-    """Creates a new IBD record."""
-    db_ibd = models.InternalBlockDiagram(**ibd.model_dump())
-    db.add(db_ibd)
-    await db.commit()
-    await db.refresh(db_ibd)
-    return db_ibd
-
-async def update_ibd(db: AsyncSession, db_ibd: models.InternalBlockDiagram, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
-    """Updates an existing IBD's nodes and edges."""
-    db_ibd.nodes = nodes
-    db_ibd.edges = edges
-    await db.commit()
-    await db.refresh(db_ibd)
-    return db_ibd
-
-async def get_ibd_by_block_id(db: AsyncSession, block_id: str):
-    """
-    Gets an IBD by its parent block ID. Reverted to simpler logic
-    as duplicates are no longer expected.
-    """
-    # Note: This will fail if multiple diagrams reuse the same block_id.
-    # The long-term fix would be to query by parent_diagram_id AND block_id.
-    stmt = select(models.InternalBlockDiagram).filter_by(parent_block_id=block_id)
-    result = await db.execute(stmt)
-    # Assuming one diagram is worked on at a time, we take the newest if somehow duplicates still occur.
-    return result.scalars().first()
-Implement the Upsert Logic in the API Endpoint:
-
-File to modify: backend/app/database/rag_router.py.
-
-Action: Find the loop where IBDs are saved (for ibd_data in ibd_to_create:). Replace that entire loop with the new logic below, which checks for existence and then decides whether to create or update.
+Action: We will change the props passed to the <ReactFlow /> component. Instead of defaultViewport and onMove, we will use viewport and onViewportChange.
 
 Current Code (to be replaced):
 
-Python
+TypeScript
 
-# for ibd_data in ibd_to_create:
-#     new_ibd = InternalBlockDiagramCreate(
-#         parent_bdd_diagram_id=db_diagram.id,
-#         parent_block_id=ibd_data["parent_block_id"],
-#         nodes=ibd_data["nodes"],
-#         edges=ibd_data["edges"],
-#         source="ai"
-#     )
-#     await crud_ibd.create_ibd(db=db, ibd=new_ibd)
-New Code (to replace the block above):
+// ...
+<ReactFlow
+  // ... other props
+  defaultViewport={activeDiagram?.viewport}
+  onMove={(_, viewport) => onViewportChange(viewport)}
+  key={activeDiagram?.id}
+>
+  {/* ... */}
+</ReactFlow>
+// ...
+New, Corrected Code (to replace the block above):
 
-Python
+TypeScript
 
-# In backend/app/database/rag_router.py
+// In DiagramWorkspace.tsx
 
-# --- New Upsert Logic ---
-for ibd_data in ibd_to_create:
-    existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
-        db=db,
-        parent_bdd_id=db_diagram.id,
-        block_id=ibd_data["parent_block_id"]
-    )
+const DiagramWorkspace = () => {
+  // ... existing hooks and state selections ...
+  const { activeDiagram, onViewportChange } = useDiagramStore(/* ... */);
 
-    if existing_ibd:
-        # IBD already exists -> UPDATE it
-        print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
-        await crud_ibd.update_ibd(
-            db=db,
-            db_ibd=existing_ibd,
-            nodes=ibd_data["nodes"],
-            edges=ibd_data["edges"]
-        )
-    else:
-        # IBD does not exist -> CREATE it
-        print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
-        new_ibd = InternalBlockDiagramCreate(
-            parent_bdd_diagram_id=db_diagram.id,
-            parent_block_id=ibd_data["parent_block_id"],
-            nodes=ibd_data["nodes"],
-            edges=ibd_data["edges"],
-            source="ai"
-        )
-        await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+  // ...
+
+  return (
+    <ReactFlow
+      // ... other props ...
+
+      // --- KEY CHANGES ---
+      // Use the controlled 'viewport' prop
+      viewport={activeDiagram?.viewport} 
+      // Use React Flow's dedicated onViewportChange prop
+      onViewportChange={onViewportChange}
+
+      // The key prop is still good practice
+      key={activeDiagram?.id} 
+    >
+      {/* ... */}
+    </ReactFlow>
+  );
+};
+Note: The onMove prop is more general. onViewportChange is specifically designed for this purpose and is often more reliable for controlled components.
+
+Verify the onViewportChange function in the store:
+
+File: frontend/src/store/diagramStore.ts.
+
+Action: The existing onViewportChange function that your assistant created is already correct for this pattern. No changes are needed there. It correctly finds the active diagram and updates its viewport property.

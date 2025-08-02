@@ -140,6 +140,8 @@ const DiagramWorkspace: React.FC = () => {
     showValidationPanel,
     toggleValidationPanel,
     addNode,
+    onViewportChange,
+    clearCenteringFlag,
   } = useDiagramStore();
 
   // Get ReactFlow instance methods
@@ -147,6 +149,19 @@ const DiagramWorkspace: React.FC = () => {
 
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+  
+  // Handle conditional fitView for new diagrams
+  useEffect(() => {
+    if (activeDiagram?.needsCentering && activeDiagramId) {
+      // Use setTimeout to ensure ReactFlow is fully mounted
+      const timer = setTimeout(() => {
+        fitView();
+        clearCenteringFlag(activeDiagramId);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeDiagram?.needsCentering, activeDiagramId, fitView, clearCenteringFlag]);
   
   // Define edge styles based on diagram type and node count
   const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
@@ -585,7 +600,9 @@ const DiagramWorkspace: React.FC = () => {
           defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          fitView
+          defaultViewport={activeDiagram?.viewport}
+          onMove={(_, viewport) => onViewportChange(viewport)}
+          key={activeDiagram?.id}
           proOptions={{ hideAttribution: true }}
           deleteKeyCode="Delete"
           multiSelectionKeyCode="Control"

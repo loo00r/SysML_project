@@ -153,7 +153,8 @@ export const useAIGeneration = () => {
           type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
           nodes: result.nodes,
           edges: result.edges,
-          description: shortDescription
+          description: shortDescription,
+          needsCentering: true // Center new AI-generated diagrams
         });
       }
     } catch (err) {
