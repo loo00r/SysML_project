@@ -179,36 +179,125 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-New Task
-Task: Isolate RAG Context by Diagram Type to Prevent Unwanted IBD Generation
+Task: Implement Upsert Logic for IBD Storage to Prevent Duplicates
 
-Task Type: Bug Fix / Backend Logic
+Task Type: Backend / Database Logic
 
 Context
-The current RAG implementation for AI diagram generation is retrieving context without filtering by diagram type. When a user requests a Block Definition Diagram (BDD) with a high number of blocks (e.g., 5 or more), the RAG system finds semantically similar complex diagrams in the database. If those examples happen to include linked Internal Block Diagrams (IBDs), the AI model incorrectly assumes this structure is desired and generates unwanted IBDs alongside the requested BDD. This leads to chaotic and unpredictable diagram creation.
+The current system creates a new row in the internal_block_diagrams table for every AI generation, which can lead to a cluttered database with multiple entries for the same block. The desired behavior is to maintain only one IBD record per block within a parent diagram. If a record already exists, it should be updated with the new data; otherwise, a new record should be created.
 
 Goal
-The primary goal is to refine the RAG retrieval logic to be context-aware. The system must ensure that when generating a diagram of a specific type (e.g., BDD), it only retrieves examples of that same type from the database to use as context.
+To refactor the IBD saving mechanism to perform an "upsert" (update or insert) operation, ensuring that the database remains clean and free of duplicate IBD records for the same block.
 
 Acceptance Criteria
-✅ Generating a BDD via the AI assistant, regardless of the number of blocks, must not automatically create any associated IBDs.
-✅ The semantic search functionality of the RAG system must be modified to filter potential examples by their diagram type.
-✅ Manually creating an IBD and linking it to a BDD block should not influence future AI generations that are requested only for BDDs.
-✅ The RAG generation process for other diagram types remains functional.
+✅ When the AI generates an IBD for a block that does not already have one, a new row is created in the internal_block_diagrams table.
+✅ When the AI generates an IBD for a block that already has an entry in the table, the existing row is updated with the new nodes and edges, and no new row is created.
+✅ The get_ibd_by_block_id function is reverted to its simpler, original form, as duplicates will no longer be possible.
 
 Technical Implementation Details
-This is primarily a backend task.
 
-File to Investigate: The logic for RAG-based generation is located in app/database/rag_router.py. The function responsible for querying the vector database needs modification.
+Update the IBD CRUD Module:
 
-Refine the Semantic Search Query:
+File to modify: backend/app/crud/crud_ibd.py.
 
-The database query that performs the similarity search against the diagram_embeddings table must be updated.
+Action: We need to add functions to check for an existing IBD and to update it. Replace the entire content of the file with the code below, which includes the new logic and reverts the old fix.
 
-It should be modified to include a WHERE clause that filters results based on a diagram_type column. For example: WHERE diagram_type = 'BDD'.
+Python
 
-The endpoint POST /api/v1/rag/generate-diagram-with-context/ will need to accept a parameter indicating the type of diagram to be generated so it can pass it to the search query.
+# In backend/app/crud/crud_ibd.py
 
-Verify Database Schema:
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, desc
+from app.database import models
+from app.database.models import InternalBlockDiagramCreate
+from typing import List, Dict, Any
 
-Ensure that the diagram_embeddings table in app/database/models.py has a column to store the diagram type (e.g., diagram_type: Mapped[str]). If not, a database migration will be required to add it. You will need to use poetry run alembic revision --autogenerate -m "Add diagram_type to embeddings" and then poetry run alembic upgrade head to apply the migration.
+async def get_ibd_by_parent_and_block(db: AsyncSession, parent_bdd_id: int, block_id: str):
+    """Checks if an IBD exists for a specific block in a specific parent diagram."""
+    stmt = select(models.InternalBlockDiagram).filter_by(
+        parent_bdd_diagram_id=parent_bdd_id,
+        parent_block_id=block_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+async def create_ibd(db: AsyncSession, ibd: InternalBlockDiagramCreate) -> models.InternalBlockDiagram:
+    """Creates a new IBD record."""
+    db_ibd = models.InternalBlockDiagram(**ibd.model_dump())
+    db.add(db_ibd)
+    await db.commit()
+    await db.refresh(db_ibd)
+    return db_ibd
+
+async def update_ibd(db: AsyncSession, db_ibd: models.InternalBlockDiagram, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
+    """Updates an existing IBD's nodes and edges."""
+    db_ibd.nodes = nodes
+    db_ibd.edges = edges
+    await db.commit()
+    await db.refresh(db_ibd)
+    return db_ibd
+
+async def get_ibd_by_block_id(db: AsyncSession, block_id: str):
+    """
+    Gets an IBD by its parent block ID. Reverted to simpler logic
+    as duplicates are no longer expected.
+    """
+    # Note: This will fail if multiple diagrams reuse the same block_id.
+    # The long-term fix would be to query by parent_diagram_id AND block_id.
+    stmt = select(models.InternalBlockDiagram).filter_by(parent_block_id=block_id)
+    result = await db.execute(stmt)
+    # Assuming one diagram is worked on at a time, we take the newest if somehow duplicates still occur.
+    return result.scalars().first()
+Implement the Upsert Logic in the API Endpoint:
+
+File to modify: backend/app/database/rag_router.py.
+
+Action: Find the loop where IBDs are saved (for ibd_data in ibd_to_create:). Replace that entire loop with the new logic below, which checks for existence and then decides whether to create or update.
+
+Current Code (to be replaced):
+
+Python
+
+# for ibd_data in ibd_to_create:
+#     new_ibd = InternalBlockDiagramCreate(
+#         parent_bdd_diagram_id=db_diagram.id,
+#         parent_block_id=ibd_data["parent_block_id"],
+#         nodes=ibd_data["nodes"],
+#         edges=ibd_data["edges"],
+#         source="ai"
+#     )
+#     await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+New Code (to replace the block above):
+
+Python
+
+# In backend/app/database/rag_router.py
+
+# --- New Upsert Logic ---
+for ibd_data in ibd_to_create:
+    existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
+        db=db,
+        parent_bdd_id=db_diagram.id,
+        block_id=ibd_data["parent_block_id"]
+    )
+
+    if existing_ibd:
+        # IBD already exists -> UPDATE it
+        print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
+        await crud_ibd.update_ibd(
+            db=db,
+            db_ibd=existing_ibd,
+            nodes=ibd_data["nodes"],
+            edges=ibd_data["edges"]
+        )
+    else:
+        # IBD does not exist -> CREATE it
+        print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
+        new_ibd = InternalBlockDiagramCreate(
+            parent_bdd_diagram_id=db_diagram.id,
+            parent_block_id=ibd_data["parent_block_id"],
+            nodes=ibd_data["nodes"],
+            edges=ibd_data["edges"],
+            source="ai"
+        )
+        await crud_ibd.create_ibd(db=db, ibd=new_ibd)

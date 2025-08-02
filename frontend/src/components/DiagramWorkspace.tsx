@@ -17,11 +17,23 @@ import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
-import { bddNodeTypes, ibdNodeTypes } from './nodes';
+import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode } from './nodes';
 import useDiagramStore from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
+
+// Unified node types object - includes all node components to prevent rendering issues
+const unifiedNodeTypes = {
+  block: BlockNode,
+  sensor: SensorNode,
+  processor: ProcessorNode,
+  port: PortNode,
+  connection: ConnectionNode,
+  ibd: IBDNode,
+  ibd_block: IBDNode, // Map backend 'ibd_block' type to IBDNode component
+  defaultNode: BlockNode
+};
 
 // Styled components
 const WorkspaceContainer = styled(Box)({
@@ -136,17 +148,15 @@ const DiagramWorkspace: React.FC = () => {
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
   
-  // Get the appropriate node types based on diagram type
-  const nodeTypes = activeDiagram?.type === 'ibd' ? ibdNodeTypes : bddNodeTypes;
-  
-  // Define edge styles based on diagram type
+  // Define edge styles based on diagram type and node count
   const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
     style: { 
       stroke: '#555', 
       strokeWidth: 2,
       strokeDasharray: '8 4', // Dashed line pattern
     },
-    type: 'straight' as const, // Use straight for IBD to avoid curve
+    // Use straight lines for 2 nodes, smoothstep (angled) for 3+ nodes
+    type: nodes.length <= 2 ? 'straight' : 'smoothstep',
     animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
     className: 'ibd-animated-edge',
   } : {
@@ -571,7 +581,7 @@ const DiagramWorkspace: React.FC = () => {
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
-          nodeTypes={nodeTypes}
+          nodeTypes={unifiedNodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}

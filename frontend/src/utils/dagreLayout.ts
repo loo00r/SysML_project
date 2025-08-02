@@ -1,71 +1,75 @@
-import { Node, Edge } from 'reactflow';
-import { NodeData } from '../store/diagramStore';
+import { Edge, Node, Position } from 'reactflow';
 import dagre from 'dagre';
+import { NodeData } from '../store/diagramStore';
 
-// Цей інтерфейс більше не потрібен, оскільки ми використовуємо реальну бібліотеку Dagre
-
-// Функція для автоматичного позиціонування елементів діаграми
-export const getLayoutedElements = (
+// This is the core layout function
+const getLayoutedElements = (
   nodes: Node<NodeData>[],
   edges: Edge[],
   direction: 'TB' | 'LR' = 'TB',
   nodeWidth = 180,
-  nodeHeight = 100
+  nodeHeight = 100,
+  nodeSep = 50, // Default spacing
+  rankSep = 50  // Default spacing
 ) => {
-  // Створюємо копії вузлів та ребер, щоб не змінювати оригінальні дані
-  const layoutedNodes = nodes.map((node) => ({ ...node }));
-  const layoutedEdges = edges.map((edge) => ({ ...edge }));
-
-  // Створюємо новий граф Dagre
   const g = new dagre.graphlib.Graph();
 
-  // Встановлюємо напрямок графа (TB = зверху вниз, LR = зліва направо)
-  g.setGraph({ rankdir: direction });
-  
-  // Встановлюємо стандартну мітку для ребер
-  g.setDefaultEdgeLabel(() => ({}));
-
-  // Додаємо вузли до графа
-  layoutedNodes.forEach((node) => {
-    g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  // Set graph properties
+  g.setGraph({ 
+    rankdir: direction,
+    nodesep: nodeSep,
+    ranksep: rankSep,
   });
 
-  // Додаємо ребра до графа
-  layoutedEdges.forEach((edge) => {
+  g.setDefaultEdgeLabel(() => ({}));
+
+  // Add nodes and edges to the graph
+  nodes.forEach((node) => {
+    g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+  edges.forEach((edge) => {
     g.setEdge(edge.source, edge.target);
   });
 
-  // Виконуємо розрахунок позицій
+  // Calculate the layout
   dagre.layout(g);
 
-  // Оновлюємо позиції вузлів з результатів Dagre
-  layoutedNodes.forEach((node) => {
-    // Отримуємо позицію вузла з графа Dagre
+  // Apply the new positions to the nodes
+  const layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = g.node(node.id);
-    
-    // Встановлюємо позицію вузла
-    // Віднімаємо половину ширини/висоти, щоб центрувати вузол
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
+    return {
+      ...node,
+      targetPosition: direction === 'LR' ? Position.Left : Position.Top,
+      sourcePosition: direction === 'LR' ? Position.Right : Position.Bottom,
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
     };
   });
 
-  return { nodes: layoutedNodes, edges: layoutedEdges };
+  return { nodes: layoutedNodes, edges };
 };
 
-/**
- * Функція для застосування автоматичного позиціонування до діаграми
- * 
- * @param nodes - Вузли діаграми
- * @param edges - Ребра діаграми
- * @param direction - Напрямок графа (TB = зверху вниз, LR = зліва направо)
- * @returns Об'єкт з позиціонованими вузлами та ребрами
- */
+// This is the helper function called from the store
 export const applyDagreLayout = (
   nodes: Node<NodeData>[],
   edges: Edge[],
-  direction: 'TB' | 'LR' = 'TB'
+  direction: 'TB' | 'LR' = 'TB',
+  options?: {
+    nodeWidth?: number;
+    nodeHeight?: number;
+    nodeSep?: number;
+    rankSep?: number;
+  }
 ) => {
-  return getLayoutedElements(nodes, edges, direction);
+  return getLayoutedElements(
+    nodes,
+    edges,
+    direction,
+    options?.nodeWidth,
+    options?.nodeHeight,
+    options?.nodeSep,
+    options?.rankSep
+  );
 };

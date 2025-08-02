@@ -81,3 +81,41 @@ class SimilarDiagramRequest(BaseModel):
     query_text: str
     limit: int = 5
     diagram_type: Optional[str] = None
+
+class InternalBlockDiagram(Base):
+    __tablename__ = "internal_block_diagrams"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Foreign key to the parent BDD diagram in the diagram_embeddings table
+    parent_bdd_diagram_id = Column(Integer, ForeignKey("diagram_embeddings.id"), nullable=False)
+    
+    # ID of the block within the parent BDD (e.g., "block-1", "processor-a")
+    parent_block_id = Column(String, nullable=False, index=True)
+    
+    # The actual IBD data
+    nodes = Column(JSON, nullable=False)
+    edges = Column(JSON, nullable=False)
+    
+    # To track if it was created by AI or manually (e.g., 'ai' or 'manual')
+    source = Column(String, default='ai', nullable=False)
+
+class InternalBlockDiagramCreate(BaseModel):
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    source: str = 'ai'
+
+class InternalBlockDiagramResponse(BaseModel):
+    id: int
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    source: str
+    created_at: datetime
+    
+    class Config:
+        orm_mode = True

@@ -491,28 +491,23 @@ body {
   filter: drop-shadow(0 0 3px rgba(85, 85, 85, 0.3));
 }
 
-/* IBD edge label positioning */
-.react-flow__edge.ibd-animated-edge .react-flow__edge-text {
-  transform: translateY(-15px); /* Position above the line */
+
+/* --- Final IBD Edge Label Styling --- */
+
+/* Styles the background of IBD edge labels to be solid and opaque */
+.react-flow__edge.ibd-edge .react-flow__edge-textbg {
+  fill: #fafafa;      /* Canvas background color */
+  stroke: #fafafa;    /* Stroke of the same color creates a padding effect */
+  stroke-width: 4px;
+  opacity: 1;         /* Ensures the background is fully opaque */
+  /* Also apply the same vertical transform as the text to move them together */
+  transform: translateY(-15px);
+}
+
+/* Positions IBD edge labels above the connection line */
+.react-flow__edge.ibd-edge .react-flow__edge-text {
   font-size: 12px;
-  fill: #555;
-  text-anchor: end; /* Align the end of text to the center point */
-  dominant-baseline: middle;
-}
-
-/* Remove background from IBD edge label */
-.react-flow__edge.ibd-animated-edge .react-flow__edge-text-bg,
-.react-flow__edge.ibd-animated-edge .react-flow__edge-textbg {
-  display: none !important; /* Hide the white background rectangle */
-}
-
-/* Also hide any potential background elements */
-.react-flow__edge.ibd-animated-edge rect {
-  fill: transparent !important; /* Make background transparent */
-  stroke: none !important; /* Remove any stroke */
-}
-
-/* Alternative approach - hide all background elements */
-.react-flow__edge.ibd-animated-edge > g > rect {
-  display: none !important;
+  fill: #333;
+  /* Moves the label up by 15px from the center of the line */
+  transform: translateY(-15px);
 }

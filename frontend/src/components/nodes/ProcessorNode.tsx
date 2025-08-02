@@ -113,7 +113,12 @@ const StyledNodeContainer = styled(NodeContainer)({
 
 // Define the ProcessorNode component
 const ProcessorNode = ({ data, selected, id }: NodeProps) => {
-  const { label, description, properties = {} } = data;
+  // Safe destructuring with fallbacks
+  const { 
+    label = 'Unnamed Processor', 
+    description = '', 
+    properties = {} 
+  } = data || {};
   const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
   
   // Check if this node has any incoming connections
@@ -122,16 +127,19 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
   
   // Check if there's already an IBD diagram for this processor in the current diagram context
   const ibdId = activeDiagramId ? `ibd-for-${activeDiagramId}-${id}` : null;
-  const ibdExists = ibdId && (
+  const ibdExistsManually = ibdId && (
     openDiagrams.some(diagram => 
       diagram.type === 'ibd' && 
       diagram.id === ibdId
     ) || !!diagramsData[ibdId]
   );
   
-  const handleOpenIBD = (e: React.MouseEvent) => {
+  // The key change: check for the new flag from the node's data prop
+  const hasIbd = ibdExistsManually || data.has_ibd;
+  
+  const handleOpenIBD = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    openIbdForBlock(id);
+    await openIbdForBlock(id);
   };
   
   return (
@@ -199,7 +207,7 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
       </NodeWrapper>
       
       {/* Smart IBD Indicator Icon - Now positioned as sibling to NodeWrapper */}
-      {ibdExists ? (
+      {hasIbd ? (
         // State 1: IBD EXISTS. Icon is always visible.
         <IBDIndicatorIcon 
           className="view-ibd" 

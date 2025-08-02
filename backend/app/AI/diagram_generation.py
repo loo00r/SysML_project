@@ -226,8 +226,126 @@ Examples may be provided in the conversation before the actual request.  Use the
 to guide your structure, then return only a single JSON object in your final reply.
 """
 
+BDD_ENHANCED_PROMPT_TEMPLATE = """
+You are an expert SysML architect. Your task is to generate a comprehensive system diagram
+in JSON format based on a user's description. The output must be a Block Definition
+Diagram (BDD) that may contain nested Internal Block Diagrams (IBDs) for specific blocks.
+
+Required output format:
+{
+  "diagram_type": "bdd",
+  "elements": [
+    {
+      "id": "block-1", "type": "block", "name": "Flight Controller",
+      "internal_diagram": {
+        "nodes": [
+          {"id": "ibd-cpu", "type": "ibd_block", "name": "Central Processing Unit"},
+          {"id": "ibd-memory", "type": "ibd_block", "name": "Memory Module"},
+          {"id": "ibd-io", "type": "ibd_block", "name": "I/O Controller"}
+        ],
+        "edges": [
+          {"id": "cpu-memory", "source": "ibd-cpu", "target": "ibd-memory", "label": "Data Bus"},
+          {"id": "cpu-io", "source": "ibd-cpu", "target": "ibd-io", "label": "Control Signals"},
+          {"id": "memory-io", "source": "ibd-memory", "target": "ibd-io", "label": "Memory Access"}
+        ]
+      }
+    },
+    {"id": "sensor-1", "type": "sensor", "name": "GPS"}
+  ],
+  "relationships": [
+    {"source_id": "sensor-1", "target_id": "block-1", "name": "Provides data"}
+  ]
+}
+
+Rules:
+1.  The main structure must be a BDD with "elements" and "relationships".
+2.  For elements of type "block" or "processor" that have a complex internal structure,
+    add an "internal_diagram" key.
+3.  The "internal_diagram" object must contain its own "nodes" and "edges".
+4.  "internal_diagram" should ONLY be added if the description implies internal complexity.
+5.  All top-level element types must be "block", "sensor", or "processor".
+6.  Use unique IDs for all elements across the entire JSON.
+7.  Do NOT include position data. Positioning will be handled separately.
+8.  **MANDATORY IBD POPULATION: When you create "internal_diagram", you MUST include AT LEAST 2-3 interconnected components mentioned in the user description. For example, if user mentions "CPU and memory module", create separate nodes for each component with connections between them.**
+9.  **IBD CONNECTIONS REQUIRED: Internal components must be connected with edges to show data/signal flow. Never create isolated internal components. Each "internal_diagram" must have AT LEAST 2 edges connecting its nodes. For 3 components, create connections like: CPU→Memory, CPU→I/O Controller.**
+10. **COMPONENT BREAKDOWN: When user mentions complex components (like "flight controller containing CPU and memory"), break them down into separate internal nodes. Each mentioned sub-component becomes its own ibd_block node.**
+11. **MEANINGFUL CONNECTIONS: IBD edges must have descriptive labels showing the type of connection (e.g., "Data Bus", "Control Signals", "Power Supply", "Communication Link").**
+12. **MANDATORY EDGES EXAMPLE: For 3 internal components, you must include at least 2-3 edges like: {"id": "cpu-memory", "source": "ibd-cpu", "target": "ibd-memory", "label": "Data Bus"}**
+"""
+
+def generate_sysml_diagram(
+    prompt: str,
+    diagram_type: str,
+    one_shot_examples: List[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Generate a SysML diagram based on the provided prompt and type using OpenAI's API.
+
+    Args:
+        prompt: The text description of the system to model.
+        diagram_type: The type of diagram to generate ('bdd' or 'bdd_enhanced').
+        one_shot_examples: Optional list of RAG examples.
+
+    Returns:
+        Dictionary containing the raw diagram and metadata.
+    """
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    # Select the appropriate prompt based on the requested diagram type
+    if diagram_type == "bdd_enhanced":
+        system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
+        print("\n==== Using BDD_ENHANCED prompt template ====")
+    else:  # Default to standard BDD
+        system_prompt = SYSML_PROMPT_TEMPLATE
+        print("\n==== Using standard BDD prompt template ====")
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if one_shot_examples and len(one_shot_examples) > 0:
+        print(f"\n==== Using {len(one_shot_examples)} RAG examples ====")
+        for example in one_shot_examples:
+            example_input = f"System description:\n\n{example['input']}"
+            messages.append({"role": "user", "content": example_input})
+            example_output = json.dumps(example['output'], indent=2)
+            messages.append({"role": "assistant", "content": example_output})
+
+    user_prompt = f"Generate a diagram for the following system description:\n\n{prompt}"
+    messages.append({"role": "user", "content": user_prompt})
+
+    print(f"\n==== Sending prompt to model ({settings.OPENAI_GENERATIVE_MODEL}) ====")
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_GENERATIVE_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1
+        )
+
+        response_text = response.choices[0].message.content
+        raw_diagram_data = json.loads(response_text)
+
+        # Note: We are no longer validating or positioning here.
+        # This will be handled in the API layer after parsing the nested data.
+
+        result = {
+            "diagram_raw": raw_diagram_data,  # Return raw data for parsing
+            "raw_text": prompt,
+            "model_used": settings.OPENAI_GENERATIVE_MODEL,
+            "rag_used": bool(one_shot_examples),
+            "examples_count": len(one_shot_examples) if one_shot_examples else 0
+        }
+
+        print("\n==== Raw Generation Successful ====")
+        return result
+
+    except Exception as e:
+        print(f"\n==== ERROR in generate_sysml_diagram: {str(e)} ====")
+        return {"error": str(e), "diagram_raw": {}}
+
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
     """
+    Legacy function for backward compatibility.
     Generate a diagram based on the provided prompt using OpenAI's API.
     
     Args:
@@ -238,60 +356,12 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
     Returns:
         Dictionary containing the diagram elements and metadata
     """
-    # Initialize the OpenAI client with the API key
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    # Use the new function with standard BDD type
+    result = generate_sysml_diagram(prompt, "bdd", one_shot_examples)
     
-    # Start building the messages list with our detailed system prompt template
-    messages = [
-        {"role": "system", "content": SYSML_PROMPT_TEMPLATE}
-    ]
-    
-    # Log RAG usage
-    if one_shot_examples and len(one_shot_examples) > 0:
-        print(f"\n==== Using {len(one_shot_examples)} RAG examples ====")
-        
-        # Add one-shot examples if provided with clear structure
-        for i, example in enumerate(one_shot_examples):
-            # Add the example input as a user message with clear formatting
-            example_input = f"System description:\n\n{example['input']}"
-            messages.append({"role": "user", "content": example_input})
-            
-            # Add the example output as an assistant message - formatted JSON
-            example_output = json.dumps(example['output'], indent=2)
-            messages.append({"role": "assistant", "content": example_output})
-            
-            print(f"Added example with {len(example['input'])} chars input and {len(example_output)} chars output")
-    else:
-        print("\n==== No RAG examples available ====")
-    
-    # Add the actual user query with clear formatting
-    user_prompt = f"Generate a block diagram for the following system description:\n\n{prompt}"
-    messages.append({"role": "user", "content": user_prompt})
-    
-    # Log what we're sending to the model
-    print(f"\n==== Sending prompt to model ({len(user_prompt)} chars) ====")
-    print(f"Prompt: {user_prompt[:200]}...")
-    
-    # Log the full conversation for debugging
-    print("\n==== FULL CONVERSATION SENT TO MODEL ====")
-    for i, msg in enumerate(messages):
-        role = msg["role"].upper()
-        content = msg["content"]
-        print(f"\n[{i+1}] {role}: {content[:500]}" + ("..." if len(content) > 500 else ""))
-    print("\n==== END OF CONVERSATION ====")
-    
-    try:
-        # Call OpenAI API with the structured prompt and examples
-        response = client.chat.completions.create(
-            model=settings.OPENAI_GENERATIVE_MODEL,
-            messages=messages,
-            response_format={"type": "json_object"},
-            temperature=0.1
-        )
-        
-        # Extract and parse the JSON response
-        response_text = response.choices[0].message.content
-        diagram_data = json.loads(response_text)
+    # If we got raw data, we need to process it for backward compatibility
+    if "diagram_raw" in result and not result.get("error"):
+        raw_diagram_data = result["diagram_raw"]
         
         # Validate and correct element types to ensure they are only 'block', 'sensor', or 'processor'
         def validate_element_types(diagram):
@@ -307,37 +377,28 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
             return diagram
         
         # Apply validation to ensure only allowed types are used
-        validated_diagram = validate_element_types(diagram_data)
+        validated_diagram = validate_element_types(raw_diagram_data)
         
         # Apply automatic positioning to the diagram elements
         positioned_diagram = DiagramPositioning.apply_positioning(validated_diagram)
         
-        # Add metadata about the generation
-        result = {
-            "diagram": positioned_diagram,
-            "raw_text": prompt,
-            "model_used": settings.OPENAI_GENERATIVE_MODEL,
-            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0,
-            "examples_count": len(one_shot_examples) if one_shot_examples else 0
-        }
-        
-        print("\n==== Generation Successful ====")
-        print(f"Generated diagram with {len(positioned_diagram.get('elements', []))} elements and {len(positioned_diagram.get('relationships', []))} relationships")
-        
-        return result
-    
-    except Exception as e:
-        error_msg = f"Error generating diagram: {str(e)}"
-        print(f"\n==== ERROR ====")
-        print(error_msg)
-        # Return a basic error structure
+        # Return in legacy format
         return {
-            "error": str(e),
+            "diagram": positioned_diagram,
+            "raw_text": result["raw_text"],
+            "model_used": result["model_used"],
+            "rag_used": result["rag_used"],
+            "examples_count": result["examples_count"]
+        }
+    else:
+        # Handle error case
+        return {
+            "error": result.get("error", "Unknown error"),
             "diagram": {
                 "diagram_type": "block",
                 "elements": [],
                 "relationships": []
             },
-            "rag_used": one_shot_examples is not None and len(one_shot_examples) > 0,
-            "examples_count": len(one_shot_examples) if one_shot_examples else 0
+            "rag_used": result.get("rag_used", False),
+            "examples_count": result.get("examples_count", 0)
         }

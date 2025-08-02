@@ -47,7 +47,12 @@ const ConnectionType = styled(Typography)(({ theme }) => ({
 
 // Define the ConnectionNode component
 const ConnectionNode = ({ data, selected, id }: NodeProps) => {
-  const { label, type = 'connection', description } = data;
+  // Safe destructuring with fallbacks
+  const { 
+    label = 'Unnamed Connection', 
+    type = 'connection', 
+    description = '' 
+  } = data || {};
   
   return (
     <ConnectionPaper

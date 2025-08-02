@@ -7,6 +7,543 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.73] - 2025-07-30
+
+### Fixed
+- Implemented upsert logic for IBD storage to prevent duplicate database entries
+- IBD generation now updates existing records instead of creating duplicates for the same block
+- Eliminated database clutter from repeated AI generation on the same blocks
+
+### Changed
+- Added `get_ibd_by_parent_and_block` function to check for existing IBD records
+- Added `update_ibd` function to update existing IBD nodes and edges
+- Replaced IBD creation loops with upsert logic in both RAG and create-diagram endpoints
+- Simplified `get_ibd_by_block_id` function to basic query without duplicate handling
+
+### Improved
+- Cleaner database with one IBD record per block within each parent diagram
+- Better database performance by eliminating unnecessary duplicate rows
+- More efficient IBD retrieval without complex duplicate resolution logic
+- Enhanced debugging with print statements for IBD creation/update operations
+
+## [1.1.72] - 2025-07-28
+
+### Changed
+- Implemented hybrid IBD edge label styling combining above-line positioning with opaque background
+- IBD edge labels now positioned 15px above connection lines using translateY(-15px) transform
+- Both label text and background moved together synchronously for perfect visual alignment
+- Enhanced readability through combination of vertical offset and solid background
+
+### Improved
+- Optimal IBD label positioning that avoids interference with visual flow while maintaining perfect readability
+- Synchronized movement of text and background elements preventing misalignment issues
+- Clean appearance with labels floating above connection lines with solid opaque backgrounds
+- Maximum clarity against any underlying grid or edge lines through hybrid approach
+
+### Fixed
+- Label positioning that combines the best aspects of above-line placement and opaque background coverage
+- Consistent visual separation between labels and connection paths in all IBD diagrams
+- Maintained stroke-width: 4px padding effect while adding vertical positioning transform
+
+## [1.1.71] - 2025-07-28
+
+### Changed
+- Finalized IBD edge label styling with centered positioning and fully opaque background
+- IBD edge labels now use ReactFlow's default centering for consistent placement on all connection orientations
+- Enhanced background opacity with stroke-width: 4px for improved padding effect around label text
+- Implemented clean "cutout" effect that completely obscures connection lines and background grid
+
+### Fixed
+- Consistent IBD label positioning that works for both horizontal and vertical connection lines
+- Robust visual clarity through fully opaque background matching canvas color (#fafafa)
+- Professional appearance with definitive styling that replaces all previous experimental approaches
+
+### Improved
+- Final, production-ready IBD edge label implementation with optimal readability
+- Enhanced visual separation between label text and underlying diagram elements
+- Maintained BDD label styling unchanged while perfecting IBD-specific appearance
+
+## [1.1.70] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels to start near source nodes instead of above connection lines
+- IBD edge labels now use text-anchor: start alignment for better readability in complex diagrams
+- Updated label positioning with translate(15px, -15px) to position near connection handle without overlapping nodes
+- Enhanced label-to-source relationship for clearer visual association with originating components
+
+### Improved
+- Better readability for IBD diagrams with multiple outgoing edges from single nodes
+- Reduced visual clutter by anchoring labels to their source nodes
+- Professional appearance with clear source-to-target relationship indication
+- Eliminated label overlap issues in complex multi-connection IBD layouts
+
+## [1.1.69] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels above connection lines instead of centered within them
+- Removed opaque background from IBD edge labels for cleaner visual appearance
+- IBD edge labels now display 15px above connection paths using CSS transform
+- Enhanced label positioning with transparent background eliminating "cutout" effect
+
+### Improved
+- Cleaner aesthetic for IBD diagrams with labels positioned cleanly above connection lines
+- Better visual separation between text labels and connection paths
+- Maintained BDD label styling unchanged while updating only IBD edge labels
+- Enhanced readability through improved label-to-line relationship
+
+## [1.1.68] - 2025-07-27
+
+### Fixed
+- Made IBD edge label backgrounds fully opaque to eliminate faint visibility of connection lines and grid through background
+- Added opacity: 1 to IBD edge label background CSS ensuring complete visual cutout effect
+
+### Improved
+- Clean and distinct "cutout" effect for IBD edge labels with no background bleeding
+- Enhanced visual clarity by completely obscuring connection lines behind label backgrounds
+- Professional appearance with solid white backgrounds that properly interrupt edge paths
+- Maintained selective application only to IBD labels while preserving BDD label styling
+
+## [1.1.67] - 2025-07-27
+
+### Fixed
+- Resolved IBD edge label text misalignment with its opaque background
+- Removed overly specific CSS positioning rules that conflicted with ReactFlow's internal SVG text positioning
+- IBD edge label text now perfectly centers within its background using ReactFlow's default mechanism
+
+### Changed
+- Simplified IBD edge label CSS by removing !important flags and explicit positioning attributes
+- Removed transform: none, text-anchor: middle, and dominant-baseline: middle from IBD text styling
+- Enhanced background styling with stroke-width: 2px for improved "padding" effect around text
+
+### Improved
+- Perfect horizontal and vertical centering of IBD edge label text within opaque backgrounds
+- Clean "cutout" effect with text and background properly interrupting edge lines
+- Better compatibility with ReactFlow's SVG text rendering system
+- Eliminated text offset issues that made labels appear broken
+
+## [1.1.66] - 2025-07-27
+
+### Fixed
+- Resolved CSS specificity conflict preventing IBD edge labels from centering on connection lines
+- Removed conflicting CSS rules that positioned IBD labels above lines instead of in center
+- IBD edge labels now properly render in the center of connection paths with opaque backgrounds
+
+### Changed  
+- Updated IBD edge label CSS selectors to use higher specificity (.react-flow__edge.ibd-edge)
+- Added !important flags to ensure IBD label positioning rules take precedence
+- Enhanced IBD label positioning with transform: none, text-anchor: middle, and dominant-baseline: middle
+
+### Removed
+- Conflicting CSS rules (.react-flow__edge.ibd-animated-edge .react-flow__edge-text) with translateY(-15px)
+- Old background hiding rules that interfered with new opaque background implementation
+
+### Improved
+- IBD edge labels now correctly display in center of connection lines with cutout effect
+- Better visual integration of labels with connection paths
+- Eliminated positioning conflicts between old and new CSS rules
+
+## [1.1.65] - 2025-07-27
+
+### Changed
+- Centered IBD edge labels for improved readability and professional appearance
+- IBD edge labels now render in the center of connection paths instead of offset positioning
+- Added opaque background (#fafafa) to IBD edge labels creating "cutout" effect on connection lines
+
+### Removed
+- Previous CSS transform rules that positioned IBD edge labels above connection lines
+- text-anchor: start and transform: translate(15px, -15px) positioning for IBD edge labels
+
+### Improved
+- Enhanced visual integration of IBD edge labels with diagram flow
+- Better text legibility through opaque backgrounds matching canvas color
+- Cleaner, more professional appearance of IBD connection labels
+- Connection lines now appear visually "interrupted" by label backgrounds for clear text readability
+
+## [1.1.64] - 2025-07-27
+
+### Fixed
+- Removed dynamic edge routing logic from IBD diagrams that caused inconsistent connection styles
+- All IBD connections now use consistent orthogonal (smoothstep) lines regardless of node count
+- Eliminated conditional edge type selection that switched between straight and angled lines based on node count
+
+### Changed
+- Unified IBD edge styling to always use smoothstep type for consistent visual appearance
+- Updated both manual connection creation (onConnect) and API-driven IBD generation to use consistent edge types
+- Simplified edge type logic by removing node count-based conditional styling
+
+### Improved
+- Better visual consistency across all IBD diagrams with uniform connection styles
+- Eliminated potential layout issues caused by mixed edge types in same diagram
+- More predictable IBD connection behavior for users regardless of diagram complexity
+
+## [1.1.63] - 2025-07-26
+
+### Changed
+- Radically increased horizontal spacing (rankSep: 350) for IBD diagrams to prevent node overlap
+- Repositioned IBD edge labels to the start of connection lines instead of center position
+- Enhanced edge label positioning with CSS transform for cleaner visual presentation
+
+### Fixed
+- Eliminated edge label overlap with nodes in IBD diagrams through aggressive horizontal spacing
+- Improved label readability by moving labels away from the center of connection lines
+- Better visual separation in complex IBD layouts with multiple interconnected components
+
+## [1.1.62] - 2025-07-26
+
+### Added
+- Configurable spacing options for Dagre layout engine through applyDagreLayout function
+- Enhanced spacing control with nodeSep and rankSep parameters for better IBD readability
+
+### Changed  
+- IBD diagrams now use increased spacing (nodeSep: 150, rankSep: 250) for better visual separation
+- Updated dagreLayout.ts to accept spacing configuration options for flexible layout customization
+- Enhanced IBD edge labels with solid background for improved readability and contrast
+
+### Fixed
+- IBD edge label overlap issues by adding solid background matching canvas color
+- Text visibility improvements for IBD connection labels with enhanced contrast
+- Better visual separation between IBD nodes preventing cluttered appearance
+
+## [1.1.61] - 2025-07-24
+
+### Changed
+- Updated IBD diagrams to use horizontal Left-to-Right (LR) Dagre layout instead of vertical Top-to-Bottom (TB)
+- IBD blocks now arrange horizontally to align with their left-to-right connection handles
+- Enhanced layout logic to automatically select LR direction for IBD diagrams and TB direction for BDD diagrams
+- Improved visual consistency between IBD block connections and their horizontal positioning
+
+### Fixed
+- IBD diagrams now properly utilize horizontal space with left-to-right component arrangement
+- Better alignment between IBD block connection handles (left/right sides) and automatic positioning
+
+## [1.1.60] - 2025-07-24
+
+### Fixed
+- Restored original simple Dagre positioning approach for AI-generated diagrams
+- Eliminated chaotic positioning by reverting to proven Dagre TB (Top-Bottom) layout algorithm
+- Applied consistent Dagre layout to both AI-generated and API-retrieved IBD diagrams
+- Enhanced IBD edge label positioning to display near source blocks instead of center
+
+### Changed
+- Updated diagramStore.ts openIbdForBlock function to apply Dagre layout to API-retrieved IBDs
+- Simplified positioning logic by removing complex semicircle algorithms in favor of clean vertical layouts
+- Enhanced IBD edge labels with translateX(-30px) translateY(-15px) positioning and text-anchor: start
+
+### Improved
+- Clean vertical hierarchical layouts in all AI-generated diagrams
+- Better visual organization with proper top-to-bottom element arrangement
+- Consistent positioning approach across all diagram generation methods
+
+## [1.1.59] - 2025-07-24
+
+### Fixed
+- Fixed AI-generated IBD edges that were hardcoded to use straight lines regardless of node count
+- AI-generated IBD diagrams now properly use dynamic edge routing (straight for ≤2 nodes, angled for 3+ nodes)
+- IBD edge type logic now works consistently for both manual connections and AI-generated diagrams
+
+### Changed
+- Updated AI edge transformation logic in diagramStore.ts to use dynamic type selection
+- Enhanced consistency between manual and AI-generated IBD connection styles
+
+## [1.1.58] - 2025-07-24
+
+### Changed
+- Implemented dynamic edge routing for IBD diagrams based on node count
+- IBD connections now use straight lines when there are 2 nodes or fewer
+- IBD connections automatically switch to angled lines (smoothstep) when there are 3 or more nodes
+- Enhanced visual layout management for complex IBD diagrams with multiple components
+
+### Improved
+- Better connection routing that adapts to diagram complexity
+- Cleaner visual appearance for simple 2-node IBD connections
+- More organized layout for complex multi-node IBD diagrams
+
+## [1.1.57] - 2025-07-24
+
+### Fixed
+- Fixed IBD rendering crash caused by conditional nodeTypes registration
+- IBD nodes now always render with proper green styling instead of default white rectangles
+- Eliminated application crashes when interacting with AI-generated IBD nodes
+- ReactFlow now receives unified nodeTypes object with all components registered at all times
+
+### Changed
+- Unified nodeTypes object now statically includes BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, and IBDNode
+- Removed conditional nodeTypes logic that caused race conditions between diagram types
+- Enhanced IBD node type mapping with both 'ibd' and 'ibd_block' keys pointing to IBDNode component
+
+## [1.1.56] - 2025-07-22
+
+### Fixed
+- Critical IBD edges not displaying in UI due to API response formatting bug
+- IBD router incorrectly processing edges as relationships instead of preserving edges data
+- Missing animated connections between IBD components despite correct AI generation and database storage
+- DiagramPositioning incorrectly handling IBD edges through relationships field
+
+### Changed
+- IBD API endpoint now returns edges directly from database without transformation
+- Removed incorrect edges-to-relationships mapping in IBD positioning logic
+- Enhanced AI prompt with mandatory IBD connection rules and detailed examples
+- Added bootstrap RAG examples with properly connected IBD components
+
+### Added
+- Comprehensive AI prompt rules for generating connected IBD components (Rules 8-12)
+- Bootstrap seeding examples with 3-component IBD structures and multiple edge connections
+- Debug logging for AI generation to track edges through the entire pipeline
+- Enhanced one-shot examples demonstrating proper IBD edge structure
+
+### Improved
+- IBD diagrams now display animated dashed lines connecting internal components
+- AI consistently generates 2-3 interconnected IBD components with meaningful connections
+- Enhanced AI understanding of internal component relationships and data flow
+- Better semantic accuracy in connection labels (Data Bus, Control Signals, Memory Access)
+
+## [1.1.55] - 2025-07-21
+
+### Fixed
+- Critical data structure mismatch between API and ReactFlow causing "Cannot destructure property 'label'" error
+- IBD nodes crashing application due to undefined data properties in React components
+- API response format incompatibility where backend returned `name` field but frontend expected `data.label`
+- Unsafe destructuring in all node components causing crashes when data was undefined
+
+### Changed
+- Added data transformation layer in openIbdForBlock to convert API format to ReactFlow format
+- Enhanced all node components with safe destructuring and fallback values
+- API nodes with `name` field now properly mapped to ReactFlow `data.label` structure
+- Improved error handling with detailed logging for IBD opening process
+
+### Added
+- Comprehensive data transformation for IBD nodes from backend API format to ReactFlow format
+- Safe destructuring patterns with fallback values in all node components (Block, Sensor, Processor, Port, Connection, IBD)
+- Detailed logging of API data structure and transformation process for debugging
+- Proper IBD edge formatting with animated dashed lines and IBD-specific styling
+
+### Improved
+- IBD diagrams now open successfully without "Something went wrong" errors
+- All node types now handle undefined or malformed data gracefully
+- Better user experience with meaningful fallback labels when data is missing
+- Enhanced robustness of ReactFlow integration with backend-generated diagram data
+
+## [1.1.54] - 2025-07-21
+
+### Fixed
+- Critical frontend nodeTypes registration bug causing IBD nodes to render as white blocks
+- Race condition in conditional nodeTypes logic that crashed application when interacting with IBD nodes  
+- Type mapping mismatch where backend generated `ibd_block` type nodes but frontend only registered `ibd` key
+- ReactFlow rendering failures for IBD diagrams due to missing node component mappings
+
+### Changed
+- Unified nodeTypes object now includes all node components (Block, Sensor, Processor, Port, Connection, IBD)
+- Removed conditional nodeTypes switching logic that caused race conditions between diagram types
+- Added proper mapping of both `ibd` and `ibd_block` types to IBDNode component for backend compatibility
+- Enhanced nodeTypes registration to prevent white block rendering issues
+
+### Improved
+- IBD nodes now render consistently with proper green styling and interactive functionality
+- Eliminated application crashes when clicking or interacting with IBD nodes
+- Better ReactFlow stability with unified component registration approach
+- Enhanced compatibility between frontend node rendering and backend IBD generation
+
+## [1.1.53] - 2025-07-21
+
+### Fixed
+- Critical IBD retrieval bug caused by duplicate block IDs in database from repeated AI testing
+- Internal Server Error (500) when accessing IBD endpoint with duplicated parent_block_id records
+- Empty IBD displays in UI due to failed API calls from database constraint violations
+- CRUD function now resilient to duplicate data by retrieving most recent record for any given block ID
+
+### Changed
+- Updated `get_ibd_by_block_id` function to use `ORDER BY created_at DESC` with `first()` instead of `scalar_one_or_none()`
+- Enhanced database query to handle multiple records gracefully by selecting the most recent IBD
+- Improved error handling for IBD retrieval to prevent 500 errors from database duplicates
+
+### Improved
+- IBD endpoint now returns 200 OK with populated data even when duplicate block IDs exist in database  
+- UI now properly displays populated IBDs instead of empty diagrams
+- System stability enhanced with resilient database query patterns for duplicate scenarios
+- Better handling of test data artifacts without affecting production functionality
+
+## [1.1.52] - 2025-07-21
+
+### Added
+- Strengthened AI prompt with mandatory IBD population rule to eliminate empty internal diagrams
+- Non-negotiable constraint (Rule #8) requiring populated nodes array when internal_diagram is created
+- Enhanced AI instruction clarity to overcome hesitation in generating nested IBD content
+
+### Fixed
+- Empty IBD generation eliminated through explicit prompt engineering requiring at least one relevant component
+- AI now consistently populates internal_diagram nodes based on user description content
+- Enhanced diagram generation reliability with mandatory internal structure population
+
+### Improved
+- More reliable enhanced diagram generation with guaranteed populated IBDs when internal complexity is detected
+- Consistent BDD connection generation between external components and complex blocks
+- Better AI compliance with internal diagram creation requirements through explicit rule enforcement
+
+### Changed
+- BDD_ENHANCED_PROMPT_TEMPLATE now includes strict rule mandating non-empty IBD nodes arrays
+- AI generation behavior now requires populated internal structures when creating internal_diagram objects
+- Enhanced prompt engineering to ensure IBD content matches user description requirements
+
+## [1.1.51] - 2025-07-21
+
+### Added
+- Refined RAG seeding system with exclusive ibd_block node typing for internal block diagrams
+- Enhanced AI training examples that enforce consistent IBD visual design (green ibd_block styling)
+- Flexible IBD component naming system that adapts to user prompt context
+
+### Fixed
+- IBD visual consistency by ensuring all internal components use ibd_block type instead of mixed types
+- AI generation now properly follows established design patterns with green IBD block styling
+- Context-aware component naming that reflects user descriptions (CPU, Memory Module, AI Decision Maker, etc.)
+
+### Changed
+- Refined seeding strategy to teach AI proper IBD structure with universal ibd_block typing
+- Enhanced RAG examples now demonstrate flexible naming with consistent visual presentation
+- Improved AI learning pattern for generating contextually appropriate IBD component names
+
+### Improved
+- Enhanced diagrams now generate visually consistent IBDs with proper green styling across all components
+- Better semantic accuracy in IBD component naming based on user prompts
+- Maintained functional correctness while achieving visual design consistency
+
+## [1.1.50] - 2025-07-21
+
+### Added
+- RAG database seeding capability for enhanced diagram generation
+- Temporary hardcoded example injection system for bootstrapping enhanced diagrams
+- Successful seeding of first high-quality bdd_enhanced example into RAG database
+
+### Fixed
+- Chicken-and-egg problem where enhanced diagrams lacked populated IBD content due to missing RAG examples
+- Enhanced diagram generation now produces properly populated internal block diagrams with meaningful components and connections
+- RAG system now has quality examples for future enhanced diagram generation requests
+
+### Changed
+- Enhanced diagrams now benefit from seeded RAG examples, producing richer internal structures
+- Post-seeding generations create complex IBDs with multiple interconnected components (processors, sensors, communication modules, power management units)
+- Improved AI generation quality through strategic example seeding approach
+
+## [1.1.49] - 2025-07-21
+
+### Added
+- Unified RAG endpoint supporting both 'bdd' and 'bdd_enhanced' diagram types
+- Complete IBD parsing and storage logic integrated into RAG generation workflow
+- Enhanced semantic search that leverages BDD examples for improved enhanced generation
+- Single endpoint architecture eliminating duplicate generation logic
+
+### Changed
+- Simplified frontend to always use unified `/api/v1/rag/generate-diagram-with-context/` endpoint
+- Enhanced RAG endpoint now handles both simple and complex diagram requests with contextual examples
+- Improved AI generation consistency by using RAG context for all diagram types
+- Streamlined request flow with unified parameter structure
+
+### Removed
+- Dependency on separate `/api/v1/create-diagram/` endpoint for enhanced generation
+- Conditional endpoint selection logic in frontend useAIGeneration hook
+- Code duplication between RAG and non-RAG generation paths
+
+### Fixed
+- Enhanced diagrams now properly benefit from RAG context, resulting in better populated nested IBDs
+- Consistent diagram generation experience regardless of diagram complexity
+- Unified error handling and response format across all generation types
+
+## [1.1.48] - 2025-07-21
+
+### Added
+- Async IBD fetching functionality for AI-generated blocks with `has_ibd` flags
+- Complete end-to-end IBD retrieval from backend API when blocks contain nested diagrams
+- API-driven IBD loading with automatic fallback to manual creation if needed
+- Enhanced IBD existence checking incorporating both manual creation and AI-generated flags
+
+### Changed
+- Updated `openIbdForBlock` function in diagramStore to be async and support API fetching
+- Modified all node components (BlockNode, SensorNode, ProcessorNode) to handle async IBD operations
+- Enhanced IBD detection logic to check both manual existence and `has_ibd` API flags
+- Improved IBD opening workflow with priority: existing tabs > local storage > API fetch > manual creation
+
+### Fixed
+- TypeScript compilation issues with async function implementations
+- Proper error handling for API calls during IBD fetching
+- Fallback mechanisms when API endpoints return 404 for expected IBDs
+- Integration between frontend IBD display and backend IBD storage
+
+## [1.1.47] - 2025-07-21
+
+### Added
+- Enhanced BDD generation flow in frontend with "Generate with Internal Diagrams" toggle switch
+- Material-UI Switch control in AIGeneratorPanel for enabling enhanced generation
+- Support for `has_ibd` flag recognition in all node components (BlockNode, SensorNode, ProcessorNode)
+- Automatic "View IBD" indicator display for AI-generated blocks with nested IBDs
+
+### Changed
+- Updated useAIGeneration hook to support both 'bdd' and 'bdd_enhanced' diagram types
+- Enhanced API call logic to use new create-diagram endpoint for enhanced generation
+- Modified node components to check both manual IBD existence and API-provided has_ibd flag
+- AIGenerationOptions interface extended to include isEnhanced parameter
+
+### Improved
+- Seamless integration between enhanced AI generation and existing IBD functionality
+- Better user experience with clear indication of blocks containing generated IBDs
+- Maintained backward compatibility with existing manual IBD creation workflow
+- Enhanced visual feedback for generated diagrams with nested internal structures
+
+## [1.1.46] - 2025-07-21
+
+### Added
+- Complete API endpoints for BDD+IBD generation and retrieval
+- New CRUD operations for Internal Block Diagrams in `app/crud/crud_ibd.py`
+- Enhanced POST `/api/v1/create-diagram/` endpoint supporting both 'bdd' and 'bdd_enhanced' types
+- New GET `/api/v1/diagrams/ibd/{parent_block_id}` endpoint for IBD retrieval
+- Automatic parsing and separation of nested IBD data from AI responses
+- Database storage of IBDs linked to parent BDD diagrams via foreign keys
+
+### Changed
+- Updated create_diagram endpoint to handle enhanced AI generation with nested IBDs
+- Enhanced diagram parsing logic to extract internal_diagram objects and mark blocks with `has_ibd: true`
+- DiagramRequest model now supports diagram_type parameter and diagram naming
+- DiagramResponse model includes diagram_id for referencing stored diagrams
+
+### Improved
+- End-to-end flow for generating, parsing, storing, and retrieving enhanced diagrams
+- Automatic positioning applied to both BDD and retrieved IBD diagrams
+- Complete separation between BDD storage and IBD storage in database
+- Enhanced error handling and database transaction management
+
+## [1.1.45] - 2025-07-21
+
+### Added
+- New enhanced AI generation logic for BDD+IBD diagrams
+- BDD_ENHANCED_PROMPT_TEMPLATE for comprehensive system diagrams with nested Internal Block Diagrams
+- Support for 'bdd_enhanced' diagram type that can include internal_diagram structures within blocks
+- Raw JSON response handling without automatic positioning for complex nested structures
+
+### Changed
+- Refactored generate_diagram function into generate_sysml_diagram with diagram_type parameter
+- Enhanced AI prompt selection logic to choose appropriate template based on diagram_type ('bdd' or 'bdd_enhanced')
+- Updated generation flow to return raw diagram data for later processing at API layer
+- Maintained backward compatibility with legacy generate_diagram function
+
+### Improved
+- Better separation of concerns between AI generation and diagram processing
+- More flexible AI generation system supporting both simple and complex diagram structures
+- Enhanced prompt engineering for nested IBD creation within BDD context
+
+## [1.1.44] - 2025-07-21
+
+### Added
+- New database schema for nested Internal Block Diagrams (IBDs)
+- InternalBlockDiagram SQLAlchemy model with foreign key relationship to parent BDD diagrams
+- Database table `internal_block_diagrams` for relational IBD storage
+- Support for parent-child relationship between BDD diagrams and their IBDs via `parent_bdd_diagram_id`
+- Block-specific IBD identification using `parent_block_id` field
+- Source tracking for IBDs (AI-generated vs manual creation)
+- Pydantic models (InternalBlockDiagramCreate, InternalBlockDiagramResponse) for API validation
+
+### Changed
+- Enhanced database architecture to avoid storing large JSON objects in parent diagrams
+- Updated configuration to include DB_URL_SYNC for Alembic migrations
+- Database schema now supports proper relational structure for nested diagram storage
+
 ## [1.1.43] - 2025-07-19
 
 ### Fixed
