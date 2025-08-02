@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.78] - 2025-08-02
+
+### Fixed
+- Fixed sidebar lock state synchronization for AI-generated diagrams
+- IBD Block now correctly becomes disabled immediately after AI creates new BDD diagrams
+- Enhanced IBD block locking logic to include both 'bdd' and 'bdd_enhanced' diagram types
+- Resolved sidebar component not re-rendering in response to active diagram type changes
+
+### Changed
+- Updated Sidebar component to use direct state subscription for active diagram type
+- Replaced computed state dependency with live state tracking for better reactivity
+- Improved lock state logic to handle all BDD diagram variants consistently
+
+### Improved
+- Sidebar now instantly reflects the correct element availability when switching between tabs
+- Better user experience with consistent element locking across manual and AI-generated diagrams
+- Enhanced state management for real-time UI updates without manual refresh
+
 ## [1.1.77] - 2025-08-02
 
 ### Added

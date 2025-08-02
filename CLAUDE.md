@@ -179,76 +179,74 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Enforce Strict Viewport Isolation with Controlled State
+Task: Fix Sidebar Lock State for AI-Generated Diagrams
 
 Task Type: Frontend / State Management Bug Fix
 
 Context
-Despite implementing per-diagram viewport storage and a key-based re-mount, the React Flow canvas state is still being shared between tabs. This indicates that the defaultViewport prop is not sufficient to force a state reset on tab switch. The more robust solution is to use React Flow's controlled component pattern by managing the viewport and onViewportChange props directly.
+The sidebar correctly disables the "IBD Block" when a BDD tab is active for manually created diagrams. However, after a new BDD is created by the AI generator, the sidebar fails to update its state. This leaves the "IBD Block" unlocked, allowing users to incorrectly drag it onto a BDD canvas. The issue stems from the sidebar component not correctly re-rendering in response to state changes triggered by the AI generation process.
 
 Goal
-To achieve complete viewport isolation by converting the React Flow component to a fully controlled component, ensuring each diagram's pan and zoom state is explicitly loaded and saved.
+To ensure the sidebar's lock state is always correctly synchronized with the active diagram's type, regardless of whether the diagram was created manually or by the AI.
 
 Acceptance Criteria
-✅ Panning and zooming in one diagram tab has zero effect on the viewport of any other tab.
-✅ The minimap for each diagram correctly reflects its unique viewport.
-✅ Switching to a tab correctly and instantly restores its last saved pan and zoom position.
+✅ Immediately after an AI generation creates a new BDD diagram, the "IBD Block" in the sidebar becomes correctly disabled/locked.
+✅ When switching from an IBD tab to any BDD tab (manually or AI-created), the "IBD Block" becomes disabled.
+✅ When switching from a BDD tab to an IBD tab, the "IBD Block" becomes enabled.
+✅ The locking logic for other blocks (e.g., locking BDD blocks in an IBD tab) remains unaffected.
 
 Technical Implementation Details
 
-Modify the DiagramWorkspace.tsx Component:
+The fix requires ensuring the sidebar component correctly subscribes to the active diagram's type from the Zustand store and re-renders when it changes.
 
-File: frontend/src/components/DiagramWorkspace.tsx.
+Locate the Sidebar Component:
 
-Action: We will change the props passed to the <ReactFlow /> component. Instead of defaultViewport and onMove, we will use viewport and onViewportChange.
+Find the component responsible for rendering the "Diagram Elements" list in the sidebar. This is likely named DiagramElements.tsx, Sidebar.tsx, or a similar name.
 
-Current Code (to be replaced):
+Implement Correct State Subscription:
 
-TypeScript
+Inside this component, ensure you are using the useDiagramStore hook to derive the type of the currently active diagram. This subscription will automatically trigger a re-render when the active tab changes.
 
-// ...
-<ReactFlow
-  // ... other props
-  defaultViewport={activeDiagram?.viewport}
-  onMove={(_, viewport) => onViewportChange(viewport)}
-  key={activeDiagram?.id}
->
-  {/* ... */}
-</ReactFlow>
-// ...
-New, Corrected Code (to replace the block above):
+Apply the Conditional disabled Prop:
+
+Use the derived diagram type to conditionally disable the "IBD Block" element.
+
+Example Implementation:
 
 TypeScript
 
-// In DiagramWorkspace.tsx
+// In your sidebar component (e.g., DiagramElements.tsx)
 
-const DiagramWorkspace = () => {
-  // ... existing hooks and state selections ...
-  const { activeDiagram, onViewportChange } = useDiagramStore(/* ... */);
+import useDiagramStore from '../store/diagramStore';
+// Assuming you have a reusable SidebarItem component
+import SidebarItem from './SidebarItem'; 
 
-  // ...
+const DiagramElements = () => {
+  // Subscribe directly to the active diagram's type.
+  // This hook will force the component to re-render whenever the active diagram or its type changes.
+  const activeDiagramType = useDiagramStore((state) => {
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+    return activeDiagram?.type;
+  });
+
+  // Determine the lock state based on the active diagram type.
+  const isIbdBlockLocked = activeDiagramType === 'bdd' || activeDiagramType === 'bdd_enhanced';
 
   return (
-    <ReactFlow
-      // ... other props ...
+    <div>
+      {/* ... other diagram elements like System Block, Sensor, etc. ... */}
 
-      // --- KEY CHANGES ---
-      // Use the controlled 'viewport' prop
-      viewport={activeDiagram?.viewport} 
-      // Use React Flow's dedicated onViewportChange prop
-      onViewportChange={onViewportChange}
-
-      // The key prop is still good practice
-      key={activeDiagram?.id} 
-    >
-      {/* ... */}
-    </ReactFlow>
+      {/* IBD Block Element */}
+      <SidebarItem
+        label="IBD Block"
+        nodeType="ibd_block" // or whatever type you use
+        // Conditionally disable the component
+        disabled={isIbdBlockLocked}
+        // Provide a helpful tooltip that explains why it's locked
+        title={isIbdBlockLocked ? "IBD Blocks can only be added to IBD diagrams" : "Add an IBD Block"}
+      />
+      
+      {/* ... other sections ... */}
+    </div>
   );
 };
-Note: The onMove prop is more general. onViewportChange is specifically designed for this purpose and is often more reliable for controlled components.
-
-Verify the onViewportChange function in the store:
-
-File: frontend/src/store/diagramStore.ts.
-
-Action: The existing onViewportChange function that your assistant created is already correct for this pattern. No changes are needed there. It correctly finds the active diagram and updates its viewport property.

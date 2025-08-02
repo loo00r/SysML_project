@@ -89,11 +89,13 @@ const ColorIndicator = styled(Box, {
 }));
 
 const Sidebar: React.FC = () => {
-  const { diagramType, openDiagrams, activeDiagramId } = useDiagramStore();
-  const version = import.meta.env.VITE_APP_VERSION || '1.0';
+  // Subscribe directly to the active diagram's type to ensure re-rendering on state changes
+  const activeDiagramType = useDiagramStore((state) => {
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+    return activeDiagram?.type;
+  });
   
-  // Get the active diagram
-  const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+  const version = import.meta.env.VITE_APP_VERSION || '1.0';
 
   // Handle drag start for creating new nodes
   const onDragStart = (event: React.DragEvent<HTMLDivElement>, nodeType: string, nodeData: any) => {
@@ -118,10 +120,10 @@ const Sidebar: React.FC = () => {
 
   // Render the node palette for block diagrams
   const renderNodePalette = () => {
-    // Check if IBD block should be locked (when diagram type is BDD)
-    const isIBDLocked = activeDiagram?.type === 'bdd';
+    // Check if IBD block should be locked (when diagram type is BDD or BDD Enhanced)
+    const isIBDLocked = activeDiagramType === 'bdd' || activeDiagramType === 'bdd_enhanced';
     // Check if BDD elements should be locked (when diagram type is IBD)
-    const areBDDElementsLocked = activeDiagram?.type === 'ibd';
+    const areBDDElementsLocked = activeDiagramType === 'ibd';
     
     return (
       <>
