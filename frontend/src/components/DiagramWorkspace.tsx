@@ -301,41 +301,58 @@ const DiagramWorkspace: React.FC = () => {
       localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
       localStorage.setItem('sysml-diagram-timestamp', Date.now().toString());
       
-      // Always save as BDD diagram type for RAG consistency
-      const diagramType = 'bdd';
-      
-      // Generate a description from the diagram
-      const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
-      
-      // Get the original text from the store if available
-      const { generationPrompt, diagramDescription } = useDiagramStore.getState();
-      
-      // Use the original generation prompt if available, otherwise use diagram description or a default
-      const originalText = generationPrompt || diagramDescription || description;
-      
-      // Clean the diagram data to remove IBD contamination from RAG
-      const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
-      
-      // Save to backend and update RAG database
-      const response = await fetch('/api/v1/rag/diagrams/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: activeDiagram.name,
-          description: description,
-          raw_text: originalText,
-          diagram_type: diagramType,
-          diagram_json: cleanDiagramData
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error saving diagram: ${response.statusText}`);
+      // Check if this is an AI-generated diagram with a Redis ID
+      if (activeDiagram.generatedDiagramId) {
+        // Use the new save endpoint for AI-generated diagrams
+        const response = await fetch('/api/v1/rag/save-diagram/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            diagram_id: activeDiagram.generatedDiagramId,
+            name: activeDiagram.name
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error saving AI diagram: ${response.statusText}`);
+        }
+        
+        showNotification('AI-generated diagram saved successfully to database', 'success');
+      } else {
+        // For manual diagrams, use the original save logic
+        const diagramType = 'bdd';
+        const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
+        
+        // Get the original text from the store if available
+        const { generationPrompt, diagramDescription } = useDiagramStore.getState();
+        const originalText = generationPrompt || diagramDescription || description;
+        
+        // Clean the diagram data to remove IBD contamination from RAG
+        const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
+        
+        // Save to backend and update RAG database
+        const response = await fetch('/api/v1/rag/diagrams/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: activeDiagram.name,
+            description: description,
+            raw_text: originalText,
+            diagram_type: diagramType,
+            diagram_json: cleanDiagramData
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error saving manual diagram: ${response.statusText}`);
+        }
+        
+        showNotification('Manual diagram saved successfully and added to knowledge base', 'success');
       }
-      
-      showNotification('Diagram saved successfully and added to knowledge base', 'success');
     } catch (error) {
       console.error('Error saving diagram:', error);
       showNotification(`Failed to save diagram: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');

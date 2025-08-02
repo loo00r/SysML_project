@@ -32,6 +32,7 @@ export interface DiagramInstance {
   modifiedAt: Date;
   viewport?: Viewport; // Add viewport state for each diagram
   needsCentering?: boolean; // Flag to trigger fitView for new diagrams
+  generatedDiagramId?: string; // Redis diagram ID for AI-generated diagrams
 }
 
 // Define validation error structure

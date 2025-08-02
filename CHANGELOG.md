@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.87] - 2025-08-02
+
+### Fixed
+- Enhanced diagram generation now keeps BDD diagram active after AI generation instead of switching to IBD tab
+- User now remains on main BDD diagram view after Enhanced generation completes
+- Resolved issue where last created IBD diagram became active, hiding the primary BDD diagram from user
+
+### Changed
+- Enhanced generation workflow now automatically switches back to main BDD diagram after creating all IBD diagrams
+- Improved user experience by maintaining focus on primary diagram while IBD diagrams are created in background
+- Added logic to preserve BDD diagram as active tab after Enhanced generation process
+
+### Improved
+- Better Enhanced diagram generation UX with predictable tab focus behavior
+- Users can immediately see BDD diagram with IBD indicator icons after generation
+- Enhanced generation now provides clear visual feedback with BDD remaining primary focus
+
+## [1.1.86] - 2025-08-02
+
+### Fixed
+- Critical Enhanced diagram generation bug where IBD data was stored in Redis but not processed by frontend
+- IBD diagrams now automatically create from AI-generated Enhanced diagrams with proper node and edge population
+- Resolved empty IBD creation issue when Enhanced generation toggle was enabled
+- Frontend now correctly processes `ibd_data` from Redis response and creates populated IBD diagram tabs
+
+### Added
+- Automatic IBD diagram creation logic in frontend for Enhanced diagram generation
+- IBD data transformation from Redis format to ReactFlow format with proper node and edge mapping
+- Comprehensive logging for IBD creation process to aid debugging
+- Dagre layout application for AI-generated IBD diagrams with optimal Left-to-Right spacing
+
+### Changed
+- Enhanced useAIGeneration hook to process IBD data from Redis and automatically create IBD diagram tabs
+- Updated AIGenerationResult interface to include ibdData property for IBD processing
+- Improved Enhanced diagram workflow to seamlessly create both BDD and IBD diagrams from single generation request
+
+### Improved
+- Enhanced diagrams now properly generate with populated internal block diagrams instead of empty IBDs
+- Better user experience with automatic IBD creation eliminating need for manual IBD setup
+- Complete end-to-end Enhanced diagram generation with properly connected internal components
+- Restored full functionality of Enhanced diagram generation that was broken by Redis architecture changes
+
+## [1.1.85] - 2025-08-02
+
+### Added
+- Two-step save architecture separating diagram generation from database storage
+- New `/api/v1/rag/save-diagram/` endpoint for explicit database saving of AI-generated diagrams
+- `generatedDiagramId` property to DiagramInstance interface for tracking Redis-stored diagrams
+- Smart save logic that differentiates between AI-generated and manual diagrams
+
+### Changed
+- AI diagram generation now only stores in Redis temporarily (no automatic database saving)
+- Save button now uses different endpoints based on diagram origin (AI vs manual)
+- Updated Redis TTL from 15 to 60 minutes for longer temporary diagram storage
+- Enhanced diagram save workflow with dual-path architecture
+
+### Fixed
+- TypeScript compilation error related to generatedDiagramId property
+- Eliminated automatic database saving during AI diagram generation
+- Resolved user confusion about when diagrams are saved to the knowledge base
+
+### Improved
+- User has explicit control over when diagrams are saved to the database
+- Better separation of concerns between temporary generation storage and permanent database storage
+- Enhanced user experience with clear save control and feedback messages
+
+## [1.1.84] - 2025-08-02
+
+### Added
+- Redis-based diagram generation architecture with command/query separation
+- Two-step diagram generation flow: immediate diagramId response followed by result polling
+- Redis client with TTL support for temporary diagram storage
+- New GET endpoint `/api/v1/rag/diagram-result/{diagram_id}` for retrieving generation results
+- Redis service integration in Docker Compose with persistent volume
+- Async polling mechanism in frontend for retrieving generated diagrams
+
+### Changed
+- Refactored `/api/v1/rag/generate-diagram-with-context/` to return 202 status with diagramId immediately
+- Enhanced frontend useAIGeneration hook to use two-step polling approach
+- Updated diagram generation to store results in Redis with 15-minute TTL
+- Improved error handling with Redis-based error storage and retrieval
+
+### Improved
+- Better user experience with immediate response and background processing
+- Enhanced system scalability through command/query separation architecture
+- More reliable diagram generation with temporary storage and retrieval mechanism
+- Reduced frontend waiting time with asynchronous background processing
+
+### Fixed
+- Eliminated blocking API calls during diagram generation
+- Improved system responsiveness through asynchronous processing model
+
 ## [1.1.83] - 2025-08-02
 
 ### Changed

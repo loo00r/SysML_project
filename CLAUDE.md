@@ -179,91 +179,71 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Display Node Descriptions Directly on Canvas Blocks
+# TICKET: DIAG-007
 
-Task Type: Frontend / UI Feature
+**Task:** Refactor Diagram Generation Flow to Use Redis for Temporary Storage
 
-Context
-Currently, a node's description field is only visible in the "Properties" panel when the node is selected. To make diagrams more self-contained and informative at a glance, this description text should be rendered directly inside the node component on the main canvas, similar to how properties are displayed.
+- **Reporter:** Programming Assistant
+- **Assignee:** [Developer's Name]
+- **Priority:** High
+- **Status:** To Do
 
-Goal
-To modify all custom node components (for both BDD and IBD) to render the description field directly within the visual boundary of the block.
+---
 
-Acceptance Criteria
-✅ The description text is now always visible inside BlockNode, SensorNode, and ProcessorNode components on the BDD canvas.
-✅ The description text is also always visible inside the IBDNode component on the IBD canvas.
-✅ The description is only rendered if the description property exists in the node's data.
-✅ The styling of the description text visually distinguishes it from the main label and other properties (e.g., using a smaller or italicized font).
+### **1. The Problem (The "Why")**
 
-Technical Implementation Details
+The current `/rag/generate-diagram-with-context/` endpoint is doing too much work: it generates data, applies positioning logic, and modifies the JSON object "on the fly." This approach (using "hacks" or workarounds) leads to:
 
-This task requires modifying the JSX and styling of each custom node component.
+-   **Unpredictability:** The object's state changes within the controller, making it difficult to track.
+-   **Complex Debugging:** Finding the source of an error in this complex data flow is a significant challenge.
+-   **Violation of Architectural Principles (SRP):** The controller should not be responsible for such complex business logic.
 
-Iterate Through Node Component Files:
+---
 
-The assistant must apply the following changes to all custom node files:
+### **2. Proposed Solution (The "What")**
 
-frontend/src/components/nodes/BlockNode.tsx
+We will migrate to a more robust, two-step architecture:
 
-frontend/src/components/nodes/SensorNode.tsx
+1.  **Initiation:** The client sends a generation request. The server creates the diagram, stores it in **Redis** with a short Time-To-Live (TTL), and immediately returns a unique identifier (`diagramId`).
+2.  **Retrieval:** The client uses the `diagramId` to fetch the completed diagram via a separate, new endpoint.
 
-frontend/src/components/nodes/ProcessorNode.tsx
+This approach separates the "command" (create a diagram) from the "query" (get a diagram), which is a clean and scalable practice.
 
-frontend/src/components/nodes/IBDNode.tsx
+---
 
-Add the Description Element:
+### **3. Implementation Plan (The "How")**
 
-Action: In each file, find the main div that renders the node's content. Inside this div, below the main label and any existing properties, add a new element to render the description. It's crucial to wrap this in a conditional render to avoid errors if the description is missing.
+-   [ ] **Step 1: Integrate Redis**
+    -   [ ] Add the Redis service to `docker-compose.yml`.
+    -   [ ] Install the Redis client library for the backend (e.g., `redis-py` for Python/FastAPI).
+    -   [ ] Configure the Redis connection in the project's settings.
 
-Example Implementation for BlockNode.tsx (apply a similar pattern to all other node files):
+-   [ ] **Step 2: Refactor the Generation Endpoint (`POST /rag/generate-diagram-with-context/`)**
+    -   [ ] Keep the existing logic for generating the JSON from GPT and processing it (`DiagramPositioning.apply_positioning`).
+    -   [ ] Generate a unique ID for the diagram (recommending `uuid.uuid4()`).
+    -   [ ] Save the final diagram JSON object to Redis. The **key** is the `diagramId`, and the **value** is the JSON string.
+    -   [ ] **Crucially**, set a TTL (Time-To-Live) for the key (e.g., 10-15 minutes) to prevent memory leaks.
+    -   [ ] Change the endpoint's response. It should now only return: `{"status": "processing", "diagramId": "your-unique-id"}` with an HTTP status of `202 Accepted`.
 
-TypeScript
+-   [ ] **Step 3: Create a New Endpoint for Result Retrieval (`GET /api/v1/diagrams/result/{diagramId}`)**
+    -   [ ] The endpoint must accept `diagramId` as a path parameter.
+    -   [ ] It should query Redis using the received `diagramId`.
+    -   [ ] **If the key is found:** return the full diagram JSON with a `200 OK` status.
+    -   [ ] **If the key is not found:** return an error response: `{"status": "not_found", "message": "Diagram not found or has expired."}` with a `404 Not Found` status.
 
-// In BlockNode.tsx (and other node components)
+-   [ ] **Step 4: Remove Old Code**
+    -   [ ] Clean up and remove all "hacks" and on-the-fly data modification logic from the controller, as it is now encapsulated in the new flow.
 
-// ... inside the return statement of the component ...
+-   [ ] **Step 5: Update Documentation (If applicable)**
+    -   [ ] Update the API documentation (Swagger/OpenAPI) to reflect the changes to the old endpoint and describe the new one.
 
-<NodeWrapper>
-  <NodeHeader>
-    <NodeTypeLabel>{data.type}</NodeTypeLabel>
-    <NodeLabel>{data.label}</NodeLabel>
-  </NodeHeader>
-  
-  <NodeBody>
-    {/* --- ADD THIS BLOCK --- */}
-    {data.description && (
-      <DescriptionText>
-        {data.description}
-      </DescriptionText>
-    )}
-    {/* --- END OF BLOCK --- */}
+---
 
-    {/* Existing properties rendering logic */}
-    {Object.entries(data.properties || {}).map(([key, value]) => (
-      // ...
-    ))}
-  </NodeBody>
-</NodeWrapper>
+### **4. Acceptance Criteria (Definition of Done)**
 
-// ...
-Note: You may need to create the DescriptionText styled component or apply inline styles.
-
-Apply Styling:
-
-Action: Add styling to make the description text distinct. This can be done with a styled-component or inline styles.
-
-Example using inline styles:
-
-TypeScript
-
-{data.description && (
-  <div style={{
-    fontSize: '11px',
-    fontStyle: 'italic',
-    opacity: 0.8,
-    marginTop: '4px',
-    whiteSpace: 'pre-wrap', // Allows for multi-line descriptions
-  }}>
-    {data.description}
-  </div>
-)}
+-   [ ] A request to `POST /rag/generate-diagram-with-context/` returns a `diagramId` and a `202` status.
+-   [ ] The new `GET /api/v1/diagrams/result/{diagramId}` endpoint is created and functional.
+-   [ ] When requesting the `GET` endpoint with a valid `diagramId`, the full diagram JSON is returned.
+-   [ ] When requesting the `GET` endpoint with an invalid or expired `diagramId`, a `404` error is returned.
+-   [ ] Diagrams are stored in Redis and are automatically deleted after their TTL expires.
+-   [ ] The old code that modified JSON on the fly within the controller has been completely removed.
