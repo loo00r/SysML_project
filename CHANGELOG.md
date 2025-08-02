@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.79] - 2025-08-02
+
+### Removed
+- Removed unused 'Diagram Type' dropdown from AI Diagram Generator panel
+- Removed unused 'Style' dropdown from AI Diagram Generator panel
+- Cleaned up associated useState hooks and event handlers for removed dropdowns
+- Removed unnecessary MUI imports (Select, MenuItem, FormControl, InputLabel, SelectChangeEvent)
+
+### Changed
+- Simplified AI Diagram Generator interface to show only functional controls
+- Updated generateDiagram function call to remove unused style parameter
+- Streamlined component props and state management
+
+### Improved
+- Cleaner and more focused AI generator UI with reduced visual clutter
+- Smaller bundle size by removing unused MUI components
+- Better user experience with simplified interface showing only relevant options
+- Reduced code complexity and maintenance overhead
+
 ## [1.1.78] - 2025-08-02
 
 ### Fixed

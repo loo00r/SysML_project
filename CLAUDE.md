@@ -179,74 +179,40 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Fix Sidebar Lock State for AI-Generated Diagrams
+Task: Remove Unused 'Diagram Type' and 'Style' Fields from AI Generator
 
-Task Type: Frontend / State Management Bug Fix
+Task Type: Frontend / UI Cleanup
 
 Context
-The sidebar correctly disables the "IBD Block" when a BDD tab is active for manually created diagrams. However, after a new BDD is created by the AI generator, the sidebar fails to update its state. This leaves the "IBD Block" unlocked, allowing users to incorrectly drag it onto a BDD canvas. The issue stems from the sidebar component not correctly re-rendering in response to state changes triggered by the AI generation process.
+The "AI Diagram Generator" panel currently contains two dropdown fields: "Diagram Type" and "Style". Since the implementation of the unified RAG endpoint and the "Generate with Internal Diagrams" switch, these fields have become redundant and are no longer used in the AI generation logic. Their presence clutters the UI and may confuse users.
 
 Goal
-To ensure the sidebar's lock state is always correctly synchronized with the active diagram's type, regardless of whether the diagram was created manually or by the AI.
+To simplify and clean up the AI Diagram Generator interface by completely removing the unused "Diagram Type" and "Style" dropdowns and their associated state.
 
 Acceptance Criteria
-✅ Immediately after an AI generation creates a new BDD diagram, the "IBD Block" in the sidebar becomes correctly disabled/locked.
-✅ When switching from an IBD tab to any BDD tab (manually or AI-created), the "IBD Block" becomes disabled.
-✅ When switching from a BDD tab to an IBD tab, the "IBD Block" becomes enabled.
-✅ The locking logic for other blocks (e.g., locking BDD blocks in an IBD tab) remains unaffected.
+✅ The "Diagram Type" dropdown is no longer visible in the AI Diagram Generator panel.
+✅ The "Style" dropdown is no longer visible in the AI Diagram Generator panel.
+✅ The corresponding useState hooks and state variables for these fields (diagramType, diagramStyle) are removed from the component's code.
+✅ The remaining UI elements ("Include Relationships" and "Generate with Internal Diagrams") are properly aligned and fully functional.
 
 Technical Implementation Details
 
-The fix requires ensuring the sidebar component correctly subscribes to the active diagram's type from the Zustand store and re-renders when it changes.
+Locate the Component:
 
-Locate the Sidebar Component:
+File to modify: frontend/src/components/DiagramGeneratorNew.tsx (or a similar name for the AI panel).
 
-Find the component responsible for rendering the "Diagram Elements" list in the sidebar. This is likely named DiagramElements.tsx, Sidebar.tsx, or a similar name.
+Remove State Management:
 
-Implement Correct State Subscription:
+Find and delete the useState hooks that manage the state for the dropdowns. They will look similar to this:
 
-Inside this component, ensure you are using the useDiagramStore hook to derive the type of the currently active diagram. This subscription will automatically trigger a re-render when the active tab changes.
+JavaScript
 
-Apply the Conditional disabled Prop:
+const [diagramType, setDiagramType] = useState('block');
+const [diagramStyle, setDiagramStyle] = useState('technical');
+Remove JSX Elements:
 
-Use the derived diagram type to conditionally disable the "IBD Block" element.
+Find and delete the JSX code blocks that render the <FormControl> and <Select> components for both "Diagram Type" and "Style".
 
-Example Implementation:
+Clean Up Function Calls:
 
-TypeScript
-
-// In your sidebar component (e.g., DiagramElements.tsx)
-
-import useDiagramStore from '../store/diagramStore';
-// Assuming you have a reusable SidebarItem component
-import SidebarItem from './SidebarItem'; 
-
-const DiagramElements = () => {
-  // Subscribe directly to the active diagram's type.
-  // This hook will force the component to re-render whenever the active diagram or its type changes.
-  const activeDiagramType = useDiagramStore((state) => {
-    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
-    return activeDiagram?.type;
-  });
-
-  // Determine the lock state based on the active diagram type.
-  const isIbdBlockLocked = activeDiagramType === 'bdd' || activeDiagramType === 'bdd_enhanced';
-
-  return (
-    <div>
-      {/* ... other diagram elements like System Block, Sensor, etc. ... */}
-
-      {/* IBD Block Element */}
-      <SidebarItem
-        label="IBD Block"
-        nodeType="ibd_block" // or whatever type you use
-        // Conditionally disable the component
-        disabled={isIbdBlockLocked}
-        // Provide a helpful tooltip that explains why it's locked
-        title={isIbdBlockLocked ? "IBD Blocks can only be added to IBD diagrams" : "Add an IBD Block"}
-      />
-      
-      {/* ... other sections ... */}
-    </div>
-  );
-};
+Find the handleGenerate (or generateDiagram) function call inside the component and remove the diagramType and style properties from the options object being passed to it.
