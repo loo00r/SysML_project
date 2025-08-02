@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.88] - 2025-08-02
+
+### Fixed
+- Critical IBD diagram save functionality where IBD diagrams were not being saved to database during manual save
+- IBD diagrams now properly save to database along with their parent BDD diagrams
+- Resolved issue where only AI-generated diagrams had IBD save capability while manual IBD creation was ignored
+
+### Added
+- New POST endpoint `/api/v1/diagrams/ibd/` for creating and updating Internal Block Diagrams
+- Comprehensive IBD save logic in frontend that detects and saves all related IBD diagrams
+- Upsert functionality for IBD diagrams preventing duplicate database entries
+- Enhanced save notifications showing count of saved IBD diagrams
+
+### Changed
+- Enhanced manual save workflow to automatically detect and save all IBD diagrams related to active BDD
+- Improved IBD data transformation for proper backend format compatibility
+- Extended handleSave function to process both BDD and IBD diagrams in single operation
+
+### Improved
+- Complete IBD save functionality for both AI-generated and manually created diagrams
+- Better user feedback with detailed save status including IBD diagram counts
+- Robust error handling for IBD save operations with comprehensive logging
+- Unified save experience regardless of diagram creation method (AI vs manual)
+
 ## [1.1.87] - 2025-08-02
 
 ### Fixed

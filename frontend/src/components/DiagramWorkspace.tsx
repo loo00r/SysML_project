@@ -326,7 +326,7 @@ const DiagramWorkspace: React.FC = () => {
         const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
         
         // Get the original text from the store if available
-        const { generationPrompt, diagramDescription } = useDiagramStore.getState();
+        const { generationPrompt, diagramDescription, openDiagrams, diagramsData } = useDiagramStore.getState();
         const originalText = generationPrompt || diagramDescription || description;
         
         // Clean the diagram data to remove IBD contamination from RAG
@@ -350,8 +350,67 @@ const DiagramWorkspace: React.FC = () => {
         if (!response.ok) {
           throw new Error(`Error saving manual diagram: ${response.statusText}`);
         }
+
+        const savedDiagramResponse = await response.json();
+        const parentBddId = savedDiagramResponse.id;
+
+        // Save any related IBD diagrams that exist for this BDD
+        const relatedIbdDiagrams = openDiagrams.filter(diagram => 
+          diagram.type === 'ibd' && 
+          diagram.id.startsWith(`ibd-for-${activeDiagram.id}-`)
+        );
+
+        console.log(`🔧 Found ${relatedIbdDiagrams.length} related IBD diagrams to save`);
+
+        for (const ibdDiagram of relatedIbdDiagrams) {
+          try {
+            // Extract block ID from IBD diagram ID
+            const blockId = ibdDiagram.id.replace(`ibd-for-${activeDiagram.id}-`, '');
+            
+            // Get IBD data (either from openDiagrams or diagramsData)
+            const ibdNodes = ibdDiagram.nodes || [];
+            const ibdEdges = ibdDiagram.edges || [];
+            
+            console.log(`💾 Saving IBD for block ${blockId} with ${ibdNodes.length} nodes and ${ibdEdges.length} edges`);
+
+            // Save IBD to database via backend endpoint
+            const ibdResponse = await fetch('/api/v1/diagrams/ibd/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                parent_bdd_diagram_id: parentBddId,
+                parent_block_id: blockId,
+                nodes: ibdNodes.map(node => ({
+                  id: node.id,
+                  name: node.data.label,
+                  type: node.type,
+                  description: node.data.description || '',
+                  properties: node.data.properties || {},
+                  position: node.position
+                })),
+                edges: ibdEdges.map(edge => ({
+                  id: edge.id,
+                  source: edge.source,
+                  target: edge.target,
+                  label: edge.label || 'IBD Connection'
+                })),
+                source: 'manual'
+              }),
+            });
+
+            if (!ibdResponse.ok) {
+              console.error(`Failed to save IBD for block ${blockId}: ${ibdResponse.statusText}`);
+            } else {
+              console.log(`✅ Successfully saved IBD for block ${blockId}`);
+            }
+          } catch (ibdError) {
+            console.error(`Error saving IBD diagram ${ibdDiagram.id}:`, ibdError);
+          }
+        }
         
-        showNotification('Manual diagram saved successfully and added to knowledge base', 'success');
+        showNotification(`Manual diagram saved successfully with ${relatedIbdDiagrams.length} IBD diagrams`, 'success');
       }
     } catch (error) {
       console.error('Error saving diagram:', error);
