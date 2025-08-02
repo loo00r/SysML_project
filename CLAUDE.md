@@ -179,40 +179,58 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Remove Unused 'Diagram Type' and 'Style' Fields from AI Generator
+Task: Populate IBD Nodes with AI-Generated Descriptions and Properties
 
-Task Type: Frontend / UI Cleanup
+Task Type: Backend / AI Prompt Engineering
 
 Context
-The "AI Diagram Generator" panel currently contains two dropdown fields: "Diagram Type" and "Style". Since the implementation of the unified RAG endpoint and the "Generate with Internal Diagrams" switch, these fields have become redundant and are no longer used in the AI generation logic. Their presence clutters the UI and may confuse users.
+Currently, when the AI generates an Internal Block Diagram (IBD), the nodes within it are created with only a name (label). They lack the description and properties fields that BDD nodes have. This limits the level of detail in the diagrams. We need to diagnose whether the AI is failing to generate this data or if our backend is failing to process it, and then implement a complete fix.
 
 Goal
-To simplify and clean up the AI Diagram Generator interface by completely removing the unused "Diagram Type" and "Style" dropdowns and their associated state.
+To ensure that nodes within an AI-generated IBD are created and saved with meaningful description and properties fields, provided the user's prompt contains sufficient detail.
 
 Acceptance Criteria
-✅ The "Diagram Type" dropdown is no longer visible in the AI Diagram Generator panel.
-✅ The "Style" dropdown is no longer visible in the AI Diagram Generator panel.
-✅ The corresponding useState hooks and state variables for these fields (diagramType, diagramStyle) are removed from the component's code.
-✅ The remaining UI elements ("Include Relationships" and "Generate with Internal Diagrams") are properly aligned and fully functional.
+✅ When a prompt provides details about an internal component (e.g., "the CPU is a 3.2 GHz quad-core processor"), the corresponding IBD node is saved to the database with a relevant description and/or properties.
+✅ The BDD_ENHANCED_PROMPT_TEMPLATE is updated to explicitly instruct the AI to generate these details for internal nodes.
+✅ The backend parsing logic correctly extracts and saves the full node object, including these new fields.
+✅ The final IBD data, when retrieved via the API, contains the descriptions and properties.
 
 Technical Implementation Details
 
-Locate the Component:
+This is a two-part task: first, we will enhance the AI's instructions, and second, we will ensure our code correctly handles the data.
 
-File to modify: frontend/src/components/DiagramGeneratorNew.tsx (or a similar name for the AI panel).
+Strengthen the AI Prompt:
 
-Remove State Management:
+File to modify: backend/app/AI/diagram_generation.py.
 
-Find and delete the useState hooks that manage the state for the dropdowns. They will look similar to this:
+Action: Modify the BDD_ENHANCED_PROMPT_TEMPLATE. We need to update both the JSON example and the rules to explicitly ask for details in the internal diagram.
 
-JavaScript
+Find this section in the prompt's example:
 
-const [diagramType, setDiagramType] = useState('block');
-const [diagramStyle, setDiagramStyle] = useState('technical');
-Remove JSX Elements:
+JSON
 
-Find and delete the JSX code blocks that render the <FormControl> and <Select> components for both "Diagram Type" and "Style".
+"internal_diagram": {
+  "nodes": [
+    {"id": "ibd-cpu", "type": "ibd_block", "name": "Central Processing Unit"},
+    // ...
+  ],
+And change it to include the new fields:
 
-Clean Up Function Calls:
+JSON
 
-Find the handleGenerate (or generateDiagram) function call inside the component and remove the diagramType and style properties from the options object being passed to it.
+"internal_diagram": {
+  "nodes": [
+    {"id": "ibd-cpu", "type": "ibd_block", "name": "CPU", "description": "Main processing unit", "properties": {"clock_speed": "3.2 GHz"}},
+    // ...
+  ],
+Then, find the Rules: section in the prompt and add a new rule:
+
+// ... after the other rules ...
+12. **INCLUDE IBD DETAILS: For each node inside an "internal_diagram", you MUST also generate 'description' and 'properties' fields if the user's prompt provides relevant details. Keep them concise.**
+Verify Backend Parsing Logic:
+
+File to review: backend/app/database/rag_router.py.
+
+Action: This step is primarily for verification. The current parsing logic in the for ibd_data in ibd_to_create: loop should already be correctly handling the full node objects, as it uses ibd_data.get("nodes", []).
+
+The assistant should confirm that this logic passes the entire node object (including any new description and properties fields) to the InternalBlockDiagramCreate model. Since the nodes are stored in a flexible JSON column in the database, no database schema changes are required.

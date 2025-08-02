@@ -239,9 +239,9 @@ Required output format:
       "id": "block-1", "type": "block", "name": "Flight Controller",
       "internal_diagram": {
         "nodes": [
-          {"id": "ibd-cpu", "type": "ibd_block", "name": "Central Processing Unit"},
-          {"id": "ibd-memory", "type": "ibd_block", "name": "Memory Module"},
-          {"id": "ibd-io", "type": "ibd_block", "name": "I/O Controller"}
+          {"id": "ibd-cpu", "type": "ibd_block", "name": "CPU", "description": "Main processing unit", "properties": {"clock_speed": "3.2 GHz"}},
+          {"id": "ibd-memory", "type": "ibd_block", "name": "Memory Module", "description": "System memory storage", "properties": {"capacity": "16 GB", "type": "DDR4"}},
+          {"id": "ibd-io", "type": "ibd_block", "name": "I/O Controller", "description": "Input/output management", "properties": {"ports": "USB 3.0, HDMI"}}
         ],
         "edges": [
           {"id": "cpu-memory", "source": "ibd-cpu", "target": "ibd-memory", "label": "Data Bus"},
@@ -271,6 +271,7 @@ Rules:
 10. **COMPONENT BREAKDOWN: When user mentions complex components (like "flight controller containing CPU and memory"), break them down into separate internal nodes. Each mentioned sub-component becomes its own ibd_block node.**
 11. **MEANINGFUL CONNECTIONS: IBD edges must have descriptive labels showing the type of connection (e.g., "Data Bus", "Control Signals", "Power Supply", "Communication Link").**
 12. **MANDATORY EDGES EXAMPLE: For 3 internal components, you must include at least 2-3 edges like: {"id": "cpu-memory", "source": "ibd-cpu", "target": "ibd-memory", "label": "Data Bus"}**
+13. **INCLUDE IBD DETAILS: For each node inside an "internal_diagram", you MUST also generate 'description' and 'properties' fields if the user's prompt provides relevant details. Keep them concise.**
 """
 
 def generate_sysml_diagram(

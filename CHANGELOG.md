@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.80] - 2025-08-02
+
+### Added
+- Enhanced IBD node generation with AI-populated descriptions and properties fields
+- New prompt rule for generating detailed IBD node information when user provides specifics
+- Rich examples in BDD_ENHANCED_PROMPT_TEMPLATE showing proper IBD node structure with metadata
+
+### Changed
+- Updated BDD_ENHANCED_PROMPT_TEMPLATE to include description and properties in IBD node examples
+- Enhanced AI instruction set to generate meaningful descriptions and properties for internal components
+- Improved IBD node data structure with technical specifications and component details
+
+### Improved
+- IBD nodes now contain detailed technical information (clock speeds, capacities, port types, etc.)
+- Better AI prompt engineering for extracting component specifications from user descriptions
+- More informative Internal Block Diagrams with component-level detail beyond just names
+- Enhanced user experience with richer diagram content and component metadata
+
 ## [1.1.79] - 2025-08-02
 
 ### Removed
