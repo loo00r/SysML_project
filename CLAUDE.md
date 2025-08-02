@@ -179,58 +179,91 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Populate IBD Nodes with AI-Generated Descriptions and Properties
+Task: Display Node Descriptions Directly on Canvas Blocks
 
-Task Type: Backend / AI Prompt Engineering
+Task Type: Frontend / UI Feature
 
 Context
-Currently, when the AI generates an Internal Block Diagram (IBD), the nodes within it are created with only a name (label). They lack the description and properties fields that BDD nodes have. This limits the level of detail in the diagrams. We need to diagnose whether the AI is failing to generate this data or if our backend is failing to process it, and then implement a complete fix.
+Currently, a node's description field is only visible in the "Properties" panel when the node is selected. To make diagrams more self-contained and informative at a glance, this description text should be rendered directly inside the node component on the main canvas, similar to how properties are displayed.
 
 Goal
-To ensure that nodes within an AI-generated IBD are created and saved with meaningful description and properties fields, provided the user's prompt contains sufficient detail.
+To modify all custom node components (for both BDD and IBD) to render the description field directly within the visual boundary of the block.
 
 Acceptance Criteria
-✅ When a prompt provides details about an internal component (e.g., "the CPU is a 3.2 GHz quad-core processor"), the corresponding IBD node is saved to the database with a relevant description and/or properties.
-✅ The BDD_ENHANCED_PROMPT_TEMPLATE is updated to explicitly instruct the AI to generate these details for internal nodes.
-✅ The backend parsing logic correctly extracts and saves the full node object, including these new fields.
-✅ The final IBD data, when retrieved via the API, contains the descriptions and properties.
+✅ The description text is now always visible inside BlockNode, SensorNode, and ProcessorNode components on the BDD canvas.
+✅ The description text is also always visible inside the IBDNode component on the IBD canvas.
+✅ The description is only rendered if the description property exists in the node's data.
+✅ The styling of the description text visually distinguishes it from the main label and other properties (e.g., using a smaller or italicized font).
 
 Technical Implementation Details
 
-This is a two-part task: first, we will enhance the AI's instructions, and second, we will ensure our code correctly handles the data.
+This task requires modifying the JSX and styling of each custom node component.
 
-Strengthen the AI Prompt:
+Iterate Through Node Component Files:
 
-File to modify: backend/app/AI/diagram_generation.py.
+The assistant must apply the following changes to all custom node files:
 
-Action: Modify the BDD_ENHANCED_PROMPT_TEMPLATE. We need to update both the JSON example and the rules to explicitly ask for details in the internal diagram.
+frontend/src/components/nodes/BlockNode.tsx
 
-Find this section in the prompt's example:
+frontend/src/components/nodes/SensorNode.tsx
 
-JSON
+frontend/src/components/nodes/ProcessorNode.tsx
 
-"internal_diagram": {
-  "nodes": [
-    {"id": "ibd-cpu", "type": "ibd_block", "name": "Central Processing Unit"},
-    // ...
-  ],
-And change it to include the new fields:
+frontend/src/components/nodes/IBDNode.tsx
 
-JSON
+Add the Description Element:
 
-"internal_diagram": {
-  "nodes": [
-    {"id": "ibd-cpu", "type": "ibd_block", "name": "CPU", "description": "Main processing unit", "properties": {"clock_speed": "3.2 GHz"}},
-    // ...
-  ],
-Then, find the Rules: section in the prompt and add a new rule:
+Action: In each file, find the main div that renders the node's content. Inside this div, below the main label and any existing properties, add a new element to render the description. It's crucial to wrap this in a conditional render to avoid errors if the description is missing.
 
-// ... after the other rules ...
-12. **INCLUDE IBD DETAILS: For each node inside an "internal_diagram", you MUST also generate 'description' and 'properties' fields if the user's prompt provides relevant details. Keep them concise.**
-Verify Backend Parsing Logic:
+Example Implementation for BlockNode.tsx (apply a similar pattern to all other node files):
 
-File to review: backend/app/database/rag_router.py.
+TypeScript
 
-Action: This step is primarily for verification. The current parsing logic in the for ibd_data in ibd_to_create: loop should already be correctly handling the full node objects, as it uses ibd_data.get("nodes", []).
+// In BlockNode.tsx (and other node components)
 
-The assistant should confirm that this logic passes the entire node object (including any new description and properties fields) to the InternalBlockDiagramCreate model. Since the nodes are stored in a flexible JSON column in the database, no database schema changes are required.
+// ... inside the return statement of the component ...
+
+<NodeWrapper>
+  <NodeHeader>
+    <NodeTypeLabel>{data.type}</NodeTypeLabel>
+    <NodeLabel>{data.label}</NodeLabel>
+  </NodeHeader>
+  
+  <NodeBody>
+    {/* --- ADD THIS BLOCK --- */}
+    {data.description && (
+      <DescriptionText>
+        {data.description}
+      </DescriptionText>
+    )}
+    {/* --- END OF BLOCK --- */}
+
+    {/* Existing properties rendering logic */}
+    {Object.entries(data.properties || {}).map(([key, value]) => (
+      // ...
+    ))}
+  </NodeBody>
+</NodeWrapper>
+
+// ...
+Note: You may need to create the DescriptionText styled component or apply inline styles.
+
+Apply Styling:
+
+Action: Add styling to make the description text distinct. This can be done with a styled-component or inline styles.
+
+Example using inline styles:
+
+TypeScript
+
+{data.description && (
+  <div style={{
+    fontSize: '11px',
+    fontStyle: 'italic',
+    opacity: 0.8,
+    marginTop: '4px',
+    whiteSpace: 'pre-wrap', // Allows for multi-line descriptions
+  }}>
+    {data.description}
+  </div>
+)}

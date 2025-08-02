@@ -104,6 +104,21 @@ const IBDNode = ({ data, selected, id }: NodeProps) => {
               {label || 'Unnamed IBD Block'}
             </IBDTitle>
           </IBDHeader>
+          
+          {/* Description text */}
+          {description && (
+            <div style={{
+              fontSize: '11px',
+              fontStyle: 'italic',
+              opacity: 0.8,
+              marginTop: '4px',
+              marginBottom: '8px',
+              whiteSpace: 'pre-wrap',
+              color: '#555',
+            }}>
+              {description}
+            </div>
+          )}
         
         {Object.keys(properties).length > 0 && (
           <IBDProperties>

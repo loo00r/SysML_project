@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.83] - 2025-08-02
+
+### Changed
+- Reverted description text styling back to original distinctive format
+- Description text now uses inline styles with italic font, reduced opacity, and gray color
+- Restored visual distinction between descriptions and other node attributes
+- Enhanced readability through original styling approach with smaller font size and visual separation
+
+### Improved
+- Better visual hierarchy with descriptions standing out from standard node attributes
+- Maintained consistent styling across all node types (BlockNode, SensorNode, ProcessorNode, IBDNode)
+- Enhanced user experience with more readable and visually distinct description text
+- Preserved original design intent for description display with proper visual emphasis
+
+## [1.1.82] - 2025-08-02
+
+### Changed
+- Standardized description text styling to match other node attributes format
+- Updated description display to use consistent "Label: Value" format across all node types
+- Replaced custom inline styles with Material-UI Typography components for better consistency
+- Applied same visual treatment for descriptions as other node properties
+
+### Improved
+- Better visual consistency across all node attributes and descriptions
+- Enhanced readability with standardized typography and formatting
+- More cohesive user interface with unified styling approach
+- Consistent font weights and spacing throughout node components
+
+## [1.1.81] - 2025-08-02
+
+### Added
+- Node descriptions are now displayed directly on canvas blocks for all diagram types
+- Description text rendered inside BlockNode, SensorNode, ProcessorNode, and IBDNode components
+- Visual distinction for description text with italic styling and reduced opacity
+- Multi-line description support with proper text wrapping
+
+### Changed
+- Updated all custom node components to include description rendering in JSX
+- Enhanced node layout to accommodate description text between title and properties
+- Improved self-contained diagram readability without requiring properties panel
+
+### Improved
+- Diagrams are now more informative at a glance with visible component descriptions
+- Better user experience with immediate access to component details on canvas
+- Enhanced visual hierarchy with properly styled description text
+- Consistent description display across all node types (BDD and IBD)
+
 ## [1.1.80] - 2025-08-02
 
 ### Added
