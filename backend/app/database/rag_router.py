@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 import json
 
 from app.db.dependencies import get_db
+from app.core.redis_client import redis_client
 from app.database.models import (
     DiagramEmbeddingCreate, 
     DiagramEmbeddingResponse, 
@@ -79,7 +80,7 @@ async def get_components(
     components = await get_components_by_type(db, component_type)
     return components
 
-@router.post("/generate-diagram-with-context/")
+@router.post("/generate-diagram-with-context/", status_code=202)
 async def generate_diagram_with_context(
     text: str = Body(..., embed=True),
     diagram_type: str = Body("bdd", embed=True),
@@ -90,6 +91,7 @@ async def generate_diagram_with_context(
     """
     Generate a diagram using context from the database if use_rag is True.
     Supports both 'bdd' and 'bdd_enhanced' diagram types with full IBD parsing.
+    Returns diagram ID immediately and stores result in Redis with TTL.
     """
     one_shot_examples = []
     
@@ -212,18 +214,90 @@ async def generate_diagram_with_context(
         # Apply positioning to the clean diagram
         positioned_diagram = DiagramPositioning.apply_positioning(raw_diagram)
         
-        # Save the main diagram to get its ID
+        # Prepare final result for Redis storage (without saving to database)
+        result = {
+            "diagram": positioned_diagram,
+            "raw_text": text,
+            "model_used": generation_result["model_used"],
+            "saved_to_rag": False,  # Not saved automatically anymore
+            "used_rag": use_rag and len(one_shot_examples) > 0,
+            "examples_count": len(one_shot_examples),
+            "ibd_data": ibd_to_create,  # Store IBD data for later saving if needed
+            "status": "completed"
+        }
+        
+        # Store result in Redis and return only diagram ID
+        diagram_id = redis_client.store_diagram(result)
+        
+        return {
+            "status": "processing",
+            "diagramId": diagram_id
+        }
+        
+    except Exception as e:
+        print(f"Error in unified RAG generation: {str(e)}")
+        
+        # Store error in Redis for retrieval
+        error_result = {
+            "status": "error",
+            "error": str(e)
+        }
+        diagram_id = redis_client.store_diagram(error_result)
+        
+        return {
+            "status": "processing", 
+            "diagramId": diagram_id
+        }
+
+@router.get("/diagram-result/{diagram_id}")
+async def get_diagram_result(diagram_id: str):
+    """
+    Retrieve the generated diagram result from Redis cache
+    """
+    try:
+        result = redis_client.get_diagram(diagram_id)
+        
+        if result is None:
+            raise HTTPException(status_code=404, detail="Diagram not found or expired")
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error retrieving diagram {diagram_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error retrieving diagram result")
+
+@router.post("/save-diagram/")
+async def save_diagram_to_database(
+    diagram_id: str = Body(..., embed=True),
+    name: str = Body("Generated Diagram", embed=True),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Save a generated diagram from Redis cache to the database
+    """
+    try:
+        # Get diagram from Redis
+        cached_diagram = redis_client.get_diagram(diagram_id)
+        
+        if cached_diagram is None:
+            raise HTTPException(status_code=404, detail="Diagram not found or expired in cache")
+        
+        if cached_diagram.get("status") != "completed":
+            raise HTTPException(status_code=400, detail="Diagram generation not completed")
+        
+        # Save the main diagram to database
         db_diagram = await store_diagram_with_embedding(
             db=db,
             name=name,
-            description=f"Generated {diagram_type} diagram",
-            raw_text=text,
+            description=f"Generated diagram",
+            raw_text=cached_diagram["raw_text"],
             diagram_type="bdd",  # Always save as 'bdd' for RAG consistency
-            diagram_json=positioned_diagram
+            diagram_json=cached_diagram["diagram"]
         )
         
-        # Save parsed IBDs with the parent BDD ID - New Upsert Logic
-        for ibd_data in ibd_to_create:
+        # Save IBDs if they exist
+        ibd_data_list = cached_diagram.get("ibd_data", [])
+        for ibd_data in ibd_data_list:
             existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
                 db=db,
                 parent_bdd_id=db_diagram.id,
@@ -251,19 +325,12 @@ async def generate_diagram_with_context(
                 )
                 await crud_ibd.create_ibd(db=db, ibd=new_ibd)
         
-        # Return in the expected format
-        result = {
-            "diagram": positioned_diagram,
-            "raw_text": text,
-            "model_used": generation_result["model_used"],
-            "saved_to_rag": True,
-            "used_rag": use_rag and len(one_shot_examples) > 0,
-            "examples_count": len(one_shot_examples),
-            "diagram_id": db_diagram.id
+        return {
+            "message": "Diagram saved successfully",
+            "diagram_id": db_diagram.id,
+            "saved_to_rag": True
         }
         
-        return result
-        
     except Exception as e:
-        print(f"Error in unified RAG generation: {str(e)}")
-        return {"error": str(e)}
+        print(f"Error saving diagram {diagram_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error saving diagram to database")

@@ -7,14 +7,9 @@ import {
   Typography,
   FormControlLabel,
   Checkbox,
-  Select,
-  MenuItem,
   IconButton,
-  FormControl,
-  InputLabel,
   Stack,
   Divider,
-  SelectChangeEvent,
   Switch
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -91,9 +86,7 @@ interface DiagramGeneratorProps {
 const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear }) => {
   const [isExpanded, setIsExpanded] = useState(false); 
   const [text, setText] = useState('');
-  const [diagramType, setDiagramType] = useState('block');
   const [includeRelationships, setIncludeRelationships] = useState(true);
-  const [diagramStyle, setDiagramStyle] = useState('technical');
   const [generateEnhanced, setGenerateEnhanced] = useState(false);
   
   // Use our custom AI generation hook
@@ -109,7 +102,6 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
         prompt: text,
         complexity: 'medium',
         includeRelationships,
-        style: diagramStyle as 'technical' | 'conceptual',
         isEnhanced: generateEnhanced
       });
       
@@ -131,14 +123,6 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
     if (onClear) {
       onClear();
     }
-  };
-  
-  const handleDiagramTypeChange = (event: SelectChangeEvent) => {
-    setDiagramType(event.target.value);
-  };
-  
-  const handleDiagramStyleChange = (event: SelectChangeEvent) => {
-    setDiagramStyle(event.target.value);
   };
   
   const handleTextChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -186,33 +170,6 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
         {isExpanded && (
           <>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="diagram-type-label">Diagram Type</InputLabel>
-                <Select
-                  labelId="diagram-type-label"
-                  value={diagramType}
-                  label="Diagram Type"
-                  onChange={handleDiagramTypeChange}
-                  disabled={isGenerating}
-                >
-                  <MenuItem value="block">Block Diagram</MenuItem>
-                  <MenuItem value="activity">Activity Diagram</MenuItem>
-                  <MenuItem value="usecase">Use Case Diagram</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="diagram-style-label">Style</InputLabel>
-                <Select
-                  labelId="diagram-style-label"
-                  value={diagramStyle}
-                  label="Style"
-                  onChange={handleDiagramStyleChange}
-                  disabled={isGenerating}
-                >
-                  <MenuItem value="technical">Technical</MenuItem>
-                  <MenuItem value="conceptual">Conceptual</MenuItem>
-                </Select>
-              </FormControl>
               <FormControlLabel
                 control={
                   <Checkbox

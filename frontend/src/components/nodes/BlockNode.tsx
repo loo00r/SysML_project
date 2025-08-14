@@ -177,6 +177,21 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
               {label || 'Unnamed Block'}
             </BlockTitle>
           </BlockHeader>
+          
+          {/* Description text */}
+          {description && (
+            <div style={{
+              fontSize: '11px',
+              fontStyle: 'italic',
+              opacity: 0.8,
+              marginTop: '4px',
+              marginBottom: '8px',
+              whiteSpace: 'pre-wrap',
+              color: '#555',
+            }}>
+              {description}
+            </div>
+          )}
         
         {Object.keys(properties).length > 0 && (
           <BlockProperties>

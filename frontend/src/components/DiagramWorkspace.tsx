@@ -140,6 +140,8 @@ const DiagramWorkspace: React.FC = () => {
     showValidationPanel,
     toggleValidationPanel,
     addNode,
+    onViewportChange,
+    clearCenteringFlag,
   } = useDiagramStore();
 
   // Get ReactFlow instance methods
@@ -147,6 +149,19 @@ const DiagramWorkspace: React.FC = () => {
 
   // Get the active diagram
   const activeDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+  
+  // Handle conditional fitView for new diagrams
+  useEffect(() => {
+    if (activeDiagram?.needsCentering && activeDiagramId) {
+      // Use setTimeout to ensure ReactFlow is fully mounted
+      const timer = setTimeout(() => {
+        fitView();
+        clearCenteringFlag(activeDiagramId);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeDiagram?.needsCentering, activeDiagramId, fitView, clearCenteringFlag]);
   
   // Define edge styles based on diagram type and node count
   const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
@@ -286,41 +301,117 @@ const DiagramWorkspace: React.FC = () => {
       localStorage.setItem('sysml-diagram', JSON.stringify({ nodes, edges }));
       localStorage.setItem('sysml-diagram-timestamp', Date.now().toString());
       
-      // Always save as BDD diagram type for RAG consistency
-      const diagramType = 'bdd';
-      
-      // Generate a description from the diagram
-      const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
-      
-      // Get the original text from the store if available
-      const { generationPrompt, diagramDescription } = useDiagramStore.getState();
-      
-      // Use the original generation prompt if available, otherwise use diagram description or a default
-      const originalText = generationPrompt || diagramDescription || description;
-      
-      // Clean the diagram data to remove IBD contamination from RAG
-      const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
-      
-      // Save to backend and update RAG database
-      const response = await fetch('/api/v1/rag/diagrams/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: activeDiagram.name,
-          description: description,
-          raw_text: originalText,
-          diagram_type: diagramType,
-          diagram_json: cleanDiagramData
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error saving diagram: ${response.statusText}`);
+      // Check if this is an AI-generated diagram with a Redis ID
+      if (activeDiagram.generatedDiagramId) {
+        // Use the new save endpoint for AI-generated diagrams
+        const response = await fetch('/api/v1/rag/save-diagram/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            diagram_id: activeDiagram.generatedDiagramId,
+            name: activeDiagram.name
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error saving AI diagram: ${response.statusText}`);
+        }
+        
+        showNotification('AI-generated diagram saved successfully to database', 'success');
+      } else {
+        // For manual diagrams, use the original save logic
+        const diagramType = 'bdd';
+        const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
+        
+        // Get the original text from the store if available
+        const { generationPrompt, diagramDescription, openDiagrams, diagramsData } = useDiagramStore.getState();
+        const originalText = generationPrompt || diagramDescription || description;
+        
+        // Clean the diagram data to remove IBD contamination from RAG
+        const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
+        
+        // Save to backend and update RAG database
+        const response = await fetch('/api/v1/rag/diagrams/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: activeDiagram.name,
+            description: description,
+            raw_text: originalText,
+            diagram_type: diagramType,
+            diagram_json: cleanDiagramData
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error saving manual diagram: ${response.statusText}`);
+        }
+
+        const savedDiagramResponse = await response.json();
+        const parentBddId = savedDiagramResponse.id;
+
+        // Save any related IBD diagrams that exist for this BDD
+        const relatedIbdDiagrams = openDiagrams.filter(diagram => 
+          diagram.type === 'ibd' && 
+          diagram.id.startsWith(`ibd-for-${activeDiagram.id}-`)
+        );
+
+        console.log(`🔧 Found ${relatedIbdDiagrams.length} related IBD diagrams to save`);
+
+        for (const ibdDiagram of relatedIbdDiagrams) {
+          try {
+            // Extract block ID from IBD diagram ID
+            const blockId = ibdDiagram.id.replace(`ibd-for-${activeDiagram.id}-`, '');
+            
+            // Get IBD data (either from openDiagrams or diagramsData)
+            const ibdNodes = ibdDiagram.nodes || [];
+            const ibdEdges = ibdDiagram.edges || [];
+            
+            console.log(`💾 Saving IBD for block ${blockId} with ${ibdNodes.length} nodes and ${ibdEdges.length} edges`);
+
+            // Save IBD to database via backend endpoint
+            const ibdResponse = await fetch('/api/v1/diagrams/ibd/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                parent_bdd_diagram_id: parentBddId,
+                parent_block_id: blockId,
+                nodes: ibdNodes.map(node => ({
+                  id: node.id,
+                  name: node.data.label,
+                  type: node.type,
+                  description: node.data.description || '',
+                  properties: node.data.properties || {},
+                  position: node.position
+                })),
+                edges: ibdEdges.map(edge => ({
+                  id: edge.id,
+                  source: edge.source,
+                  target: edge.target,
+                  label: edge.label || 'IBD Connection'
+                })),
+                source: 'manual'
+              }),
+            });
+
+            if (!ibdResponse.ok) {
+              console.error(`Failed to save IBD for block ${blockId}: ${ibdResponse.statusText}`);
+            } else {
+              console.log(`✅ Successfully saved IBD for block ${blockId}`);
+            }
+          } catch (ibdError) {
+            console.error(`Error saving IBD diagram ${ibdDiagram.id}:`, ibdError);
+          }
+        }
+        
+        showNotification(`Manual diagram saved successfully with ${relatedIbdDiagrams.length} IBD diagrams`, 'success');
       }
-      
-      showNotification('Diagram saved successfully and added to knowledge base', 'success');
     } catch (error) {
       console.error('Error saving diagram:', error);
       showNotification(`Failed to save diagram: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
@@ -585,7 +676,9 @@ const DiagramWorkspace: React.FC = () => {
           defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}
-          fitView
+          defaultViewport={activeDiagram?.viewport}
+          onMove={(_, viewport) => onViewportChange(viewport)}
+          key={activeDiagram?.id}
           proOptions={{ hideAttribution: true }}
           deleteKeyCode="Delete"
           multiSelectionKeyCode="Control"

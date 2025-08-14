@@ -164,6 +164,21 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
             </ProcessorTitle>
           </ProcessorHeader>
           
+          {/* Description text */}
+          {description && (
+            <div style={{
+              fontSize: '11px',
+              fontStyle: 'italic',
+              opacity: 0.8,
+              marginTop: '4px',
+              marginBottom: '8px',
+              whiteSpace: 'pre-wrap',
+              color: '#555',
+            }}>
+              {description}
+            </div>
+          )}
+          
           {Object.keys(properties).length > 0 && (
             <ProcessorProperties>
               {Object.entries(properties)

@@ -179,125 +179,71 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task: Implement Upsert Logic for IBD Storage to Prevent Duplicates
+# TICKET: DIAG-007
 
-Task Type: Backend / Database Logic
+**Task:** Refactor Diagram Generation Flow to Use Redis for Temporary Storage
 
-Context
-The current system creates a new row in the internal_block_diagrams table for every AI generation, which can lead to a cluttered database with multiple entries for the same block. The desired behavior is to maintain only one IBD record per block within a parent diagram. If a record already exists, it should be updated with the new data; otherwise, a new record should be created.
+- **Reporter:** Programming Assistant
+- **Assignee:** [Developer's Name]
+- **Priority:** High
+- **Status:** To Do
 
-Goal
-To refactor the IBD saving mechanism to perform an "upsert" (update or insert) operation, ensuring that the database remains clean and free of duplicate IBD records for the same block.
+---
 
-Acceptance Criteria
-✅ When the AI generates an IBD for a block that does not already have one, a new row is created in the internal_block_diagrams table.
-✅ When the AI generates an IBD for a block that already has an entry in the table, the existing row is updated with the new nodes and edges, and no new row is created.
-✅ The get_ibd_by_block_id function is reverted to its simpler, original form, as duplicates will no longer be possible.
+### **1. The Problem (The "Why")**
 
-Technical Implementation Details
+The current `/rag/generate-diagram-with-context/` endpoint is doing too much work: it generates data, applies positioning logic, and modifies the JSON object "on the fly." This approach (using "hacks" or workarounds) leads to:
 
-Update the IBD CRUD Module:
+-   **Unpredictability:** The object's state changes within the controller, making it difficult to track.
+-   **Complex Debugging:** Finding the source of an error in this complex data flow is a significant challenge.
+-   **Violation of Architectural Principles (SRP):** The controller should not be responsible for such complex business logic.
 
-File to modify: backend/app/crud/crud_ibd.py.
+---
 
-Action: We need to add functions to check for an existing IBD and to update it. Replace the entire content of the file with the code below, which includes the new logic and reverts the old fix.
+### **2. Proposed Solution (The "What")**
 
-Python
+We will migrate to a more robust, two-step architecture:
 
-# In backend/app/crud/crud_ibd.py
+1.  **Initiation:** The client sends a generation request. The server creates the diagram, stores it in **Redis** with a short Time-To-Live (TTL), and immediately returns a unique identifier (`diagramId`).
+2.  **Retrieval:** The client uses the `diagramId` to fetch the completed diagram via a separate, new endpoint.
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, desc
-from app.database import models
-from app.database.models import InternalBlockDiagramCreate
-from typing import List, Dict, Any
+This approach separates the "command" (create a diagram) from the "query" (get a diagram), which is a clean and scalable practice.
 
-async def get_ibd_by_parent_and_block(db: AsyncSession, parent_bdd_id: int, block_id: str):
-    """Checks if an IBD exists for a specific block in a specific parent diagram."""
-    stmt = select(models.InternalBlockDiagram).filter_by(
-        parent_bdd_diagram_id=parent_bdd_id,
-        parent_block_id=block_id
-    )
-    result = await db.execute(stmt)
-    return result.scalar_one_or_none()
+---
 
-async def create_ibd(db: AsyncSession, ibd: InternalBlockDiagramCreate) -> models.InternalBlockDiagram:
-    """Creates a new IBD record."""
-    db_ibd = models.InternalBlockDiagram(**ibd.model_dump())
-    db.add(db_ibd)
-    await db.commit()
-    await db.refresh(db_ibd)
-    return db_ibd
+### **3. Implementation Plan (The "How")**
 
-async def update_ibd(db: AsyncSession, db_ibd: models.InternalBlockDiagram, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
-    """Updates an existing IBD's nodes and edges."""
-    db_ibd.nodes = nodes
-    db_ibd.edges = edges
-    await db.commit()
-    await db.refresh(db_ibd)
-    return db_ibd
+-   [ ] **Step 1: Integrate Redis**
+    -   [ ] Add the Redis service to `docker-compose.yml`.
+    -   [ ] Install the Redis client library for the backend (e.g., `redis-py` for Python/FastAPI).
+    -   [ ] Configure the Redis connection in the project's settings.
 
-async def get_ibd_by_block_id(db: AsyncSession, block_id: str):
-    """
-    Gets an IBD by its parent block ID. Reverted to simpler logic
-    as duplicates are no longer expected.
-    """
-    # Note: This will fail if multiple diagrams reuse the same block_id.
-    # The long-term fix would be to query by parent_diagram_id AND block_id.
-    stmt = select(models.InternalBlockDiagram).filter_by(parent_block_id=block_id)
-    result = await db.execute(stmt)
-    # Assuming one diagram is worked on at a time, we take the newest if somehow duplicates still occur.
-    return result.scalars().first()
-Implement the Upsert Logic in the API Endpoint:
+-   [ ] **Step 2: Refactor the Generation Endpoint (`POST /rag/generate-diagram-with-context/`)**
+    -   [ ] Keep the existing logic for generating the JSON from GPT and processing it (`DiagramPositioning.apply_positioning`).
+    -   [ ] Generate a unique ID for the diagram (recommending `uuid.uuid4()`).
+    -   [ ] Save the final diagram JSON object to Redis. The **key** is the `diagramId`, and the **value** is the JSON string.
+    -   [ ] **Crucially**, set a TTL (Time-To-Live) for the key (e.g., 10-15 minutes) to prevent memory leaks.
+    -   [ ] Change the endpoint's response. It should now only return: `{"status": "processing", "diagramId": "your-unique-id"}` with an HTTP status of `202 Accepted`.
 
-File to modify: backend/app/database/rag_router.py.
+-   [ ] **Step 3: Create a New Endpoint for Result Retrieval (`GET /api/v1/diagrams/result/{diagramId}`)**
+    -   [ ] The endpoint must accept `diagramId` as a path parameter.
+    -   [ ] It should query Redis using the received `diagramId`.
+    -   [ ] **If the key is found:** return the full diagram JSON with a `200 OK` status.
+    -   [ ] **If the key is not found:** return an error response: `{"status": "not_found", "message": "Diagram not found or has expired."}` with a `404 Not Found` status.
 
-Action: Find the loop where IBDs are saved (for ibd_data in ibd_to_create:). Replace that entire loop with the new logic below, which checks for existence and then decides whether to create or update.
+-   [ ] **Step 4: Remove Old Code**
+    -   [ ] Clean up and remove all "hacks" and on-the-fly data modification logic from the controller, as it is now encapsulated in the new flow.
 
-Current Code (to be replaced):
+-   [ ] **Step 5: Update Documentation (If applicable)**
+    -   [ ] Update the API documentation (Swagger/OpenAPI) to reflect the changes to the old endpoint and describe the new one.
 
-Python
+---
 
-# for ibd_data in ibd_to_create:
-#     new_ibd = InternalBlockDiagramCreate(
-#         parent_bdd_diagram_id=db_diagram.id,
-#         parent_block_id=ibd_data["parent_block_id"],
-#         nodes=ibd_data["nodes"],
-#         edges=ibd_data["edges"],
-#         source="ai"
-#     )
-#     await crud_ibd.create_ibd(db=db, ibd=new_ibd)
-New Code (to replace the block above):
+### **4. Acceptance Criteria (Definition of Done)**
 
-Python
-
-# In backend/app/database/rag_router.py
-
-# --- New Upsert Logic ---
-for ibd_data in ibd_to_create:
-    existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
-        db=db,
-        parent_bdd_id=db_diagram.id,
-        block_id=ibd_data["parent_block_id"]
-    )
-
-    if existing_ibd:
-        # IBD already exists -> UPDATE it
-        print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
-        await crud_ibd.update_ibd(
-            db=db,
-            db_ibd=existing_ibd,
-            nodes=ibd_data["nodes"],
-            edges=ibd_data["edges"]
-        )
-    else:
-        # IBD does not exist -> CREATE it
-        print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
-        new_ibd = InternalBlockDiagramCreate(
-            parent_bdd_diagram_id=db_diagram.id,
-            parent_block_id=ibd_data["parent_block_id"],
-            nodes=ibd_data["nodes"],
-            edges=ibd_data["edges"],
-            source="ai"
-        )
-        await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+-   [ ] A request to `POST /rag/generate-diagram-with-context/` returns a `diagramId` and a `202` status.
+-   [ ] The new `GET /api/v1/diagrams/result/{diagramId}` endpoint is created and functional.
+-   [ ] When requesting the `GET` endpoint with a valid `diagramId`, the full diagram JSON is returned.
+-   [ ] When requesting the `GET` endpoint with an invalid or expired `diagramId`, a `404` error is returned.
+-   [ ] Diagrams are stored in Redis and are automatically deleted after their TTL expires.
+-   [ ] The old code that modified JSON on the fly within the controller has been completely removed.

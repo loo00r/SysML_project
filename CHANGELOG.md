@@ -7,6 +7,296 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.88] - 2025-08-02
+
+### Fixed
+- Critical IBD diagram save functionality where IBD diagrams were not being saved to database during manual save
+- IBD diagrams now properly save to database along with their parent BDD diagrams
+- Resolved issue where only AI-generated diagrams had IBD save capability while manual IBD creation was ignored
+
+### Added
+- New POST endpoint `/api/v1/diagrams/ibd/` for creating and updating Internal Block Diagrams
+- Comprehensive IBD save logic in frontend that detects and saves all related IBD diagrams
+- Upsert functionality for IBD diagrams preventing duplicate database entries
+- Enhanced save notifications showing count of saved IBD diagrams
+
+### Changed
+- Enhanced manual save workflow to automatically detect and save all IBD diagrams related to active BDD
+- Improved IBD data transformation for proper backend format compatibility
+- Extended handleSave function to process both BDD and IBD diagrams in single operation
+
+### Improved
+- Complete IBD save functionality for both AI-generated and manually created diagrams
+- Better user feedback with detailed save status including IBD diagram counts
+- Robust error handling for IBD save operations with comprehensive logging
+- Unified save experience regardless of diagram creation method (AI vs manual)
+
+## [1.1.87] - 2025-08-02
+
+### Fixed
+- Enhanced diagram generation now keeps BDD diagram active after AI generation instead of switching to IBD tab
+- User now remains on main BDD diagram view after Enhanced generation completes
+- Resolved issue where last created IBD diagram became active, hiding the primary BDD diagram from user
+
+### Changed
+- Enhanced generation workflow now automatically switches back to main BDD diagram after creating all IBD diagrams
+- Improved user experience by maintaining focus on primary diagram while IBD diagrams are created in background
+- Added logic to preserve BDD diagram as active tab after Enhanced generation process
+
+### Improved
+- Better Enhanced diagram generation UX with predictable tab focus behavior
+- Users can immediately see BDD diagram with IBD indicator icons after generation
+- Enhanced generation now provides clear visual feedback with BDD remaining primary focus
+
+## [1.1.86] - 2025-08-02
+
+### Fixed
+- Critical Enhanced diagram generation bug where IBD data was stored in Redis but not processed by frontend
+- IBD diagrams now automatically create from AI-generated Enhanced diagrams with proper node and edge population
+- Resolved empty IBD creation issue when Enhanced generation toggle was enabled
+- Frontend now correctly processes `ibd_data` from Redis response and creates populated IBD diagram tabs
+
+### Added
+- Automatic IBD diagram creation logic in frontend for Enhanced diagram generation
+- IBD data transformation from Redis format to ReactFlow format with proper node and edge mapping
+- Comprehensive logging for IBD creation process to aid debugging
+- Dagre layout application for AI-generated IBD diagrams with optimal Left-to-Right spacing
+
+### Changed
+- Enhanced useAIGeneration hook to process IBD data from Redis and automatically create IBD diagram tabs
+- Updated AIGenerationResult interface to include ibdData property for IBD processing
+- Improved Enhanced diagram workflow to seamlessly create both BDD and IBD diagrams from single generation request
+
+### Improved
+- Enhanced diagrams now properly generate with populated internal block diagrams instead of empty IBDs
+- Better user experience with automatic IBD creation eliminating need for manual IBD setup
+- Complete end-to-end Enhanced diagram generation with properly connected internal components
+- Restored full functionality of Enhanced diagram generation that was broken by Redis architecture changes
+
+## [1.1.85] - 2025-08-02
+
+### Added
+- Two-step save architecture separating diagram generation from database storage
+- New `/api/v1/rag/save-diagram/` endpoint for explicit database saving of AI-generated diagrams
+- `generatedDiagramId` property to DiagramInstance interface for tracking Redis-stored diagrams
+- Smart save logic that differentiates between AI-generated and manual diagrams
+
+### Changed
+- AI diagram generation now only stores in Redis temporarily (no automatic database saving)
+- Save button now uses different endpoints based on diagram origin (AI vs manual)
+- Updated Redis TTL from 15 to 60 minutes for longer temporary diagram storage
+- Enhanced diagram save workflow with dual-path architecture
+
+### Fixed
+- TypeScript compilation error related to generatedDiagramId property
+- Eliminated automatic database saving during AI diagram generation
+- Resolved user confusion about when diagrams are saved to the knowledge base
+
+### Improved
+- User has explicit control over when diagrams are saved to the database
+- Better separation of concerns between temporary generation storage and permanent database storage
+- Enhanced user experience with clear save control and feedback messages
+
+## [1.1.84] - 2025-08-02
+
+### Added
+- Redis-based diagram generation architecture with command/query separation
+- Two-step diagram generation flow: immediate diagramId response followed by result polling
+- Redis client with TTL support for temporary diagram storage
+- New GET endpoint `/api/v1/rag/diagram-result/{diagram_id}` for retrieving generation results
+- Redis service integration in Docker Compose with persistent volume
+- Async polling mechanism in frontend for retrieving generated diagrams
+
+### Changed
+- Refactored `/api/v1/rag/generate-diagram-with-context/` to return 202 status with diagramId immediately
+- Enhanced frontend useAIGeneration hook to use two-step polling approach
+- Updated diagram generation to store results in Redis with 15-minute TTL
+- Improved error handling with Redis-based error storage and retrieval
+
+### Improved
+- Better user experience with immediate response and background processing
+- Enhanced system scalability through command/query separation architecture
+- More reliable diagram generation with temporary storage and retrieval mechanism
+- Reduced frontend waiting time with asynchronous background processing
+
+### Fixed
+- Eliminated blocking API calls during diagram generation
+- Improved system responsiveness through asynchronous processing model
+
+## [1.1.83] - 2025-08-02
+
+### Changed
+- Reverted description text styling back to original distinctive format
+- Description text now uses inline styles with italic font, reduced opacity, and gray color
+- Restored visual distinction between descriptions and other node attributes
+- Enhanced readability through original styling approach with smaller font size and visual separation
+
+### Improved
+- Better visual hierarchy with descriptions standing out from standard node attributes
+- Maintained consistent styling across all node types (BlockNode, SensorNode, ProcessorNode, IBDNode)
+- Enhanced user experience with more readable and visually distinct description text
+- Preserved original design intent for description display with proper visual emphasis
+
+## [1.1.82] - 2025-08-02
+
+### Changed
+- Standardized description text styling to match other node attributes format
+- Updated description display to use consistent "Label: Value" format across all node types
+- Replaced custom inline styles with Material-UI Typography components for better consistency
+- Applied same visual treatment for descriptions as other node properties
+
+### Improved
+- Better visual consistency across all node attributes and descriptions
+- Enhanced readability with standardized typography and formatting
+- More cohesive user interface with unified styling approach
+- Consistent font weights and spacing throughout node components
+
+## [1.1.81] - 2025-08-02
+
+### Added
+- Node descriptions are now displayed directly on canvas blocks for all diagram types
+- Description text rendered inside BlockNode, SensorNode, ProcessorNode, and IBDNode components
+- Visual distinction for description text with italic styling and reduced opacity
+- Multi-line description support with proper text wrapping
+
+### Changed
+- Updated all custom node components to include description rendering in JSX
+- Enhanced node layout to accommodate description text between title and properties
+- Improved self-contained diagram readability without requiring properties panel
+
+### Improved
+- Diagrams are now more informative at a glance with visible component descriptions
+- Better user experience with immediate access to component details on canvas
+- Enhanced visual hierarchy with properly styled description text
+- Consistent description display across all node types (BDD and IBD)
+
+## [1.1.80] - 2025-08-02
+
+### Added
+- Enhanced IBD node generation with AI-populated descriptions and properties fields
+- New prompt rule for generating detailed IBD node information when user provides specifics
+- Rich examples in BDD_ENHANCED_PROMPT_TEMPLATE showing proper IBD node structure with metadata
+
+### Changed
+- Updated BDD_ENHANCED_PROMPT_TEMPLATE to include description and properties in IBD node examples
+- Enhanced AI instruction set to generate meaningful descriptions and properties for internal components
+- Improved IBD node data structure with technical specifications and component details
+
+### Improved
+- IBD nodes now contain detailed technical information (clock speeds, capacities, port types, etc.)
+- Better AI prompt engineering for extracting component specifications from user descriptions
+- More informative Internal Block Diagrams with component-level detail beyond just names
+- Enhanced user experience with richer diagram content and component metadata
+
+## [1.1.79] - 2025-08-02
+
+### Removed
+- Removed unused 'Diagram Type' dropdown from AI Diagram Generator panel
+- Removed unused 'Style' dropdown from AI Diagram Generator panel
+- Cleaned up associated useState hooks and event handlers for removed dropdowns
+- Removed unnecessary MUI imports (Select, MenuItem, FormControl, InputLabel, SelectChangeEvent)
+
+### Changed
+- Simplified AI Diagram Generator interface to show only functional controls
+- Updated generateDiagram function call to remove unused style parameter
+- Streamlined component props and state management
+
+### Improved
+- Cleaner and more focused AI generator UI with reduced visual clutter
+- Smaller bundle size by removing unused MUI components
+- Better user experience with simplified interface showing only relevant options
+- Reduced code complexity and maintenance overhead
+
+## [1.1.78] - 2025-08-02
+
+### Fixed
+- Fixed sidebar lock state synchronization for AI-generated diagrams
+- IBD Block now correctly becomes disabled immediately after AI creates new BDD diagrams
+- Enhanced IBD block locking logic to include both 'bdd' and 'bdd_enhanced' diagram types
+- Resolved sidebar component not re-rendering in response to active diagram type changes
+
+### Changed
+- Updated Sidebar component to use direct state subscription for active diagram type
+- Replaced computed state dependency with live state tracking for better reactivity
+- Improved lock state logic to handle all BDD diagram variants consistently
+
+### Improved
+- Sidebar now instantly reflects the correct element availability when switching between tabs
+- Better user experience with consistent element locking across manual and AI-generated diagrams
+- Enhanced state management for real-time UI updates without manual refresh
+
+## [1.1.77] - 2025-08-02
+
+### Added
+- Smart conditional centering system for new diagrams vs user-modified viewport states
+- `needsCentering` flag to DiagramInstance interface for distinguishing auto-generated content
+- `clearCenteringFlag` action to reset centering flag after fitView execution
+
+### Fixed
+- New AI-generated diagrams now properly center on canvas while preserving user viewport changes
+- IBD diagrams from API and cache now automatically center when first opened
+- Empty fallback IBD diagrams center correctly for better user experience
+
+### Changed
+- Enhanced diagram creation workflow with conditional fitView logic
+- Added useEffect in DiagramWorkspace to handle smart centering with proper cleanup
+- Updated AI generation and IBD creation to set needsCentering flag
+
+### Improved
+- Perfect balance between automatic centering for new content and viewport persistence for user modifications
+- Better user experience with predictable diagram positioning behavior
+- Clean separation of centering logic from viewport management
+
+## [1.1.76] - 2025-08-02
+
+### Fixed
+- Removed automatic viewport centering when switching between diagram tabs
+- Fixed ReactFlow TypeScript compatibility by reverting to supported API props
+- Eliminated fitView auto-centering that was resetting user's custom zoom/pan positions
+
+### Changed
+- Reverted from `viewport`/`onViewportChange` to `defaultViewport`/`onMove` props for ReactFlow v11 compatibility
+- Removed `fitView` prop to preserve user-defined viewport positions across tab switches
+
+### Improved
+- True viewport persistence - zoom and pan positions remain exactly as set when switching tabs
+- Better user experience with preserved custom viewport states
+- Enhanced diagram navigation workflow without unexpected viewport resets
+
+## [1.1.75] - 2025-08-02
+
+### Fixed
+- Enforced strict viewport isolation with controlled React Flow component state
+- Eliminated remaining viewport sharing between diagram tabs
+- Fixed minimap sync issues with per-diagram viewport states
+
+### Changed
+- Converted React Flow from uncontrolled to controlled component pattern
+- Replaced `defaultViewport` and `onMove` with `viewport` and `onViewportChange` props
+- Enhanced viewport state management for instant and reliable restoration
+
+### Improved
+- Complete viewport isolation between BDD and IBD diagrams
+- More reliable pan and zoom state persistence across tab switches
+- Better React Flow component performance with controlled state pattern
+
+## [1.1.74] - 2025-08-02
+
+### Fixed
+- Decoupled canvas viewport state between BDD and IBD diagrams
+- Each diagram tab now maintains its own unique pan and zoom position
+- Fixed issue where panning/zooming in one diagram affected all other open diagrams
+
+### Changed
+- Added `viewport` property to `DiagramInstance` interface for per-diagram viewport storage
+- Added `onViewportChange` action to Zustand store for viewport state management
+- Updated `DiagramWorkspace` component to use individual viewport states with React Flow key-based remounting
+
+### Improved
+- Better user experience with isolated viewport controls for each diagram
+- Viewport state is now persisted and restored when switching between tabs
+- Enhanced tabbed interface with proper viewport isolation
+
 ## [1.1.73] - 2025-07-30
 
 ### Fixed

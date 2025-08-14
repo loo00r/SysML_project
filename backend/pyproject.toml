@@ -17,7 +17,8 @@ dependencies = [
     "asyncpg (>=0.29.0,<0.30.0)",
     "psycopg2-binary (>=2.9.9,<3.0.0)",
     "alembic (>=1.13.1,<2.0.0)",
-    "pgvector (>=0.2.5,<0.3.0)"
+    "pgvector (>=0.2.5,<0.3.0)",
+    "redis (>=5.0.0,<6.0.0)"
 ]
 
 [build-system]
