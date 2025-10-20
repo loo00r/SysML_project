@@ -43,7 +43,7 @@ const SmdFinalNode: React.FC<NodeProps> = ({ selected }) => (
   <Container>
     <Handle type="target" position={Position.Top} style={handleStyle} />
     <Handle type="source" position={Position.Right} style={handleStyle} />
-    <Handle type="target" position={Position.Left} style={handleStyle} />
+    <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
     <Handle type="source" position={Position.Bottom} style={handleStyle} />
     <OuterRing selected={selected}>
       <InnerRing />

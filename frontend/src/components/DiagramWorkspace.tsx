@@ -670,26 +670,34 @@ const DiagramWorkspace: React.FC = () => {
       const sourceNode = nodes.find(node => node.id === connection.source);
       const targetNode = nodes.find(node => node.id === connection.target);
 
-      const isChild = (node?: typeof nodes[number]) => !!node?.parentNode;
-      const isSameComposite = (parentId: string, otherNode?: typeof nodes[number]) => {
-        if (!otherNode) return false;
-        if (otherNode.parentNode === parentId) return true;
-        if (otherNode.id === parentId) return true;
-        return false;
-      };
+      const sourceParent = sourceNode?.parentNode ?? null;
+      const targetParent = targetNode?.parentNode ?? null;
+      const sourceInside = Boolean(sourceParent);
+      const targetInside = Boolean(targetParent);
+      const sameComposite = sourceInside && targetInside && sourceParent === targetParent;
 
-      let invalid = false;
-
-      if (isChild(sourceNode) && sourceNode?.parentNode) {
-        invalid = !isSameComposite(sourceNode.parentNode, targetNode);
-      }
-
-      if (!invalid && isChild(targetNode) && targetNode?.parentNode) {
-        invalid = !isSameComposite(targetNode.parentNode, sourceNode);
-      }
-
-      if (invalid) {
+      if (
+        (sourceInside && !targetInside) ||
+        (!sourceInside && targetInside) ||
+        (sourceInside && targetInside && !sameComposite)
+      ) {
         showNotification('Transitions from/to nested states must stay inside their composite (MVP).', 'info');
+        return;
+      }
+
+      if (sourceNode?.type === 'smdComposite') {
+        const isTargetOutside = !targetParent;
+        const hasValidHandles =
+          connection.sourceHandle === 'out-right' && connection.targetHandle === 'in-left';
+
+        if (!isTargetOutside || !hasValidHandles) {
+          showNotification('Composite may connect outside only from right port to a node’s left port.', 'info');
+          return;
+        }
+      }
+
+      if (targetNode?.type === 'smdComposite') {
+        showNotification('Composite may connect outside only from right port to a node’s left port.', 'info');
         return;
       }
     }
@@ -842,6 +850,21 @@ const DiagramWorkspace: React.FC = () => {
           snapToGrid
           snapGrid={[15, 15]}
         >
+          <defs>
+            <marker
+              id="smd-arrowhead"
+              markerWidth="12"
+              markerHeight="12"
+              viewBox="0 0 12 12"
+              refX="10"
+              refY="6"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L12,6 L0,12 z" fill="#37474f" />
+            </marker>
+          </defs>
+
           {/* Background grid */}
           <Background color="#aaa" gap={16} />
           

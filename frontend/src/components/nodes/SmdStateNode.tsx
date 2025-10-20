@@ -60,7 +60,7 @@ const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) => {
   return (
     <Container>
       <Handle type="target" position={Position.Top} style={handleStyle} />
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
       <Handle type="source" position={Position.Right} style={handleStyle} />
       <Handle type="source" position={Position.Bottom} style={handleStyle} />
 

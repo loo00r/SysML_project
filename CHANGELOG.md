@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Composite internal transition tooling and build pipeline follow-ups pending next iteration.
+
+## [1.1.97] - 2025-10-20
+
+### Fixed
+- SMD edge build errors — render paths via BaseEdge, labels via EdgeLabelRenderer, and enforce typed `pointerEvents`.
+
+## [1.1.96] - 2025-10-20
+
+### Fixed
+- Edge label rendering — proper EdgeLabelRenderer usage and CSS `pointerEvents` typing to restore successful builds.
+
+## [1.1.95] - 2025-10-20
+
+### Fixed
+- Enabled child-to-child transitions inside composite states and restored SMD transition labels while keeping the right-to-left external policy.
+
+## [1.1.94] - 2025-10-20
+
+### Changed
+- Composite external connection policy — right-only source port and left-target requirement for outside nodes.
+
+## [1.1.93] - 2025-10-20
+
+### Fixed
+- Allow internal transitions inside Composite state containers and block only cross-boundary child ↔ outside transitions with a soft warning.
+- Enabled composite top/right ports for external connections while keeping arrow rendering and optional labels consistent.
+
 ## [1.1.92] - 2025-10-20
 
 ### Added

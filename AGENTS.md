@@ -55,76 +55,92 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-## SMD-02 — Composite State nesting (parent/child containment)
+## SMD-02c-BuildFix — Refactor SmdTransitionEdge to BaseEdge + proper EdgeLabelRenderer
 
-**Branch:** `feat/smd-composite-nesting`
+**Branch:** `fix/smd-transitionedge-baseedge`
 
 ### Goal
-Enable a **Composite State** node that acts as a container for child SMD nodes (`smdState`, `smdInitial`, `smdFinal`, `smdChoice`). Children can be moved **only inside** the composite’s workspace (below its header). Edges starting/ending on a child **cannot** connect outside the composite (soft warning).
+Unblock TypeScript during Docker build and restore edge labels by:
+- Rendering the **edge path** with `BaseEdge`.
+- Rendering the **label** only as a child of `EdgeLabelRenderer` (no unsupported props).
+- Using typed CSS for `pointerEvents`.
 
 ### Steps
-1. **Add `smdComposite` node type**
-   - Visuals:
-     - Rounded rectangle with a header band (title on top).
-     - Inner **workspace** area with padding (e.g., 16–24px).
-   - Default data:
-     ```ts
-     { name: "Composite", entry: "", exit: "", do: "" }
+1. **Refactor `SmdTransitionEdge.tsx`**
+   - Replace the mixed label/edge rendering with the React Flow–recommended pattern:
+     ```tsx
+     import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from 'reactflow';
+     import type { CSSProperties } from 'react';
+
+     export default function SmdTransitionEdge(props: EdgeProps) {
+       const {
+         id, sourceX, sourceY, targetX, targetY,
+         sourcePosition, targetPosition,
+         markerEnd, style, label,
+       } = props;
+
+       const [edgePath, labelX, labelY] = getSmoothStepPath({
+         sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
+       });
+
+       const show = (label ?? '').trim().length > 0;
+
+       const labelStyle: CSSProperties = {
+         position: 'absolute',
+         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+         pointerEvents: 'all' as CSSProperties['pointerEvents'],
+         zIndex: 1,
+       };
+
+       return (
+         <>
+           <BaseEdge
+             id={id}
+             path={edgePath}
+             markerEnd={markerEnd}
+             style={style}
+             interactionWidth={20}
+           />
+           {show && (
+             <EdgeLabelRenderer>
+               <div style={labelStyle} className="smd-edge-label">
+                 {label}
+               </div>
+             </EdgeLabelRenderer>
+           )}
+         </>
+       );
+     }
      ```
+   - **Do not** pass `id`, `path`, `style`, `markerEnd`, `selected`, `interactionWidth`, etc. to `EdgeLabelRenderer`. It only portals **children**.
 
-2. **Parent/child containment**
-   - On drop of `smdState|smdInitial|smdFinal|smdChoice` onto a composite:
-     - set `parentNode = <compositeId>` and `extent = 'parent'`.
-     - ensure child positions are **relative** to the composite’s inner workspace.
-   - Constrain dragging:
-     - Children must stay within the workspace (respect padding and header height).
-     - Prevent moving children outside (clamp positions in onDrag / onNodeDragStop).
+2. **Type-safe `pointerEvents`**
+   - Wherever inline styles are used, ensure literal typed values:
+     ```tsx
+     import type { CSSProperties } from 'react';
+     const bg: CSSProperties = {
+       pointerEvents: 'none' as CSSProperties['pointerEvents'],
+     };
+     ```
+   - Avoid `pointerEvents: someStringVar`.
 
-3. **Connection rules (soft warning)**
-   - For edges where `source` or `target` is a child inside a composite:
-     - **Disallow** connecting to nodes **outside** that composite.
-     - UX: cancel the connection and show a non-blocking notice:
-       - “Transitions from/to nested states must stay inside their composite (MVP).”
-   - Allow connections **within** the same composite freely (child↔child, child↔composite if we later support entry/exit points—skip for MVP).
-
-4. **Workspace geometry**
-   - Define header height (e.g., 32–40px) and internal padding constants.
-   - Expose helpers:
-     - `getCompositeWorkspaceRect(node): { x, y, width, height }`
-     - `isPointInsideCompositeWorkspace(point, node): boolean`
-   - Use these in hit-testing for drop and drag clamping.
-
-5. **Store & serialization**
-   - Persist `parentNode` and `extent` in diagram JSON for children.
-   - Ensure load/resume recreates the containment graph exactly.
-
-6. **UI polish**
-   - Show subtle dashed border for the workspace while dragging children.
-   - Cursor changes to indicate “no drop” when trying to leave the container.
+3. **Sanity pass**
+   - Grep the codebase to confirm `EdgeLabelRenderer` isn’t given unsupported props anywhere else.
+   - Keep the Composite external policy (right → left) and internal child↔child transitions intact.
 
 ### DoD
-- You can create an `smdComposite`, then drop/move `smdState/Initial/Final/Choice` **inside** it.
-- Children cannot be dragged outside the composite’s workspace; positions are clamped.
-- Attempting to connect a child to a node outside the composite is blocked with a **soft warning** (no hard error).
-- Save → reload preserves parent/child relations and positions.
-- Existing SMD/BDD/IBD behaviors remain unaffected.
-
-### Manual test
-1. Create SMD → add **Composite** → drop `Initial`, `State`, `Final` inside it.
-2. Try to drag a child outside the border → it clamps inside.
-3. Create an edge from a child to a node outside → connection canceled + soft warning shown.
-4. Save, reload the app → containment and edges persist as before.
+- `docker compose up --build` succeeds with no TS errors.
+- Transition labels render correctly on SMD edges.
+- Internal child↔child transitions inside Composite still work.
 
 ### Versioning
-- Bump to **1.1.92**.
-- `CHANGELOG.md`:  
-  `## [1.1.92] - <today>`  
-  `Added: Composite State with parent/child containment and soft boundary rules.`
+- Bump to **1.1.97**.
+- `CHANGELOG.md`:
+  - `## [1.1.97] - <today>`
+  - `Fixed: SMD edge build errors — render path via BaseEdge and labels via EdgeLabelRenderer; typed pointerEvents.`
 
 ### Suggested commits
-- `feat(smd): add Composite State node with inner workspace`
-- `feat(smd): parentNode containment and drag clamp for nested children`
-- `feat(smd): block cross-boundary transitions with soft warning`
-- `chore(smd): helpers for composite workspace geometry`
-- `chore(version): bump to 1.1.92 and update changelog`
-- `test(smd): e2e nesting, drag clamp, and soft connection rule`
+- `fix(smd): render transition path via BaseEdge and labels via EdgeLabelRenderer`
+- `chore(smd): type-safe pointerEvents in TSX styles`
+- `chore(version): bump to 1.1.97 and update changelog`
+

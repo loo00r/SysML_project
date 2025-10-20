@@ -196,6 +196,20 @@ body {
   filter: drop-shadow(0 0 3px rgba(0, 115, 230, 0.3));
 }
 
+.smd-edge-label {
+  background: #eceff1;
+  border: 1px solid #b0bec5;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(55, 71, 79, 0.25);
+  color: #37474f;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 4px 8px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
 /* Modal animations */
 .modal-overlay {
   opacity: 0;

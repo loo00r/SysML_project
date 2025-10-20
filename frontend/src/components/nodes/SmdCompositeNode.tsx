@@ -8,6 +8,7 @@ import {
   COMPOSITE_HEADER_HEIGHT,
   COMPOSITE_PADDING,
 } from '../../utils/smdComposite';
+import type { CSSProperties } from 'react';
 
 const CompositeContainer = styled(Paper)<{ isSelected: boolean; width: number; height: number }>(
   ({ theme, isSelected, width, height }) => ({
@@ -22,6 +23,8 @@ const CompositeContainer = styled(Paper)<{ isSelected: boolean; width: number; h
     overflow: 'hidden',
     position: 'relative',
     transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+    pointerEvents: 'auto' as CSSProperties['pointerEvents'],
+    zIndex: 0,
   })
 );
 
@@ -49,6 +52,8 @@ const Workspace = styled(Box)(({ theme }) => ({
     'repeating-linear-gradient(45deg, rgba(227, 242, 253, 0.4), rgba(227, 242, 253, 0.4) 10px, rgba(255, 255, 255, 0.4) 10px, rgba(255, 255, 255, 0.4) 20px)',
   borderRadius: theme.shape.borderRadius,
   border: '1px dashed rgba(13, 71, 161, 0.4)',
+  pointerEvents: 'none' as CSSProperties['pointerEvents'],
+  zIndex: 0,
 }));
 
 const MetaSection = styled(Box)(({ theme }) => ({
@@ -67,10 +72,15 @@ const MetaRow = styled(Typography)(({ theme }) => ({
   whiteSpace: 'pre-wrap',
 }));
 
-const handleStyle = {
+const rightHandleStyle: CSSProperties = {
   background: '#455a64',
   width: 10,
   height: 10,
+  right: -6,
+  top: '50%',
+  transform: 'translate(0, -50%)',
+  pointerEvents: 'auto' as CSSProperties['pointerEvents'],
+  zIndex: 10,
 };
 
 const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?: number }>> = ({
@@ -107,10 +117,7 @@ const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?:
         </MetaSection>
       )}
 
-      <Handle type="target" position={Position.Top} style={handleStyle} />
-      <Handle type="source" position={Position.Right} style={handleStyle} />
-      <Handle type="source" position={Position.Bottom} style={handleStyle} />
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle id="out-right" type="source" position={Position.Right} style={rightHandleStyle} />
     </CompositeContainer>
   );
 };
