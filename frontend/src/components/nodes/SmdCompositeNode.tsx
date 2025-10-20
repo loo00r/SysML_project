@@ -16,8 +16,10 @@ const CompositeContainer = styled(Paper)<{ isSelected: boolean; width: number; h
     height,
     borderRadius: 16,
     border: isSelected ? `2px solid ${theme.palette.primary.main}` : '1px solid #90a4ae',
-    backgroundColor: '#fafafa',
-    boxShadow: isSelected ? '0 6px 16px rgba(21, 101, 192, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.12)',
+    backgroundColor: 'transparent',
+    boxShadow: `${
+      isSelected ? '0 6px 16px rgba(21, 101, 192, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.12)'
+    }, inset 0 0 0 1px rgba(0, 0, 0, 0.08)`,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -44,16 +46,13 @@ const HeaderTitle = styled(Typography)({
   color: '#0d47a1',
 });
 
-const Workspace = styled(Box)(({ theme }) => ({
+const WorkspaceArea = styled(Box)(() => ({
   flex: 1,
-  padding: `${COMPOSITE_PADDING}px`,
   position: 'relative',
-  background:
-    'repeating-linear-gradient(45deg, rgba(227, 242, 253, 0.4), rgba(227, 242, 253, 0.4) 10px, rgba(255, 255, 255, 0.4) 10px, rgba(255, 255, 255, 0.4) 20px)',
-  borderRadius: theme.shape.borderRadius,
-  border: '1px dashed rgba(13, 71, 161, 0.4)',
+  margin: `${COMPOSITE_PADDING}px`,
+  borderRadius: 12,
+  border: '1px dashed rgba(13, 71, 161, 0.3)',
   pointerEvents: 'none' as CSSProperties['pointerEvents'],
-  zIndex: 0,
 }));
 
 const MetaSection = styled(Box)(({ theme }) => ({
@@ -101,7 +100,7 @@ const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?:
         <HeaderTitle variant="subtitle2">{name}</HeaderTitle>
       </Header>
 
-      <Workspace />
+      <WorkspaceArea aria-hidden />
 
       {(entry || exit || doActivity) && (
         <MetaSection>

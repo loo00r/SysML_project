@@ -8,7 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Composite workspace outline keeps internal SMD edges fully visible without any overlay fill.
+- Internal SMD edges remain visible beneath the composite workspace via a transparent, non-interactive stripe overlay.
 - Composite internal transition tooling and build pipeline follow-ups pending next iteration.
+
+## [1.1.99] - 2025-10-20
+
+### Fixed
+- Composite workspace no longer overlays internal edges — switched to hollow workspace with border/outline only.
+
+## [1.1.98] - 2025-10-20
+
+### Fixed
+- Internal SMD edges hidden by Composite workspace — transparent overlay with pointer-events:none and no opaque fill.
 
 ## [1.1.97] - 2025-10-20
 

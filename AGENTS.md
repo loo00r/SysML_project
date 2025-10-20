@@ -55,92 +55,61 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-## SMD-02c-BuildFix — Refactor SmdTransitionEdge to BaseEdge + proper EdgeLabelRenderer
+## SMD-02d-Alt — Hollow Composite workspace (no overlay, edges fully visible)
 
-**Branch:** `fix/smd-transitionedge-baseedge`
+**Branch:** `fix/smd-composite-hollow-workspace`
 
 ### Goal
-Unblock TypeScript during Docker build and restore edge labels by:
-- Rendering the **edge path** with `BaseEdge`.
-- Rendering the **label** only as a child of `EdgeLabelRenderer` (no unsupported props).
-- Using typed CSS for `pointerEvents`.
+Guarantee internal child↔child edges are visible by removing any filled/striped overlay inside `smdComposite`. Keep visual separation with borders/outline only.
 
 ### Steps
-1. **Refactor `SmdTransitionEdge.tsx`**
-   - Replace the mixed label/edge rendering with the React Flow–recommended pattern:
-     ```tsx
-     import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from 'reactflow';
-     import type { CSSProperties } from 'react';
+1. **Remove overlay element**
+   - In `SmdCompositeNode.tsx`, delete the inner `workspace overlay` `<div>` (the one absolutely positioned under the header).
+   - Do **not** render any background (solid or patterned) inside the composite content area.
 
-     export default function SmdTransitionEdge(props: EdgeProps) {
-       const {
-         id, sourceX, sourceY, targetX, targetY,
-         sourcePosition, targetPosition,
-         markerEnd, style, label,
-       } = props;
-
-       const [edgePath, labelX, labelY] = getSmoothStepPath({
-         sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
-       });
-
-       const show = (label ?? '').trim().length > 0;
-
-       const labelStyle: CSSProperties = {
-         position: 'absolute',
-         transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-         pointerEvents: 'all' as CSSProperties['pointerEvents'],
-         zIndex: 1,
-       };
-
-       return (
-         <>
-           <BaseEdge
-             id={id}
-             path={edgePath}
-             markerEnd={markerEnd}
-             style={style}
-             interactionWidth={20}
-           />
-           {show && (
-             <EdgeLabelRenderer>
-               <div style={labelStyle} className="smd-edge-label">
-                 {label}
-               </div>
-             </EdgeLabelRenderer>
-           )}
-         </>
-       );
-     }
-     ```
-   - **Do not** pass `id`, `path`, `style`, `markerEnd`, `selected`, `interactionWidth`, etc. to `EdgeLabelRenderer`. It only portals **children**.
-
-2. **Type-safe `pointerEvents`**
-   - Wherever inline styles are used, ensure literal typed values:
+2. **Use outline/border instead of background**
+   - On the composite host container (the node’s root), add padding to create the “workspace” inset and draw only borders:
      ```tsx
      import type { CSSProperties } from 'react';
-     const bg: CSSProperties = {
-       pointerEvents: 'none' as CSSProperties['pointerEvents'],
+
+     const hostStyle: CSSProperties = {
+       position: 'relative',
+       borderRadius: 12,
+       background: 'transparent',
+       // header occupies the top; create an inset area below it:
+       paddingTop: 28,
+       // draw a subtle inner border to hint the workspace bounds
+       boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.08)',
      };
      ```
-   - Avoid `pointerEvents: someStringVar`.
+   - If you want a tiny hint of pattern, use **outline-only** tricks that don’t cover content, e.g. a very light `box-shadow: inset …` or a hairline dashed **border**. Avoid any `background*` properties.
 
-3. **Sanity pass**
-   - Grep the codebase to confirm `EdgeLabelRenderer` isn’t given unsupported props anywhere else.
-   - Keep the Composite external policy (right → left) and internal child↔child transitions intact.
+3. **Pointer events & z-index**
+   - No additional overlay layers; child nodes/handles remain interactive (default `pointer-events`).
+   - Do **not** assign a positive z-index on anything covering the workspace.
+
+4. **Clean up CSS**
+   - Remove previous `workspaceOverlayStyle`, gradients, and `mix-blend-mode` from the composite.
+   - Ensure there is no leftover `background-color` on any wrapping element.
+
+5. **Regression checks**
+   - Internal edges/arrowheads are visible across the entire composite area.
+   - Labels still render above via `EdgeLabelRenderer`.
+   - External policy unchanged (Composite **right** → outside node **left**); child↔outside is soft-blocked.
+   - Save/reload preserves visuals and behavior.
 
 ### DoD
-- `docker compose up --build` succeeds with no TS errors.
-- Transition labels render correctly on SMD edges.
-- Internal child↔child transitions inside Composite still work.
+- Inside Composite, edges are clearly visible everywhere; no area hides the line.
+- The composite still looks framed (header + subtle inner border), but there is **no** filled/striped background.
 
 ### Versioning
-- Bump to **1.1.97**.
+- Bump to **1.1.99**.
 - `CHANGELOG.md`:
-  - `## [1.1.97] - <today>`
-  - `Fixed: SMD edge build errors — render path via BaseEdge and labels via EdgeLabelRenderer; typed pointerEvents.`
+  - `## [1.1.99] - <today>`
+  - `Fixed: Composite workspace no longer overlays internal edges — switched to hollow workspace with border/outline only.`
 
 ### Suggested commits
-- `fix(smd): render transition path via BaseEdge and labels via EdgeLabelRenderer`
-- `chore(smd): type-safe pointerEvents in TSX styles`
-- `chore(version): bump to 1.1.97 and update changelog`
+- `fix(smd): remove composite workspace overlay and switch to hollow layout`
+- `chore(smd): clean old overlay styles; keep subtle inset border`
+- `chore(version): bump to 1.1.99 and update changelog`
 
