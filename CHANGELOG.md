@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.92] - 2025-10-20
+
+### Added
+- Composite State with parent/child containment and soft boundary rules, including in-canvas drag limits and connection guardrails.
+
 ## [1.1.91] - 2025-10-20
 
 ### Added

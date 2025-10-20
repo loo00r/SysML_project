@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import ReactFlow, {
   Background,
+  Connection,
   MiniMap,
   Panel,
   useReactFlow,
@@ -17,12 +18,18 @@ import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
-import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode, SmdInitialNode, SmdFinalNode, SmdStateNode, SmdChoiceNode } from './nodes';
+import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode, SmdInitialNode, SmdFinalNode, SmdStateNode, SmdChoiceNode, SmdCompositeNode } from './nodes';
 import SmdTransitionEdge from './edges/SmdTransitionEdge';
 import useDiagramStore, { DiagramType } from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
+import {
+  COMPOSITE_DEFAULT_HEIGHT,
+  COMPOSITE_DEFAULT_WIDTH,
+  getCompositeWorkspaceRect,
+  isPointInsideCompositeWorkspace,
+} from '../utils/smdComposite';
 
 // Unified node types object - includes all node components to prevent rendering issues
 const unifiedNodeTypes = {
@@ -37,6 +44,7 @@ const unifiedNodeTypes = {
   smdFinal: SmdFinalNode,
   smdState: SmdStateNode,
   smdChoice: SmdChoiceNode,
+  smdComposite: SmdCompositeNode,
   defaultNode: BlockNode
 };
 
@@ -141,6 +149,7 @@ const DiagramWorkspace: React.FC = () => {
     smdFinal: 'final state',
     smdState: 'state node',
     smdChoice: 'choice pseudo-state',
+    smdComposite: 'composite state',
   };
 
   // Access the diagram store
@@ -151,7 +160,7 @@ const DiagramWorkspace: React.FC = () => {
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
+    onConnect: storeOnConnect,
     setNodes,
     setEdges,
     setSelectedNodes,
@@ -557,7 +566,7 @@ const DiagramWorkspace: React.FC = () => {
         let nodeType: string | null = null;
 
         if (activeDiagram?.type === 'smd') {
-          const allowedSmdTypes = ['smdInitial', 'smdFinal', 'smdState', 'smdChoice'];
+          const allowedSmdTypes = ['smdInitial', 'smdFinal', 'smdState', 'smdChoice', 'smdComposite'];
           if (!allowedSmdTypes.includes(data.type)) {
             showNotification('Only state machine elements can be added to SMD diagrams.', 'warning');
             return;
@@ -579,7 +588,7 @@ const DiagramWorkspace: React.FC = () => {
           return;
         }
 
-        const newNode = {
+        const newNode: any = {
           id: `${nodeType}-${Date.now()}`,
           type: nodeType,
           position,
@@ -588,7 +597,61 @@ const DiagramWorkspace: React.FC = () => {
             type: nodeType,
           },
         };
-        
+
+        if (activeDiagram?.type === 'smd') {
+          let parentNode: string | undefined;
+          let extent: 'parent' | undefined;
+          let adjustedPosition = { ...position };
+
+          if (nodeType !== 'smdComposite') {
+            const compositeNodes = nodes.filter(node => node.type === 'smdComposite');
+            const containingComposite = compositeNodes.find(composite =>
+              isPointInsideCompositeWorkspace(position, composite)
+            );
+
+            if (containingComposite) {
+              parentNode = containingComposite.id;
+              extent = 'parent';
+
+              const workspace = getCompositeWorkspaceRect(containingComposite);
+              const parentPosition = containingComposite.positionAbsolute ?? containingComposite.position;
+              const relativeX = position.x - parentPosition.x;
+              const relativeY = position.y - parentPosition.y;
+
+              const clampedX = Math.min(
+                Math.max(relativeX, workspace.x),
+                workspace.x + workspace.width
+              );
+              const clampedY = Math.min(
+                Math.max(relativeY, workspace.y),
+                workspace.y + workspace.height
+              );
+
+              adjustedPosition = { x: clampedX, y: clampedY };
+            }
+          }
+
+          if (nodeType === 'smdComposite') {
+            newNode.style = {
+              width: COMPOSITE_DEFAULT_WIDTH,
+              height: COMPOSITE_DEFAULT_HEIGHT,
+            };
+            newNode.data = {
+              ...newNode.data,
+              width: COMPOSITE_DEFAULT_WIDTH,
+              height: COMPOSITE_DEFAULT_HEIGHT,
+              name: newNode.data?.name || 'Composite',
+              label: newNode.data?.label || 'Composite',
+            };
+          } else {
+            newNode.position = adjustedPosition;
+            if (parentNode) {
+              newNode.parentNode = parentNode;
+              newNode.extent = extent;
+            }
+          }
+        }
+
         // Add the node to the diagram
         addNode(newNode);
         const displayName = typeDisplayNames[nodeType] || `${nodeType} node`;
@@ -599,8 +662,40 @@ const DiagramWorkspace: React.FC = () => {
         showNotification('Failed to add node', 'error');
       }
     },
-    [addNode, showNotification, project]
+    [addNode, showNotification, project, activeDiagram?.type, nodes]
   );
+
+  const handleConnect = useCallback((connection: Connection) => {
+    if (activeDiagram?.type === 'smd') {
+      const sourceNode = nodes.find(node => node.id === connection.source);
+      const targetNode = nodes.find(node => node.id === connection.target);
+
+      const isChild = (node?: typeof nodes[number]) => !!node?.parentNode;
+      const isSameComposite = (parentId: string, otherNode?: typeof nodes[number]) => {
+        if (!otherNode) return false;
+        if (otherNode.parentNode === parentId) return true;
+        if (otherNode.id === parentId) return true;
+        return false;
+      };
+
+      let invalid = false;
+
+      if (isChild(sourceNode) && sourceNode?.parentNode) {
+        invalid = !isSameComposite(sourceNode.parentNode, targetNode);
+      }
+
+      if (!invalid && isChild(targetNode) && targetNode?.parentNode) {
+        invalid = !isSameComposite(targetNode.parentNode, sourceNode);
+      }
+
+      if (invalid) {
+        showNotification('Transitions from/to nested states must stay inside their composite (MVP).', 'info');
+        return;
+      }
+    }
+
+    storeOnConnect(connection);
+  }, [activeDiagram?.type, nodes, showNotification, storeOnConnect]);
 
   // Render empty state when no diagram is active
   if (!activeDiagram) {
@@ -728,7 +823,7 @@ const DiagramWorkspace: React.FC = () => {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          onConnect={handleConnect}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
@@ -761,6 +856,7 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'smdFinal') return '#37474f';
               if (n.type === 'smdState') return '#1565c0';
               if (n.type === 'smdChoice') return '#455a64';
+              if (n.type === 'smdComposite') return '#0d47a1';
               return '#0041d0';
             }}
             nodeColor={(n) => {
@@ -772,6 +868,7 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'smdFinal') return '#cfd8dc';
               if (n.type === 'smdState') return '#bbdefb';
               if (n.type === 'smdChoice') return '#eceff1';
+              if (n.type === 'smdComposite') return '#c5cae9';
               return '#e3f2fd';
             }}
             maskColor="rgba(0, 0, 0, 0.1)"

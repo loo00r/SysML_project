@@ -8,6 +8,7 @@ import SmdInitialNode from './SmdInitialNode';
 import SmdFinalNode from './SmdFinalNode';
 import SmdStateNode from './SmdStateNode';
 import SmdChoiceNode from './SmdChoiceNode';
+import SmdCompositeNode from './SmdCompositeNode';
 
 // Export all node components
 export {
@@ -20,7 +21,8 @@ export {
   SmdInitialNode,
   SmdFinalNode,
   SmdStateNode,
-  SmdChoiceNode
+  SmdChoiceNode,
+  SmdCompositeNode
 };
 
 // BDD node types mapping for ReactFlow
@@ -47,6 +49,7 @@ export const smdNodeTypes = {
   smdFinal: SmdFinalNode,
   smdState: SmdStateNode,
   smdChoice: SmdChoiceNode,
+  smdComposite: SmdCompositeNode,
   defaultNode: SmdStateNode
 };
 

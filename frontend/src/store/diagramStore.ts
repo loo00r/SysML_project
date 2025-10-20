@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport, MarkerType } from 'reactflow';
+import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
+import { clampPositionWithinComposite, getCompositeWorkspaceRect } from '../utils/smdComposite';
 
 // Define node types based on SysML diagram elements
 export type NodeType =
@@ -15,7 +16,8 @@ export type NodeType =
   | 'smdInitial'
   | 'smdFinal'
   | 'smdState'
-  | 'smdChoice';
+  | 'smdChoice'
+  | 'smdComposite';
 
 // Define node data structure
 export interface NodeData {
@@ -34,6 +36,8 @@ export interface NodeData {
   guard?: string;
   action?: string;
   stateType?: 'initial' | 'final' | 'choice' | 'state';
+  width?: number;
+  height?: number;
 }
 
 // Define diagram types
@@ -710,9 +714,36 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   },
   
   onNodesChange: (changes) => {
-    const newNodes = applyNodeChanges(changes, get().nodes);
-    set({ nodes: newNodes });
-    get().updateActiveDiagram({ nodes: newNodes });
+    const currentNodes = get().nodes;
+    const newNodes = applyNodeChanges(changes, currentNodes);
+
+    const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
+    let adjustedNodes = newNodes;
+
+    if (activeDiagram?.type === 'smd') {
+      const composites = new Map<string, Node<NodeData>>();
+      newNodes.forEach(node => {
+        if (node.type === 'smdComposite') {
+          composites.set(node.id, node);
+        }
+      });
+
+      adjustedNodes = newNodes.map(node => {
+        if (node.parentNode && composites.has(node.parentNode)) {
+          const parentComposite = composites.get(node.parentNode)!;
+          const clampedPosition = clampPositionWithinComposite(node as Node<NodeData>, parentComposite);
+          return {
+            ...node,
+            position: clampedPosition,
+            extent: 'parent' as const,
+          };
+        }
+        return node;
+      });
+    }
+
+    set({ nodes: adjustedNodes });
+    get().updateActiveDiagram({ nodes: adjustedNodes });
   },
   
   onEdgesChange: (changes) => {
@@ -750,14 +781,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
           }
         : { stroke: '#555', strokeWidth: 1 },
       className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
-      markerEnd: isSMD
-        ? {
-            type: MarkerType.ArrowClosed,
-            color: '#37474f',
-            width: 24,
-            height: 24
-          }
-        : undefined,
+      markerEnd: isSMD ? 'arrowclosed' : undefined,
       label: isIBD ? 'IBD Blocks' : isSMD ? 'event [guard] / action' : undefined
     };
     
