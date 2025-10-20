@@ -197,33 +197,45 @@ class DiagramPositioning:
             # Return original data if there was an error
             return diagram_data
 
-# Core SysML prompt template to help guide model responses (without positioning logic)
-SYSML_PROMPT_TEMPLATE = """
-You are a SysML expert assisting a software tool.  When given a system description
-and optional example diagrams, produce a Block Definition Diagram in JSON with the
-structure shown below.
+# Core prompt for BDD-only generation (no nested diagrams or positioning data)
+BDD_ONLY_PROMPT_TEMPLATE = """
+You are a SysML expert specializing in Block Definition Diagrams (BDD).
 
-Required output format:
+TASK: Produce a SysML Block Definition Diagram in JSON format.
+
+GOAL:
+Generate a Block Definition Diagram that captures ONLY the high-level system structure described by the user.
+
+OUTPUT REQUIREMENTS:
 {
-  "diagram_type": "block",
+  "diagram_type": "bdd",
   "elements": [
-    {"id": "sensor-1", "type": "sensor", "name": "...", "description": "...", "properties": {...}}
+    {
+      "id": "block-1",
+      "type": "block",  # allowed: "block", "sensor", "processor"
+      "name": "Descriptive Name",
+      "description": "Concise explanation of the block's role",
+      "properties": {"optional_key": "value"}  # include only when relevant
+    }
   ],
   "relationships": [
-    {"source_id": "sensor-1", "target_id": "processor-1", "type": "smoothstep", "name": "..."}
+    {
+      "source_id": "sensor-1",
+      "target_id": "block-1",
+      "type": "association",
+      "name": "Describes connection"
+    }
   ]
 }
 
-Rules:
-1. Allowed element types: "block", "sensor", "processor".  Use "block" for anything else.
-2. Keep descriptions concise.
-3. Use unique IDs for all elements.
-4. Do **not** include position data in the response.
-5. Only create logical connections relevant to the description.
-6. Follow the style of provided examples without copying them verbatim.
-
-Examples may be provided in the conversation before the actual request.  Use them
-to guide your structure, then return only a single JSON object in your final reply.
+RULES:
+1. Focus exclusively on top-level blocks and their relationships.
+2. Use logical SysML relationship types (default to "association" unless another specific type is implied).
+3. Do NOT generate internal structures, nested diagrams, or state machines.
+4. Omit any positioning or layout data.
+5. Use unique, descriptive IDs (lowercase with hyphens).
+6. Provide concise descriptions that highlight the purpose of each element.
+7. Only output a single valid JSON object—no markdown fences, no explanations, no additional commentary.
 """
 
 BDD_ENHANCED_PROMPT_TEMPLATE = """
@@ -296,9 +308,9 @@ def generate_sysml_diagram(
     if diagram_type == "bdd_enhanced":
         system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
         print("\n==== Using BDD_ENHANCED prompt template ====")
-    else:  # Default to standard BDD
-        system_prompt = SYSML_PROMPT_TEMPLATE
-        print("\n==== Using standard BDD prompt template ====")
+    else:  # Default to simplified BDD-only chain prompt
+        system_prompt = BDD_ONLY_PROMPT_TEMPLATE
+        print("\n==== Using BDD_ONLY prompt template ====")
 
     messages = [{"role": "system", "content": system_prompt}]
 

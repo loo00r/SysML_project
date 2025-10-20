@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Clarified the BDD-only prompt to require returning a single raw JSON object with no explanations.
+- Updated the BDD-only prompt to default relationship type to "association" for SysML compliance.
+- Added a direct instruction line so the BDD-only prompt immediately communicates the expected output.
+
+## [1.1.92] - 2025-10-20
+
+### Changed
+- Clarified the BDD-only prompt to require returning a single raw JSON object with no explanations.
+
+## [1.1.91] - 2025-10-20
+
+### Changed
+- Updated the BDD-only prompt to default relationship type to "association" for SysML compliance.
+
+## [1.1.90] - 2025-10-20
+
+### Changed
+- Added a direct instruction line so the BDD-only prompt immediately communicates the expected output.
+
+## [1.1.89] - 2025-10-20
+
+### Changed
+- Simplified the BDD generation prompt to focus solely on high-level blocks and relationships.
+
 ## [1.1.88] - 2025-08-02
 
 ### Fixed
@@ -1366,4 +1391,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
-
