@@ -209,5 +209,64 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
-### new task
+
+### NEW TASK
+## State Machine Diagrams (SMD) - PLANNED
+
+### Overview
+**Status**: Planning phase - See `SMD_IMPLEMENTATION_PLAN.md` for complete specification
+
+State Machine Diagrams (SMD) will be added to show **behavioral aspects** of system blocks, complementing the structural views provided by BDD and IBD.
+
+### Key Concept
+**Chain Prompting Architecture**:
+```
+BDD Generation → Block Identification → SMD Generation for each block
+```
+
+Unlike IBD (generated in single AI call with BDD), SMD uses **sequential prompting**:
+1. First AI call generates BDD structure
+2. Second AI call(s) generate SMD for specific blocks, using BDD context
+
+### Example Use Case
+**User**: "Create SysML diagrams for Tesla car"
+
+**System generates**:
+- **BDD**: Shows blocks (Battery, Motor, Autopilot, Sensors)
+- **IBD**: Shows internal structure (e.g., Battery → Cells, BMS, Cooling)
+- **SMD**: Shows behavior (e.g., Autopilot: Off → Standby → Active → Manual/Emergency → Parking)
+
+### SMD Structure
+```json
+{
+  "diagram_type": "smd",
+  "parent_block_id": "autopilot-system",
+  "states": [
+    {"id": "initial", "type": "initial"},
+    {"id": "state-off", "type": "state", "name": "Off"},
+    {"id": "state-active", "type": "state", "name": "Active",
+     "entry_action": "activate_sensors()", "do_action": "monitor()"}
+  ],
+  "transitions": [
+    {"source": "state-off", "target": "state-active",
+     "trigger": "engage", "guard": "speed > 30"}
+  ]
+}
+```
+
+### Implementation Plan
+See **SMD_IMPLEMENTATION_PLAN.md** for:
+- Database schema (`state_machine_diagrams` table)
+- AI prompt templates for SMD
+- Chain prompting implementation
+- RAG integration for SMD
+- Frontend visualization
+- 4-week phased rollout
+
+### Why Chain Prompting?
+- ✅ Better quality: Specialized prompts for behavior vs. structure
+- ✅ Context-aware: Uses actual BDD blocks as input
+- ✅ Flexible: Generate SMD only for selected blocks
+- ✅ Scalable: Easy to add more diagram types (Sequence, Activity)
+- ✅ Research-backed: 2024 best practices for LLM workflows
 
