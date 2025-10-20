@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.91] - 2025-10-20
+
+### Added
+- Contextual SMD creation handle on BDD blocks that seeds Initial → Idle → Final states with arrowed transitions.
+
+### Changed
+- SMD tabs reuse the existing diagram per block/parent pair and persist parent links for quick reopen and focusing.
+
+## [1.1.90] - 2025-10-20
+
+### Changed
+- Clicking the global "+" (and related shortcuts) now opens a new Block Definition Diagram immediately and hides the type chooser menu.
+
+## [1.1.89] - 2025-10-20
+
+### Added
+- SMD diagram scaffold (nodes + arrowed transitions).
+- Introduced the SMD diagram type with initial, state, choice, and final nodes plus arrowed transition edges.
+- Added a State Machine palette section, node components, and custom edge styling for directional transitions.
+
+### Changed
+- Updated diagram persistence to include explicit diagram type metadata (including SMD) when saving or rehydrating diagrams.
+- Enhanced backend diagram JSON optimization to respect incoming diagram types and retain SMD-specific state details.
+
+### Chore
+- Build fixes and clean dependency install.
+
 ## [1.1.88] - 2025-08-02
 
 ### Fixed
@@ -1366,4 +1393,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
-

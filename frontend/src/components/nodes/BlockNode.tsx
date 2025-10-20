@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
-import { Paper, Typography, Box, IconButton } from '@mui/material';
-import { AddCircleOutline } from '@mui/icons-material';
+import { Paper, Typography, Box, IconButton, Tooltip, Menu, MenuItem } from '@mui/material';
+import { AddCircleOutline, ChangeCircle } from '@mui/icons-material';
 import { AdaptiveIbdIcon } from '../icons/AdaptiveIbdIcon';
 import { nodeColors } from '../icons/nodeColors';
 import useDiagramStore from '../../store/diagramStore';
@@ -56,7 +56,7 @@ const NodeContainer = styled(Box)({
   position: 'relative',
   display: 'inline-block',
   // KEY FIX: Creates an invisible hover area below the node
-  paddingBottom: '40px',
+  paddingBottom: '48px',
 });
 
 // Styled wrapper for the actual node content
@@ -104,9 +104,46 @@ const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
   },
 }));
 
+const SMDIndicatorIcon = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  bottom: '5px',
+  left: '10px',
+  background: theme.palette.background.paper,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: '50%',
+  width: '24px',
+  height: '24px',
+  padding: '4px',
+  boxShadow: theme.shadows[2],
+  zIndex: 999,
+  transition: 'all 0.2s ease-in-out',
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+    boxShadow: theme.shadows[4],
+  },
+  '&.add-smd': {
+    display: 'none',
+  },
+  '&.view-smd': {
+    display: 'flex',
+    backgroundColor: 'transparent',
+    border: 'none',
+    boxShadow: 'none',
+    color: theme.palette.secondary.main,
+    '&:hover': {
+      filter: 'brightness(0.85)',
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+      boxShadow: theme.shadows[1],
+    },
+  },
+}));
+
 // THE CRITICAL CHANGE: The hover selector is now on the parent container
 const StyledNodeContainer = styled(NodeContainer)({
   '&:hover .add-ibd': {
+    display: 'flex',
+  },
+  '&:hover .add-smd': {
     display: 'flex',
   },
 });
@@ -119,7 +156,7 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
     description = '', 
     properties = {} 
   } = data || {};
-  const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
+  const { openDiagrams, openIbdForBlock, openSmdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
@@ -127,6 +164,9 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
   
   // Check if there's already an IBD diagram for this block in the current diagram context
   const ibdId = activeDiagramId ? `ibd-for-${activeDiagramId}-${id}` : null;
+  const activeDiagram = activeDiagramId ? openDiagrams.find(diagram => diagram.id === activeDiagramId) : undefined;
+  const isBddContext = activeDiagram?.type === 'bdd' || activeDiagram?.type === 'bdd_enhanced';
+
   const ibdExistsManually = ibdId && (
     openDiagrams.some(diagram => 
       diagram.type === 'ibd' && 
@@ -136,8 +176,20 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
   
   // The key change: check for the new flag from the node's data prop
   const hasIbd = ibdExistsManually || data.has_ibd;
+
+  const smdId = activeDiagramId ? `smd-for-${activeDiagramId}-${id}` : null;
+  const hasSmd = smdId ? (
+    openDiagrams.some(diagram => diagram.id === smdId || (diagram.type === 'smd' && diagram.parentBlockId === id && diagram.parentDiagramId === activeDiagramId)) ||
+    !!diagramsData[smdId]
+  ) : false;
+
+  const [contextMenuAnchor, setContextMenuAnchor] = React.useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
   
   const handleOpenIBD = async (e: React.MouseEvent) => {
+    setContextMenuAnchor(null);
     console.log('🖱️ [BlockNode] IBD button clicked for block:', id);
     console.log('📊 [BlockNode] Current state - hasIbd:', hasIbd, 'has_ibd flag:', data.has_ibd, 'ibdExistsManually:', ibdExistsManually);
     
@@ -155,9 +207,33 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
       throw error;
     }
   };
+
+  const handleOpenSMD = (e: React.MouseEvent) => {
+    setContextMenuAnchor(null);
+    e.stopPropagation();
+    openSmdForBlock(id);
+  };
+
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenuAnchor(
+      contextMenuAnchor === null
+        ? { mouseX: event.clientX + 2, mouseY: event.clientY - 6 }
+        : null,
+    );
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenuAnchor(null);
+  };
+
+  const handleContextOpenSmd = () => {
+    openSmdForBlock(id);
+    handleCloseContextMenu();
+  };
   
   return (
-    <StyledNodeContainer>
+    <StyledNodeContainer onContextMenu={handleContextMenu}>
       <NodeWrapper>
         <BlockPaper
           elevation={selected ? 3 : 1}
@@ -238,23 +314,65 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
       {/* Smart IBD Indicator Icon - Now positioned as sibling to NodeWrapper */}
       {hasIbd ? (
         // State 1: IBD EXISTS. Icon is always visible.
-        <IBDIndicatorIcon 
-          className="view-ibd" 
-          onClick={handleOpenIBD}
-          title="View Internal Block Diagram"
-        >
-          <AdaptiveIbdIcon color={nodeColors.block} size={16} />
-        </IBDIndicatorIcon>
+        <Tooltip title="View Internal Block Diagram" placement="top">
+          <IBDIndicatorIcon 
+            className="view-ibd" 
+            onClick={handleOpenIBD}
+          >
+            <AdaptiveIbdIcon color={nodeColors.block} size={16} />
+          </IBDIndicatorIcon>
+        </Tooltip>
       ) : (
         // State 2: IBD DOES NOT EXIST. Icon appears on hover.
-        <IBDIndicatorIcon 
-          className="add-ibd" 
-          onClick={handleOpenIBD}
-          title="Create Internal Block Diagram"
-        >
-          <AddCircleOutline fontSize="small" />
-        </IBDIndicatorIcon>
+        <Tooltip title="Create Internal Block Diagram" placement="top">
+          <IBDIndicatorIcon 
+            className="add-ibd" 
+            onClick={handleOpenIBD}
+          >
+            <AddCircleOutline fontSize="small" />
+          </IBDIndicatorIcon>
+        </Tooltip>
       )}
+
+      {isBddContext && (hasSmd ? (
+        <Tooltip title="View State Machine Diagram" placement="top">
+          <SMDIndicatorIcon
+            className="view-smd"
+            onClick={handleOpenSMD}
+          >
+            <ChangeCircle fontSize="small" />
+          </SMDIndicatorIcon>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Create State Machine Diagram" placement="top">
+          <SMDIndicatorIcon
+            className="add-smd"
+            onClick={handleOpenSMD}
+          >
+            <AddCircleOutline fontSize="small" />
+          </SMDIndicatorIcon>
+        </Tooltip>
+      ))}
+
+      <Menu
+        open={contextMenuAnchor !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenuAnchor !== null
+            ? { top: contextMenuAnchor.mouseY, left: contextMenuAnchor.mouseX }
+            : undefined
+        }
+      >
+      <MenuItem onClick={handleOpenIBD}>
+        {hasIbd ? 'View IBD' : 'Create IBD'}
+      </MenuItem>
+        {hasSmd && isBddContext && (
+          <MenuItem onClick={handleContextOpenSmd}>
+            Open SMD
+          </MenuItem>
+        )}
+      </Menu>
     </StyledNodeContainer>
   );
 };

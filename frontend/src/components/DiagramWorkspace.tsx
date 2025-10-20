@@ -17,8 +17,9 @@ import FitScreenIcon from '@mui/icons-material/FitScreen';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
-import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode } from './nodes';
-import useDiagramStore from '../store/diagramStore';
+import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode, SmdInitialNode, SmdFinalNode, SmdStateNode, SmdChoiceNode } from './nodes';
+import SmdTransitionEdge from './edges/SmdTransitionEdge';
+import useDiagramStore, { DiagramType } from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
@@ -32,7 +33,15 @@ const unifiedNodeTypes = {
   connection: ConnectionNode,
   ibd: IBDNode,
   ibd_block: IBDNode, // Map backend 'ibd_block' type to IBDNode component
+  smdInitial: SmdInitialNode,
+  smdFinal: SmdFinalNode,
+  smdState: SmdStateNode,
+  smdChoice: SmdChoiceNode,
   defaultNode: BlockNode
+};
+
+const edgeTypes = {
+  smdTransition: SmdTransitionEdge,
 };
 
 // Styled components
@@ -120,6 +129,20 @@ const DiagramWorkspace: React.FC = () => {
     errors: []
   });
 
+  const typeDisplayNames: Record<string, string> = {
+    block: 'block node',
+    sensor: 'sensor node',
+    processor: 'processor node',
+    port: 'port node',
+    connection: 'connection node',
+    ibd: 'IBD block',
+    ibd_block: 'IBD block',
+    smdInitial: 'initial pseudo-state',
+    smdFinal: 'final state',
+    smdState: 'state node',
+    smdChoice: 'choice pseudo-state',
+  };
+
   // Access the diagram store
   const {
     openDiagrams,
@@ -164,21 +187,37 @@ const DiagramWorkspace: React.FC = () => {
   }, [activeDiagram?.needsCentering, activeDiagramId, fitView, clearCenteringFlag]);
   
   // Define edge styles based on diagram type and node count
-  const defaultEdgeOptions = activeDiagram?.type === 'ibd' ? {
-    style: { 
-      stroke: '#555', 
-      strokeWidth: 2,
-      strokeDasharray: '8 4', // Dashed line pattern
-    },
-    // Use straight lines for 2 nodes, smoothstep (angled) for 3+ nodes
-    type: nodes.length <= 2 ? 'straight' : 'smoothstep',
-    animated: true, // Animated dashed line for IBD (1.6s for 25% faster)
-    className: 'ibd-animated-edge',
-  } : {
-    style: { stroke: '#555', strokeWidth: 1 }, // Solid gray for BDD
-    type: 'smoothstep' as const,
-    animated: false,
-  };
+  const defaultEdgeOptions = (() => {
+    if (activeDiagram?.type === 'ibd') {
+      return {
+        style: {
+          stroke: '#555',
+          strokeWidth: 2,
+          strokeDasharray: '8 4', // Dashed line pattern
+        },
+        type: nodes.length <= 2 ? 'straight' : 'smoothstep',
+        animated: true, // Animated dashed line for IBD
+        className: 'ibd-animated-edge',
+      };
+    }
+
+    if (activeDiagram?.type === 'smd') {
+      return {
+        style: {
+          stroke: '#37474f',
+          strokeWidth: 2,
+        },
+        type: 'smdTransition' as const,
+        animated: false,
+      };
+    }
+
+    return {
+      style: { stroke: '#555', strokeWidth: 1 }, // Solid gray for BDD
+      type: 'smoothstep' as const,
+      animated: false,
+    };
+  })();
 
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
@@ -226,7 +265,16 @@ const DiagramWorkspace: React.FC = () => {
   };
 
   // Clean diagram data for RAG storage (remove only manual IBD-specific information)
-  const cleanDiagramForRAG = (nodes: any[], edges: any[]) => {
+  const cleanDiagramForRAG = (nodes: any[], edges: any[], diagramType: DiagramType) => {
+    const serializedType =
+      diagramType === 'bdd_enhanced'
+        ? 'BDD_ENHANCED'
+        : diagramType.toUpperCase();
+
+    if (diagramType !== 'bdd' && diagramType !== 'bdd_enhanced') {
+      return { type: serializedType, nodes, edges };
+    }
+
     const { diagramsData } = useDiagramStore.getState();
     
     // Only include BDD elements - filter out IBD blocks and manual IBD-related content
@@ -289,7 +337,7 @@ const DiagramWorkspace: React.FC = () => {
     console.log(`Cleaned diagram: ${nodes.length} -> ${cleanNodes.length} nodes, ${edges.length} -> ${cleanEdges.length} edges`);
     console.log(`Filtered manual IBDs from diagramsData: ${Object.keys(diagramsData).length} -> ${Object.keys(cleanDiagramsData).length} IBDs`);
     
-    return { nodes: cleanNodes, edges: cleanEdges };
+    return { type: serializedType, nodes: cleanNodes, edges: cleanEdges };
   };
 
   // Handle diagram save
@@ -322,7 +370,7 @@ const DiagramWorkspace: React.FC = () => {
         showNotification('AI-generated diagram saved successfully to database', 'success');
       } else {
         // For manual diagrams, use the original save logic
-        const diagramType = 'bdd';
+        const diagramType = activeDiagram.type as DiagramType;
         const description = `Diagram with ${nodes.length} nodes and ${edges.length} connections`;
         
         // Get the original text from the store if available
@@ -330,7 +378,7 @@ const DiagramWorkspace: React.FC = () => {
         const originalText = generationPrompt || diagramDescription || description;
         
         // Clean the diagram data to remove IBD contamination from RAG
-        const cleanDiagramData = cleanDiagramForRAG(nodes, edges);
+        const cleanDiagramData = cleanDiagramForRAG(nodes, edges, diagramType);
         
         // Save to backend and update RAG database
         const response = await fetch('/api/v1/rag/diagrams/', {
@@ -506,19 +554,29 @@ const DiagramWorkspace: React.FC = () => {
         });
 
         // Create a new node with the correct type based on diagram type
-        let nodeType: string;
-        if (activeDiagram?.type === 'ibd') {
+        let nodeType: string | null = null;
+
+        if (activeDiagram?.type === 'smd') {
+          const allowedSmdTypes = ['smdInitial', 'smdFinal', 'smdState', 'smdChoice'];
+          if (!allowedSmdTypes.includes(data.type)) {
+            showNotification('Only state machine elements can be added to SMD diagrams.', 'warning');
+            return;
+          }
+          nodeType = data.type;
+        } else if (activeDiagram?.type === 'ibd') {
           // For IBD diagrams, prefer port and connection types
-          nodeType = data.type === 'port' || data.type === 'connection' || data.type === 'block' || data.type === 'ibd' ? 
-            data.type : 'port';
+          nodeType = ['port', 'connection', 'block', 'ibd'].includes(data.type) ? data.type : 'port';
         } else {
           // For other diagrams, use traditional types (but not IBD blocks for BDD)
           if (data.type === 'ibd' && activeDiagram?.type === 'bdd') {
             // Don't allow IBD blocks in BDD diagrams
             return;
           }
-          nodeType = data.type === 'block' || data.type === 'sensor' || data.type === 'processor' || data.type === 'ibd' ? 
-            data.type : 'block';
+          nodeType = ['block', 'sensor', 'processor', 'ibd'].includes(data.type) ? data.type : 'block';
+        }
+
+        if (!nodeType) {
+          return;
         }
 
         const newNode = {
@@ -533,7 +591,9 @@ const DiagramWorkspace: React.FC = () => {
         
         // Add the node to the diagram
         addNode(newNode);
-        showNotification(`Added new ${nodeType} node`, 'success');
+        const displayName = typeDisplayNames[nodeType] || `${nodeType} node`;
+        const capitalizedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+        showNotification(`Added ${capitalizedName}`, 'success');
       } catch (error) {
         console.error('Error adding new node:', error);
         showNotification('Failed to add node', 'error');
@@ -673,6 +733,7 @@ const DiagramWorkspace: React.FC = () => {
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
           nodeTypes={unifiedNodeTypes}
+          edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           onDrop={onDrop}
           onDragOver={onDragOver}
@@ -696,6 +757,10 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'sensor') return '#ff0072';
               if (n.type === 'processor') return '#ff9500';
               if (n.type === 'ibd') return '#4caf50';
+              if (n.type === 'smdInitial') return '#212121';
+              if (n.type === 'smdFinal') return '#37474f';
+              if (n.type === 'smdState') return '#1565c0';
+              if (n.type === 'smdChoice') return '#455a64';
               return '#0041d0';
             }}
             nodeColor={(n) => {
@@ -703,6 +768,10 @@ const DiagramWorkspace: React.FC = () => {
               if (n.type === 'sensor') return '#ffebee';
               if (n.type === 'processor') return '#fff8e1';
               if (n.type === 'ibd') return '#e8f5e8';
+              if (n.type === 'smdInitial') return '#212121';
+              if (n.type === 'smdFinal') return '#cfd8dc';
+              if (n.type === 'smdState') return '#bbdefb';
+              if (n.type === 'smdChoice') return '#eceff1';
               return '#e3f2fd';
             }}
             maskColor="rgba(0, 0, 0, 0.1)"

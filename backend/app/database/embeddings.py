@@ -38,8 +38,10 @@ async def optimize_diagram_json(diagram_json: Dict[str, Any]) -> Dict[str, Any]:
     Converts nodes/edges format to elements/relationships format for RAG consistency.
     """
     # Create the output structure exactly matching the prompt format
+    base_diagram_type = diagram_json.get("type") or diagram_json.get("diagram_type") or "block"
+
     optimized_json = {
-        "diagram_type": "block",
+        "diagram_type": str(base_diagram_type).lower(),
         "elements": [],
         "relationships": []
     }
@@ -64,7 +66,13 @@ async def optimize_diagram_json(diagram_json: Dict[str, Any]) -> Dict[str, Any]:
                         element["properties"][key] = value
             else:
                 element["properties"] = {}
-                
+
+            # Preserve state machine specific data when available
+            for smd_field in ("entry", "exit", "do", "stateType"):
+                field_value = node["data"].get(smd_field)
+                if field_value:
+                    element["properties"][smd_field] = field_value
+            
             optimized_json["elements"].append(element)
     
     # Process edges -> relationships (matching prompt format)

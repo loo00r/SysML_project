@@ -52,3 +52,71 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 ```
 
 **Important**: Always follow [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and [Semantic Versioning](https://semver.org/) principles.
+
+### new task
+
+## SMD-Context-Create — Add contextual SMD creation on BDD block
+
+**Branch:** `feat/smd-context-create`
+
+### Goal
+Create SMD from a specific **BDD block** via a small plus handle on the **bottom-left edge** of the BDD block (IBD handle remains bottom-right).
+
+### Steps
+1. **UI handle (bottom-left)**
+   - Add a small “+” action handle anchored to the **bottom-left** of a hovered/selected BDD block.
+   - Tooltip: `Create State Machine Diagram`.
+   - Ensure proper z-index and pointer-events so it doesn’t conflict with the IBD handle.
+
+2. **Creation behavior**
+   - On click, create or focus a diagram tab with metadata:
+     ```ts
+     {
+       type: "SMD",
+       title: `SMD for ${blockLabel}`,
+       parentBlockId: <BDD block id>,
+       parentDiagramId: <current BDD diagram id>
+     }
+     ```
+   - **De-dup rule:** if an SMD for the same `(parentDiagramId, parentBlockId)` exists, **focus** that tab instead of creating a new one.
+
+3. **Initial content (seed)**
+   - Create minimal nodes and transitions:
+     - Nodes: `Initial`, `State` (label `Idle`), `Final`.
+     - Edges: `Initial → State`, `State → Final` (arrowed transitions).
+   - Apply auto-layout (LR) if available; otherwise place with sane defaults (non-overlapping, LR flow).
+
+4. **Linking & persistence**
+   - Persist `parentBlockId` and `parentDiagramId` with the SMD model.
+   - On BDD block context menu, add `Open SMD` when an SMD exists → navigates/focuses its tab.
+   - On BDD block rename, update only the SMD **tab title** (optional), not the identifiers.
+
+5. **Visual separation from IBD**
+   - Keep IBD handle at **bottom-right** (unchanged).
+   - Avoid overlap and provide distinct icons/hover states for SMD vs IBD.
+
+6. **Store/Router integration**
+   - Extend diagram store/selectors to query SMD by `(parentDiagramId, parentBlockId)`.
+   - Add/open/focus tab helpers for SMD similar to IBD behavior.
+
+### DoD
+- Hover a BDD block → a bottom-left “+” with tooltip **Create State Machine Diagram** is visible.
+- Click → opens `SMD for <Block>`; repeated click **focuses** existing tab (no duplicates).
+- Seeded nodes/edges appear with arrowheads and readable LR layout.
+- Save → reload → BDD block context menu shows `Open SMD` and restores the linked SMD.
+- IBD handle (bottom-right) remains functional and doesn’t visually collide with the SMD handle.
+
+### Manual test
+1. Create/open a BDD, hover a block → see SMD handle bottom-left.
+2. Click handle → new `SMD for <Block>` tab with Initial/Idle/Final + transitions.
+3. Click handle again → focuses existing SMD tab (no second tab).
+4. Rename the BDD block → (optional) tab title updates; identifiers stay stable.
+5. Save & reload → `Open SMD` opens the same tab; IBD handle still works.
+
+### Suggested commits
+- `feat(smd): contextual SMD create handle on BDD block (bottom-left)`
+- `feat(smd): prevent duplicate SMD per (parentDiagramId, parentBlockId)`
+- `chore(diagrams): persist SMD parent links and add open/focus helpers`
+- `ui(smd): distinct handle icon/hover separate from IBD`
+- `test(smd): e2e create/focus SMD from BDD block and persistence`
+

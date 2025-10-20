@@ -1,10 +1,21 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport } from 'reactflow';
+import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport, MarkerType } from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
 
 // Define node types based on SysML diagram elements
-export type NodeType = 'block' | 'sensor' | 'processor' | 'port' | 'connection';
+export type NodeType =
+  | 'block'
+  | 'sensor'
+  | 'processor'
+  | 'port'
+  | 'connection'
+  | 'ibd'
+  | 'ibd_block'
+  | 'smdInitial'
+  | 'smdFinal'
+  | 'smdState'
+  | 'smdChoice';
 
 // Define node data structure
 export interface NodeData {
@@ -15,10 +26,18 @@ export interface NodeData {
   inputs?: string[];
   outputs?: string[];
   has_ibd?: boolean; // Flag for AI-generated IBDs
+  name?: string;
+  entry?: string;
+  exit?: string;
+  do?: string;
+  event?: string;
+  guard?: string;
+  action?: string;
+  stateType?: 'initial' | 'final' | 'choice' | 'state';
 }
 
 // Define diagram types
-export type DiagramType = 'bdd' | 'bdd_enhanced' | 'ibd';
+export type DiagramType = 'bdd' | 'bdd_enhanced' | 'ibd' | 'smd';
 
 // Define diagram instance interface
 export interface DiagramInstance {
@@ -33,6 +52,8 @@ export interface DiagramInstance {
   viewport?: Viewport; // Add viewport state for each diagram
   needsCentering?: boolean; // Flag to trigger fitView for new diagrams
   generatedDiagramId?: string; // Redis diagram ID for AI-generated diagrams
+  parentBlockId?: string;
+  parentDiagramId?: string;
 }
 
 // Define validation error structure
@@ -48,6 +69,10 @@ export interface DiagramState {
   edges: Edge[];
   viewport?: { x: number; y: number; zoom: number };
   source?: 'ai' | 'manual'; // Track how this diagram was created
+  type?: DiagramType;
+  name?: string;
+  parentBlockId?: string;
+  parentDiagramId?: string;
 }
 
 // Define the store state
@@ -101,6 +126,7 @@ interface DiagramStoreState {
   // Persistent state actions
   saveDiagramState: (diagramId: string, state: DiagramState) => void;
   openIbdForBlock: (bddBlockId: string) => Promise<void>;
+  openSmdForBlock: (bddBlockId: string) => void;
   
   // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
@@ -224,11 +250,15 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Find the diagram being closed
     const diagramToClose = state.openDiagrams.find(d => d.id === diagramId);
     
-    // If it's an IBD diagram, save its state before closing
-    if (diagramToClose && diagramToClose.type === 'ibd') {
+    // If it's an IBD or SMD diagram, save its state before closing
+    if (diagramToClose && (diagramToClose.type === 'ibd' || diagramToClose.type === 'smd')) {
       get().saveDiagramState(diagramId, {
         nodes: diagramToClose.nodes,
-        edges: diagramToClose.edges
+        edges: diagramToClose.edges,
+        type: diagramToClose.type,
+        name: diagramToClose.name,
+        parentBlockId: diagramToClose.parentBlockId,
+        parentDiagramId: diagramToClose.parentDiagramId
       });
     }
     
@@ -259,13 +289,17 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   setActiveDiagram: (diagramId) => {
     const state = get();
     
-    // Save current active diagram state if it's an IBD
+    // Save current active diagram state if it's an IBD or SMD
     if (state.activeDiagramId && state.activeDiagramId !== diagramId) {
       const currentDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
-      if (currentDiagram && currentDiagram.type === 'ibd') {
+      if (currentDiagram && (currentDiagram.type === 'ibd' || currentDiagram.type === 'smd')) {
         get().saveDiagramState(state.activeDiagramId, {
           nodes: state.nodes,
-          edges: state.edges
+          edges: state.edges,
+          type: currentDiagram.type,
+          name: currentDiagram.name,
+          parentBlockId: currentDiagram.parentBlockId,
+          parentDiagramId: currentDiagram.parentDiagramId
         });
       }
     }
@@ -310,13 +344,17 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       edges: payload.edges || state.edges
     }));
     
-    // Auto-save to diagramsData if this is an IBD
+    // Auto-save to diagramsData if this is an IBD or SMD
     if (state.activeDiagramId) {
       const activeDiagram = updatedDiagrams.find(d => d.id === state.activeDiagramId);
-      if (activeDiagram && activeDiagram.type === 'ibd') {
+      if (activeDiagram && (activeDiagram.type === 'ibd' || activeDiagram.type === 'smd')) {
         get().saveDiagramState(state.activeDiagramId, {
-          nodes: payload.nodes || state.nodes,
-          edges: payload.edges || state.edges
+          nodes: payload.nodes || activeDiagram.nodes,
+          edges: payload.edges || activeDiagram.edges,
+          type: activeDiagram.type,
+          name: activeDiagram.name,
+          parentBlockId: activeDiagram.parentBlockId,
+          parentDiagramId: activeDiagram.parentDiagramId
         });
       }
     }
@@ -352,7 +390,10 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     set(currentState => ({
       diagramsData: {
         ...currentState.diagramsData,
-        [diagramId]: state
+        [diagramId]: {
+          ...(currentState.diagramsData[diagramId] || {}),
+          ...state
+        }
       }
     }));
   },
@@ -513,6 +554,150 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       throw error;
     }
   },
+
+  openSmdForBlock: (bddBlockId) => {
+    const { openDiagrams, diagramsData, activeDiagramId, openNewDiagramTab, setActiveDiagram } = get();
+
+    if (!activeDiagramId) {
+      console.error('❌ [SMD] Cannot create SMD: no active diagram');
+      return;
+    }
+
+    const parentDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+    if (!parentDiagram) {
+      console.error('❌ [SMD] Parent diagram not found for active diagram id:', activeDiagramId);
+      return;
+    }
+
+    if (parentDiagram.type !== 'bdd' && parentDiagram.type !== 'bdd_enhanced') {
+      console.warn('ℹ️ [SMD] SMD creation is only available from BDD diagrams');
+      return;
+    }
+
+    const smdId = `smd-for-${activeDiagramId}-${bddBlockId}`;
+
+    // If already open, focus it
+    const existingTab = openDiagrams.find(d => d.id === smdId);
+    if (existingTab) {
+      setActiveDiagram(smdId);
+      return;
+    }
+
+    const parentNode = parentDiagram.nodes.find(node => node.id === bddBlockId);
+    const blockLabel = parentNode?.data?.label || parentNode?.data?.name || 'Block';
+    const smdName = `SMD for ${blockLabel}`;
+
+    // Try to restore from cache
+    const cachedState = diagramsData[smdId];
+    if (cachedState) {
+      openNewDiagramTab({
+        name: cachedState.name || smdName,
+        type: 'smd',
+        nodes: cachedState.nodes,
+        edges: cachedState.edges,
+        description: `State Machine Diagram for ${blockLabel}`,
+        customId: smdId,
+        needsCentering: true,
+        parentBlockId: cachedState.parentBlockId || bddBlockId,
+        parentDiagramId: cachedState.parentDiagramId || activeDiagramId
+      });
+      setActiveDiagram(smdId);
+      return;
+    }
+
+    // Seed default SMD nodes and edges
+    const initialNodeId = `${smdId}-initial`;
+    const stateNodeId = `${smdId}-state`;
+    const finalNodeId = `${smdId}-final`;
+
+    const seedNodes: Node<NodeData>[] = [
+      {
+        id: initialNodeId,
+        type: 'smdInitial',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'Initial',
+          name: 'Initial',
+          type: 'smdInitial',
+          stateType: 'initial'
+        } as NodeData
+      },
+      {
+        id: stateNodeId,
+        type: 'smdState',
+        position: { x: 200, y: 0 },
+        data: {
+          label: 'Idle',
+          name: 'Idle',
+          entry: '',
+          exit: '',
+          do: '',
+          type: 'smdState',
+          stateType: 'state'
+        } as NodeData
+      },
+      {
+        id: finalNodeId,
+        type: 'smdFinal',
+        position: { x: 400, y: 0 },
+        data: {
+          label: 'Final',
+          name: 'Final',
+          type: 'smdFinal',
+          stateType: 'final'
+        } as NodeData
+      }
+    ];
+
+    const seedEdges: Edge[] = [
+      {
+        id: `${initialNodeId}-${stateNodeId}`,
+        source: initialNodeId,
+        target: stateNodeId,
+        type: 'smdTransition',
+        label: 'event [guard] / action',
+        markerEnd: 'arrowclosed',
+        style: { stroke: '#37474f', strokeWidth: 2 }
+      },
+      {
+        id: `${stateNodeId}-${finalNodeId}`,
+        source: stateNodeId,
+        target: finalNodeId,
+        type: 'smdTransition',
+        label: 'event [guard] / action',
+        markerEnd: 'arrowclosed',
+        style: { stroke: '#37474f', strokeWidth: 2 }
+      }
+    ];
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+      seedNodes,
+      seedEdges,
+      'LR',
+      { nodeSep: 160, rankSep: 160 }
+    );
+
+    openNewDiagramTab({
+      name: smdName,
+      type: 'smd',
+      nodes: layoutedNodes,
+      edges: layoutedEdges,
+      description: `State Machine Diagram for ${blockLabel}`,
+      customId: smdId,
+      needsCentering: true,
+      parentBlockId: bddBlockId,
+      parentDiagramId: activeDiagramId
+    });
+
+    get().saveDiagramState(smdId, {
+      nodes: layoutedNodes,
+      edges: layoutedEdges,
+      type: 'smd',
+      name: smdName,
+      parentBlockId: bddBlockId,
+      parentDiagramId: activeDiagramId
+    });
+  },
   
   // Legacy actions
   setNodes: (nodes) => {
@@ -543,22 +728,37 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Get current diagram type and node count to determine edge style
     const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
     const isIBD = activeDiagram?.type === 'ibd';
-    const currentNodes = get().nodes;
+    const isSMD = activeDiagram?.type === 'smd';
     
     const newEdge: Edge = {
-      id: `e-${connection.source}-${connection.target}`,
+      id: `e-${connection.source}-${connection.target}-${Date.now()}`,
       source: connection.source || '',
       target: connection.target || '',
       // For IBD: always use smoothstep (orthogonal lines). For BDD: always smoothstep
-      type: 'smoothstep',
-      animated: isIBD,
-      style: isIBD ? { 
-        stroke: '#555', 
-        strokeWidth: 2,
-        strokeDasharray: '8 4'
-      } : { stroke: '#555', strokeWidth: 1 },
+      type: isSMD ? 'smdTransition' : 'smoothstep',
+      animated: isIBD ? true : false,
+      style: isIBD
+        ? {
+            stroke: '#555',
+            strokeWidth: 2,
+            strokeDasharray: '8 4'
+          }
+        : isSMD
+        ? {
+            stroke: '#37474f',
+            strokeWidth: 2
+          }
+        : { stroke: '#555', strokeWidth: 1 },
       className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
-      label: isIBD ? 'IBD Blocks' : undefined
+      markerEnd: isSMD
+        ? {
+            type: MarkerType.ArrowClosed,
+            color: '#37474f',
+            width: 24,
+            height: 24
+          }
+        : undefined,
+      label: isIBD ? 'IBD Blocks' : isSMD ? 'event [guard] / action' : undefined
     };
     
     const newEdges = [...get().edges, newEdge];
@@ -579,12 +779,45 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   updateNode: (id, data) => {
     // Save current state before updating node
     get().saveToHistory();
+    const prevState = get();
+    const targetNode = prevState.nodes.find(node => node.id === id);
+    const mergedData = targetNode ? { ...targetNode.data, ...data } : data;
+    const previousLabel = targetNode?.data?.label;
+    const nextLabel = mergedData?.label ?? previousLabel;
     
     const newNodes = get().nodes.map(node => 
       node.id === id ? { ...node, data: { ...node.data, ...data } } : node
     );
     set({ nodes: newNodes });
     get().updateActiveDiagram({ nodes: newNodes });
+
+    if (
+      targetNode &&
+      (targetNode.type === 'block' || targetNode.data?.type === 'block') &&
+      prevState.activeDiagramId &&
+      previousLabel !== nextLabel &&
+      nextLabel
+    ) {
+      const smdId = `smd-for-${prevState.activeDiagramId}-${id}`;
+      const newDiagramName = `SMD for ${nextLabel}`;
+
+      set(current => ({
+        openDiagrams: current.openDiagrams.map(diagram =>
+          diagram.id === smdId
+            ? { ...diagram, name: newDiagramName, modifiedAt: new Date() }
+            : diagram
+        ),
+        diagramsData: current.diagramsData[smdId]
+          ? {
+              ...current.diagramsData,
+              [smdId]: {
+                ...current.diagramsData[smdId],
+                name: newDiagramName
+              }
+            }
+          : current.diagramsData
+      }));
+    }
   },
   
   removeNode: (id) => {

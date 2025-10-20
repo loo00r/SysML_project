@@ -5,7 +5,7 @@ import {
   Tab, 
   IconButton, 
   Typography, 
-  styled 
+  styled
 } from '@mui/material';
 import { 
   Close as CloseIcon, 
@@ -151,23 +151,26 @@ const DiagramTabs: React.FC = () => {
     openDiagram 
   } = useDiagramStore();
 
+  const createBddDiagram = React.useCallback(() => {
+    const existingBdds = openDiagrams.filter(diagram => diagram.type === 'bdd').length;
+    const diagramName = `BDD Diagram ${existingBdds + 1}`;
+
+    openDiagram({
+      name: diagramName,
+      type: 'bdd',
+      nodes: [],
+      edges: [],
+      description: '',
+      needsCentering: true
+    });
+  }, [openDiagram, openDiagrams]);
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
     setActiveDiagram(newValue);
   };
 
   const handleCloseTab = (diagramId: string) => {
     closeDiagram(diagramId);
-  };
-
-  const handleAddTab = () => {
-    const newDiagramName = `Diagram ${openDiagrams.length + 1}`;
-    openDiagram({
-      name: newDiagramName,
-      type: 'bdd',
-      nodes: [],
-      edges: [],
-      description: ''
-    });
   };
 
   if (openDiagrams.length === 0) {
@@ -178,7 +181,7 @@ const DiagramTabs: React.FC = () => {
         </Typography>
         
         {/* Inline add button for empty state */}
-        <AddButton onClick={handleAddTab} aria-label="Add new diagram">
+        <AddButton onClick={createBddDiagram} aria-label="Add new diagram">
           <AddIcon fontSize="small" />
         </AddButton>
       </TabsContainer>
@@ -213,12 +216,12 @@ const DiagramTabs: React.FC = () => {
       {/* Conditional add button positioning */}
       {openDiagrams.length > 9 ? (
         /* Fixed add button when scrolling */
-        <FixedAddButton onClick={handleAddTab} aria-label="Add new diagram">
+        <FixedAddButton onClick={createBddDiagram} aria-label="Add new diagram">
           <AddIcon fontSize="small" />
         </FixedAddButton>
       ) : (
         /* Inline add button when no scrolling */
-        <AddButton onClick={handleAddTab} aria-label="Add new diagram">
+        <AddButton onClick={createBddDiagram} aria-label="Add new diagram">
           <AddIcon fontSize="small" />
         </AddButton>
       )}
