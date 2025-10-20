@@ -55,68 +55,76 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-## SMD-Context-Create — Add contextual SMD creation on BDD block
+## SMD-02 — Composite State nesting (parent/child containment)
 
-**Branch:** `feat/smd-context-create`
+**Branch:** `feat/smd-composite-nesting`
 
 ### Goal
-Create SMD from a specific **BDD block** via a small plus handle on the **bottom-left edge** of the BDD block (IBD handle remains bottom-right).
+Enable a **Composite State** node that acts as a container for child SMD nodes (`smdState`, `smdInitial`, `smdFinal`, `smdChoice`). Children can be moved **only inside** the composite’s workspace (below its header). Edges starting/ending on a child **cannot** connect outside the composite (soft warning).
 
 ### Steps
-1. **UI handle (bottom-left)**
-   - Add a small “+” action handle anchored to the **bottom-left** of a hovered/selected BDD block.
-   - Tooltip: `Create State Machine Diagram`.
-   - Ensure proper z-index and pointer-events so it doesn’t conflict with the IBD handle.
-
-2. **Creation behavior**
-   - On click, create or focus a diagram tab with metadata:
+1. **Add `smdComposite` node type**
+   - Visuals:
+     - Rounded rectangle with a header band (title on top).
+     - Inner **workspace** area with padding (e.g., 16–24px).
+   - Default data:
      ```ts
-     {
-       type: "SMD",
-       title: `SMD for ${blockLabel}`,
-       parentBlockId: <BDD block id>,
-       parentDiagramId: <current BDD diagram id>
-     }
+     { name: "Composite", entry: "", exit: "", do: "" }
      ```
-   - **De-dup rule:** if an SMD for the same `(parentDiagramId, parentBlockId)` exists, **focus** that tab instead of creating a new one.
 
-3. **Initial content (seed)**
-   - Create minimal nodes and transitions:
-     - Nodes: `Initial`, `State` (label `Idle`), `Final`.
-     - Edges: `Initial → State`, `State → Final` (arrowed transitions).
-   - Apply auto-layout (LR) if available; otherwise place with sane defaults (non-overlapping, LR flow).
+2. **Parent/child containment**
+   - On drop of `smdState|smdInitial|smdFinal|smdChoice` onto a composite:
+     - set `parentNode = <compositeId>` and `extent = 'parent'`.
+     - ensure child positions are **relative** to the composite’s inner workspace.
+   - Constrain dragging:
+     - Children must stay within the workspace (respect padding and header height).
+     - Prevent moving children outside (clamp positions in onDrag / onNodeDragStop).
 
-4. **Linking & persistence**
-   - Persist `parentBlockId` and `parentDiagramId` with the SMD model.
-   - On BDD block context menu, add `Open SMD` when an SMD exists → navigates/focuses its tab.
-   - On BDD block rename, update only the SMD **tab title** (optional), not the identifiers.
+3. **Connection rules (soft warning)**
+   - For edges where `source` or `target` is a child inside a composite:
+     - **Disallow** connecting to nodes **outside** that composite.
+     - UX: cancel the connection and show a non-blocking notice:
+       - “Transitions from/to nested states must stay inside their composite (MVP).”
+   - Allow connections **within** the same composite freely (child↔child, child↔composite if we later support entry/exit points—skip for MVP).
 
-5. **Visual separation from IBD**
-   - Keep IBD handle at **bottom-right** (unchanged).
-   - Avoid overlap and provide distinct icons/hover states for SMD vs IBD.
+4. **Workspace geometry**
+   - Define header height (e.g., 32–40px) and internal padding constants.
+   - Expose helpers:
+     - `getCompositeWorkspaceRect(node): { x, y, width, height }`
+     - `isPointInsideCompositeWorkspace(point, node): boolean`
+   - Use these in hit-testing for drop and drag clamping.
 
-6. **Store/Router integration**
-   - Extend diagram store/selectors to query SMD by `(parentDiagramId, parentBlockId)`.
-   - Add/open/focus tab helpers for SMD similar to IBD behavior.
+5. **Store & serialization**
+   - Persist `parentNode` and `extent` in diagram JSON for children.
+   - Ensure load/resume recreates the containment graph exactly.
+
+6. **UI polish**
+   - Show subtle dashed border for the workspace while dragging children.
+   - Cursor changes to indicate “no drop” when trying to leave the container.
 
 ### DoD
-- Hover a BDD block → a bottom-left “+” with tooltip **Create State Machine Diagram** is visible.
-- Click → opens `SMD for <Block>`; repeated click **focuses** existing tab (no duplicates).
-- Seeded nodes/edges appear with arrowheads and readable LR layout.
-- Save → reload → BDD block context menu shows `Open SMD` and restores the linked SMD.
-- IBD handle (bottom-right) remains functional and doesn’t visually collide with the SMD handle.
+- You can create an `smdComposite`, then drop/move `smdState/Initial/Final/Choice` **inside** it.
+- Children cannot be dragged outside the composite’s workspace; positions are clamped.
+- Attempting to connect a child to a node outside the composite is blocked with a **soft warning** (no hard error).
+- Save → reload preserves parent/child relations and positions.
+- Existing SMD/BDD/IBD behaviors remain unaffected.
 
 ### Manual test
-1. Create/open a BDD, hover a block → see SMD handle bottom-left.
-2. Click handle → new `SMD for <Block>` tab with Initial/Idle/Final + transitions.
-3. Click handle again → focuses existing SMD tab (no second tab).
-4. Rename the BDD block → (optional) tab title updates; identifiers stay stable.
-5. Save & reload → `Open SMD` opens the same tab; IBD handle still works.
+1. Create SMD → add **Composite** → drop `Initial`, `State`, `Final` inside it.
+2. Try to drag a child outside the border → it clamps inside.
+3. Create an edge from a child to a node outside → connection canceled + soft warning shown.
+4. Save, reload the app → containment and edges persist as before.
+
+### Versioning
+- Bump to **1.1.92**.
+- `CHANGELOG.md`:  
+  `## [1.1.92] - <today>`  
+  `Added: Composite State with parent/child containment and soft boundary rules.`
 
 ### Suggested commits
-- `feat(smd): contextual SMD create handle on BDD block (bottom-left)`
-- `feat(smd): prevent duplicate SMD per (parentDiagramId, parentBlockId)`
-- `chore(diagrams): persist SMD parent links and add open/focus helpers`
-- `ui(smd): distinct handle icon/hover separate from IBD`
-- `test(smd): e2e create/focus SMD from BDD block and persistence`
-
+- `feat(smd): add Composite State node with inner workspace`
+- `feat(smd): parentNode containment and drag clamp for nested children`
+- `feat(smd): block cross-boundary transitions with soft warning`
+- `chore(smd): helpers for composite workspace geometry`
+- `chore(version): bump to 1.1.92 and update changelog`
+- `test(smd): e2e nesting, drag clamp, and soft connection rule`
