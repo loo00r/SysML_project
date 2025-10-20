@@ -102,10 +102,42 @@ DB_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
 
 ## API Endpoints
 
+### Core Diagram Generation
 - `GET /api/v1/ping`: Health check
-- `POST /api/v1/create-diagram/`: Generate diagram without RAG
-- `POST /api/v1/rag/generate-diagram-with-context/`: Generate diagram with RAG
-- Database endpoints for embeddings, templates, and components
+- `POST /api/v1/create-diagram/`: Generate diagram without RAG (immediate save to database)
+  - Body: `{text: string, diagram_type: "bdd" | "bdd_enhanced", name: string}`
+  - Returns: Complete diagram with `diagram_id`
+  - Automatically saves to database and creates IBD records
+
+### RAG-Based Generation (Two-Step Process)
+- `POST /api/v1/rag/generate-diagram-with-context/`: Generate diagram with RAG (Redis cache first)
+  - Body: `{text: string, diagram_type: "bdd" | "bdd_enhanced", use_rag: boolean, name: string}`
+  - Returns: `{status: "processing", diagramId: "uuid"}`
+  - Stores result in Redis with TTL (default 3600s)
+
+- `GET /api/v1/rag/diagram-result/{diagram_id}`: Retrieve generated diagram from Redis
+  - Returns: Cached diagram data with status
+
+- `POST /api/v1/rag/save-diagram/`: Save Redis-cached diagram to database
+  - Body: `{diagram_id: string, name: string}`
+  - Saves main BDD diagram to `diagram_embeddings` table
+  - Creates IBD records in `internal_block_diagrams` table
+  - Generates embeddings for RAG
+
+### RAG Database Operations
+- `POST /api/v1/rag/diagrams/`: Store diagram with embedding
+- `POST /api/v1/rag/similar-diagrams/`: Find similar diagrams (vector search)
+  - Body: `{query_text: string, limit: number, diagram_type: string}`
+  - Uses pgvector cosine similarity search
+- `GET /api/v1/rag/templates/{template_type}`: Get SysML templates
+- `GET /api/v1/rag/components/{component_type}`: Get UAV components
+
+### IBD Operations
+- `GET /api/v1/diagrams/ibd/{parent_block_id}`: Get IBD by parent block ID
+  - Returns positioned IBD nodes and edges
+- `POST /api/v1/diagrams/ibd/`: Create or update IBD (upsert)
+  - Body: `{parent_bdd_diagram_id: int, parent_block_id: string, nodes: [], edges: [], source: "ai" | "manual"}`
+  - Automatically updates existing IBD or creates new one
 
 ## Development Notes
 
@@ -177,4 +209,65 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
+### NEW TASK
+## State Machine Diagrams (SMD) - PLANNED
+
+### Overview
+**Status**: Planning phase - See `SMD_IMPLEMENTATION_PLAN.md` for complete specification
+
+State Machine Diagrams (SMD) will be added to show **behavioral aspects** of system blocks, complementing the structural views provided by BDD and IBD.
+
+### Key Concept
+**Chain Prompting Architecture**:
+```
+BDD Generation → Block Identification → SMD Generation for each block
+```
+
+Unlike IBD (generated in single AI call with BDD), SMD uses **sequential prompting**:
+1. First AI call generates BDD structure
+2. Second AI call(s) generate SMD for specific blocks, using BDD context
+
+### Example Use Case
+**User**: "Create SysML diagrams for Tesla car"
+
+**System generates**:
+- **BDD**: Shows blocks (Battery, Motor, Autopilot, Sensors)
+- **IBD**: Shows internal structure (e.g., Battery → Cells, BMS, Cooling)
+- **SMD**: Shows behavior (e.g., Autopilot: Off → Standby → Active → Manual/Emergency → Parking)
+
+### SMD Structure
+```json
+{
+  "diagram_type": "smd",
+  "parent_block_id": "autopilot-system",
+  "states": [
+    {"id": "initial", "type": "initial"},
+    {"id": "state-off", "type": "state", "name": "Off"},
+    {"id": "state-active", "type": "state", "name": "Active",
+     "entry_action": "activate_sensors()", "do_action": "monitor()"}
+  ],
+  "transitions": [
+    {"source": "state-off", "target": "state-active",
+     "trigger": "engage", "guard": "speed > 30"}
+  ]
+}
+```
+
+### Implementation Plan
+See **SMD_IMPLEMENTATION_PLAN.md** for:
+- Database schema (`state_machine_diagrams` table)
+- AI prompt templates for SMD
+- Chain prompting implementation
+- RAG integration for SMD
+- Frontend visualization
+- 4-week phased rollout
+
+### Why Chain Prompting?
+- ✅ Better quality: Specialized prompts for behavior vs. structure
+- ✅ Context-aware: Uses actual BDD blocks as input
+- ✅ Flexible: Generate SMD only for selected blocks
+- ✅ Scalable: Easy to add more diagram types (Sequence, Activity)
+- ✅ Research-backed: 2024 best practices for LLM workflows
+
+=======
 ### new task
