@@ -209,7 +209,6 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
-
 ### NEW TASK
 ## State Machine Diagrams (SMD) - PLANNED
 
@@ -270,3 +269,5 @@ See **SMD_IMPLEMENTATION_PLAN.md** for:
 - ✅ Scalable: Easy to add more diagram types (Sequence, Activity)
 - ✅ Research-backed: 2024 best practices for LLM workflows
 
+=======
+### new task
