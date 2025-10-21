@@ -198,19 +198,35 @@ class DiagramPositioning:
             return diagram_data
 
 # Core SysML prompt template to help guide model responses (without positioning logic)
-SYSML_PROMPT_TEMPLATE = """
-You are a SysML expert assisting a software tool.  When given a system description
-and optional example diagrams, produce a Block Definition Diagram in JSON with the
-structure shown below.
+BDD_ONLY_PROMPT_TEMPLATE = """
+You are a SysML expert specializing in Block Definition Diagrams (BDD).
+
+TASK: Produce a SysML Block Definition Diagram in JSON format.
+
+GOAL:
+Generate a Block Definition Diagram that captures ONLY the high-level system structure described by the user.
 
 Required output format:
 {
-  "diagram_type": "block",
+  "diagram_type": "bdd",
   "elements": [
-    {"id": "sensor-1", "type": "sensor", "name": "...", "description": "...", "properties": {...}}
+    {
+    "id": "sensor-1", 
+    "type": "sensor", 
+    "name": "...", 
+    "description": "...", 
+    "properties": {...}
+    },
+    {
+    "id": "block-1",
+    "type": "block",  # allowed: "block", "sensor", "processor"
+    "name": "Descriptive Name",
+    "description": "Concise explanation of the block's role",
+    "properties": {"optional_key": "value"}  # include only when relevant
+    } 
   ],
   "relationships": [
-    {"source_id": "sensor-1", "target_id": "processor-1", "type": "smoothstep", "name": "..."}
+    {"source_id": "sensor-1", "target_id": "block-1", "type": "smoothstep", "name": "..."}
   ]
 }
 
@@ -297,7 +313,7 @@ def generate_sysml_diagram(
         system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
         print("\n==== Using BDD_ENHANCED prompt template ====")
     else:  # Default to standard BDD
-        system_prompt = SYSML_PROMPT_TEMPLATE
+        system_prompt = BDD_ONLY_PROMPT_TEMPLATE
         print("\n==== Using standard BDD prompt template ====")
 
     messages = [{"role": "system", "content": system_prompt}]
