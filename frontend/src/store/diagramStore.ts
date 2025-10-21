@@ -1,8 +1,27 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport } from 'reactflow';
+import {
+  Node,
+  Edge,
+  Connection,
+  NodeChange,
+  EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+  Viewport,
+} from 'reactflow';
 import { applyDagreLayout } from '../utils/dagreLayout';
-import { clampPositionWithinComposite, getCompositeWorkspaceRect } from '../utils/smdComposite';
+import {
+  clampPositionWithinComposite,
+  getCompositeWorkspaceRect,
+} from '../utils/smdComposite';
+import {
+  createCompositeResizeScheduler,
+  isSmdChildNode,
+  isSmdCompositeNode,
+  type CompositeResizeReason,
+} from '../features/smd/composite/resizeService';
+import { getNodeChangeId } from '../utils/reactflowChanges';
 
 // Define node types based on SysML diagram elements
 export type NodeType =
@@ -202,6 +221,10 @@ interface DiagramStoreState {
   addNode: (node: Node<NodeData>) => void;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   removeNode: (id: string) => void;
+  scheduleCompositeResize: (parentId: string, options?: CompositeResizeOptions) => void;
+  scheduleCompositeResizes: (parentIds: Iterable<string>, options?: CompositeResizeOptions) => void;
+  flushCompositeResizes: (parentIds: Iterable<string>, options?: CompositeResizeOptions) => void;
+  flushAllCompositeResizes: (options?: CompositeResizeOptions) => void;
   
   addEdge: (edge: Edge) => void;
   updateEdge: (id: string, data: Partial<Edge>) => void;
@@ -232,11 +255,78 @@ interface DiagramStoreState {
   saveToHistory: () => void;
 }
 
+type CompositeResizeOptions = {
+  reason?: CompositeResizeReason;
+  flush?: boolean;
+};
+
 // Create the store
-const useDiagramStore = create<DiagramStoreState>()(persist(
-  (set, get) => ({
-  // Initial state
-  openDiagrams: [],
+const useDiagramStore = create<DiagramStoreState>()(
+  persist(
+    (set, get) => {
+      const isActiveSmdDiagram = () => {
+        const { activeDiagramId, openDiagrams } = get();
+        if (!activeDiagramId) {
+          return false;
+        }
+        const activeDiagram = openDiagrams.find(diagram => diagram.id === activeDiagramId);
+        return activeDiagram?.type === 'smd';
+      };
+
+      const compositeResizeScheduler = createCompositeResizeScheduler({
+        getNodes: () => get().nodes,
+        applyNodes: nodes => {
+          set({ nodes });
+          get().updateActiveDiagram({ nodes });
+        },
+      });
+
+      const addParentIfSmdChild = (
+        node: Node<NodeData> | undefined,
+        parents: Set<string>
+      ) => {
+        if (!node) return;
+        const parentId = node.parentNode;
+        if (!parentId) return;
+        if (!isSmdChildNode(node)) return;
+        parents.add(parentId);
+      };
+
+      const toRequest = (options?: CompositeResizeOptions) =>
+        options?.reason ? { reason: options.reason } : undefined;
+
+      const requestResize = (parentId: string, options?: CompositeResizeOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        if (!parentId) return;
+        const request = toRequest(options);
+        if (options?.flush) {
+          compositeResizeScheduler.flush(parentId, request);
+        } else {
+          compositeResizeScheduler.schedule(parentId, request);
+        }
+      };
+
+      const requestResizeMany = (parentIds: Iterable<string>, options?: CompositeResizeOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        const ids = Array.from(new Set(parentIds));
+        if (ids.length === 0) return;
+        ids.forEach(id => requestResize(id, options));
+      };
+
+      const flushAll = (options?: CompositeResizeOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        const composites = get()
+          .nodes
+          .filter(isSmdCompositeNode)
+          .map(node => node.id);
+        if (composites.length === 0) return;
+        const request = toRequest(options);
+        compositeResizeScheduler.flushMany(composites, request);
+      };
+
+      return {
+      // Initial state
+      openDiagrams: [],
   activeDiagramId: null,
   
   // Persistent state for IBD diagrams
@@ -784,6 +874,14 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   setNodes: (nodes) => {
     set({ nodes });
     get().updateActiveDiagram({ nodes });
+    const parentIds = new Set<string>();
+    nodes.forEach(node => addParentIfSmdChild(node, parentIds));
+    if (parentIds.size > 0) {
+      requestResizeMany(parentIds, { reason: 'hydrate', flush: true });
+    } else if (isActiveSmdDiagram()) {
+      // If no specific parents detected but we are in SMD, ensure composites stay in sync.
+      flushAll({ reason: 'hydrate', flush: true });
+    }
   },
   setEdges: (edges) => {
     set({ edges });
@@ -796,6 +894,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
 
     const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
     let adjustedNodes = newNodes;
+    const affectedParents = new Set<string>();
+    const immediateParents = new Set<string>();
 
     if (activeDiagram?.type === 'smd') {
       const composites = new Map<string, Node<NodeData>>();
@@ -817,10 +917,40 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         }
         return node;
       });
+
+      const previousNodesMap = new Map(currentNodes.map(node => [node.id, node]));
+      const adjustedNodesMap = new Map(adjustedNodes.map(node => [node.id, node]));
+
+      changes.forEach(change => {
+        const changeId = getNodeChangeId(change);
+        if (!changeId) {
+          return;
+        }
+
+        const previousNode = previousNodesMap.get(changeId);
+        const nextNode = adjustedNodesMap.get(changeId);
+
+        if (change.type === 'remove') {
+          addParentIfSmdChild(previousNode, immediateParents);
+          return;
+        }
+
+        addParentIfSmdChild(previousNode, affectedParents);
+        addParentIfSmdChild(nextNode, affectedParents);
+      });
+
+      immediateParents.forEach(id => affectedParents.delete(id));
     }
 
     set({ nodes: adjustedNodes });
     get().updateActiveDiagram({ nodes: adjustedNodes });
+
+    if (immediateParents.size > 0) {
+      requestResizeMany(immediateParents, { reason: 'child-remove', flush: true });
+    }
+    if (affectedParents.size > 0) {
+      requestResizeMany(affectedParents, { reason: 'move' });
+    }
   },
   
   onEdgesChange: (changes) => {
@@ -877,6 +1007,10 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     const newNodes = [...get().nodes, node];
     set({ nodes: newNodes });
     get().updateActiveDiagram({ nodes: newNodes });
+    
+    if (node.parentNode) {
+      requestResize(node.parentNode, { reason: 'child-add', flush: true });
+    }
   },
   
   updateNode: (id, data) => {
@@ -927,13 +1061,24 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Save current state before removing node
     get().saveToHistory();
     
+    const previousNodes = get().nodes;
+    const nodeToRemove = previousNodes.find(node => node.id === id);
+
     // Remove the node and connected edges
-    const newNodes = get().nodes.filter(node => node.id !== id);
+    const newNodes = previousNodes.filter(node => node.id !== id);
     const newEdges = get().edges.filter(edge => edge.source !== id && edge.target !== id);
     
     set({ nodes: newNodes, edges: newEdges });
     get().updateActiveDiagram({ nodes: newNodes, edges: newEdges });
+
+    if (nodeToRemove?.parentNode) {
+      requestResize(nodeToRemove.parentNode, { reason: 'child-remove', flush: true });
+    }
   },
+  scheduleCompositeResize: (parentId, options) => requestResize(parentId, options),
+  scheduleCompositeResizes: (parentIds, options) => requestResizeMany(parentIds, options),
+  flushCompositeResizes: (parentIds, options) => requestResizeMany(parentIds, { ...options, flush: true }),
+  flushAllCompositeResizes: (options) => flushAll({ ...options, flush: true }),
   
   // Edge operations
   addEdge: (edge) => {
@@ -1071,6 +1216,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         edges: layoutedEdges
       });
       get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
+      flushAll({ reason: 'layout', flush: true });
         
         // Validate the generated diagram
         const errors = get().validateDiagram();
@@ -1166,6 +1312,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         lastActionTimestamp
       }
     });
+
+    flushAll({ reason: 'hydrate', flush: true });
   },
   
   
@@ -1191,6 +1339,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         lastActionTimestamp
       }
     });
+
+    flushAll({ reason: 'hydrate', flush: true });
   },
   
   
@@ -1211,8 +1361,9 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       });
     }
   }
-}),
-{
+      };
+    },
+    {
   name: 'sysml-diagram-storage',
   storage: createJSONStorage(() => sessionStorage),
   partialize: (state) => ({ 

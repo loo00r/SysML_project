@@ -6,7 +6,8 @@ import {
   COMPOSITE_DEFAULT_HEIGHT,
   COMPOSITE_DEFAULT_WIDTH,
   COMPOSITE_HEADER_HEIGHT,
-  COMPOSITE_PADDING,
+  COMPOSITE_PADDING_X,
+  COMPOSITE_PADDING_Y,
 } from '../../utils/smdComposite';
 import type { CSSProperties } from 'react';
 
@@ -49,7 +50,7 @@ const HeaderTitle = styled(Typography)({
 const WorkspaceArea = styled(Box)(() => ({
   flex: 1,
   position: 'relative',
-  margin: `${COMPOSITE_PADDING}px`,
+  margin: `${COMPOSITE_PADDING_Y}px ${COMPOSITE_PADDING_X}px`,
   borderRadius: 12,
   border: '1px dashed rgba(13, 71, 161, 0.3)',
   pointerEvents: 'none' as CSSProperties['pointerEvents'],

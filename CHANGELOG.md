@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Composite auto-resize now waits for stable frames, uses parent-local bounding boxes, clamps children post-resize, and blocks shrink on palette drops.
+
+## [1.2.4] - 2025-10-21
+### Fixed
+- Composite auto-resize now waits for stable frames, uses parent-local bounding boxes, clamps children post-resize, and blocks shrink on palette drops.
+
+## [1.2.3] - 2025-10-21
+### Fixed
+- Composite states now wait for child measurement, using parent-local bounding boxes and no-shrink guards so palette drops always grow the container.
+- Auto-resize scheduling flushes immediately on child add/drag-end via double-RAF, preventing the first child from collapsing the composite.
+
+## [1.2.2] - 2025-10-21
+### Fixed
+- React Flow node change handling now uses official type guards, eliminating `NodeChange` union access errors during TypeScript builds.
+
+### Changed
+- Frontend Docker build copies dependency manifests before application code and runs `npm ci` followed by `npm run build` for reliable caching.
+
+## [1.2.1] - 2025-10-21
+### Added
+- Debounced SMD composite auto-resize that recalculates on palette drops, drags, deletes, auto-layout, undo/redo, and rehydrate.
+
+### Fixed
+- Palette drops into composites now derive typed parent IDs and clamp positions, removing bare `parentNode` references that broke builds.
+
+## [1.2.0] - 2025-10-20
 
 ### Fixed
 - Composite workspace outline keeps internal SMD edges fully visible without any overlay fill.
