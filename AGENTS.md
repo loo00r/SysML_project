@@ -55,130 +55,116 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-# SMD-03-FIX — Composite must grow (never shrink) on palette child add
+# SMD-03-TUNE — Deterministic composite growth on child add (+5%), never on drag
 
 ## Goal
-When a user drags **Initial / State / Choice / Final** from the Diagram Elements panel **into** a Composite, the Composite must **increase** its size to include the new child with padding. It must **not shrink** on add. (Shrinking is allowed only on delete or explicit auto-layout.)
+Make **Composite** resizing predictable:
+- **No growth on drag/move** of children — drag only clamps.
+- On **palette drop inside Composite**:
+  - If this is the **first** child → size stays unchanged.
+  - For **every next** child (2nd, 3rd, …) → Composite **grows by +5%** from its current width/height.
+- On **delete** → Composite may shrink (to fit or to initial/min), as it already does.
 
-## Context
-Current behavior: on the **first** palette drop inside a Composite, the container **shrinks once** and then stops resizing on subsequent adds; after deleting children it stays small. This typically happens due to early measurement (child width/height 0), using world instead of parent-local coordinates, wrong padding/header math, and/or debounced scheduling that swallows the final update.
+## Rationale
+Current auto-resize sometimes grows during drag and inconsistently on add. We want a stable rule: growth happens **only** on add, by a fixed step, and never as a side-effect of moving nodes.
 
 ## Scope
-- In scope:
-  - Reliable resize scheduling (microtask + double `requestAnimationFrame`, with **flush** on drop/dragEnd).
-  - Parent-local bbox calculation with non-zero width/height fallbacks.
-  - Correct size math including header and padding, plus **no-shrink guard** for `reason: 'child-add'`.
-  - Clamp children **after** resize; batch updates in a single store transaction.
-  - Proper behavior for **zero children** (revert to initial size ≥ min).
-- Out of scope:
-  - Reparenting nodes dragged from canvas over Composite (separate task).
-  - Advanced multi-region statechart semantics.
+- In scope: resize scheduler gating by event `reason`, fixed-step growth (+5%) on `child-add` when `childCount >= 2`, no growth on `move/drag`.
+- Out of scope: geometry-based “fit-to-children” growth on add (keep for future mode), reparenting from canvas, multi-region logic.
 
 ## Implementation Steps
-1. **Palette → Composite drop scheduling**
-   - In the palette-drop handler (where the child is created):
-     - Create the node with `parentNode = composite.id`, **parent-local** position inside the inner workspace.
-     - Call:
-       ```ts
-       scheduleCompositeResize(parentId, { reason: 'child-add', flush: true })
-       ```
-   - Implement `scheduleCompositeResize` to:
-     - `await Promise.resolve()` → `requestAnimationFrame(() => requestAnimationFrame(() => resizeCompositeToChildren(parentId, 'child-add')))`.
-     - If `flush: true`, cancel pending debounced jobs for that parent and run the above immediately.
 
-2. **Parent-local bbox with safe sizes**
+1. **Resize policy switch**
+   - Add a policy flag in composite data (or service constant):  
+     `AUTO_RESIZE_POLICY = 'incrementalOnAdd'`.
+   - The service will branch on policy; default to this policy for SMD composites.
+
+2. **Scheduler gating**
+   - Ensure all resize scheduling calls pass a `reason`:
+     - `child-add`, `child-delete`, `dragging`, `drag-end`, `layout-done`, `hydrate`.
+   - Update the central scheduler:
+     - **Ignore growth** for `dragging` and `drag-end`. (Still run **clamp** without size change.)
+     - Allow resize for `child-delete`, `layout-done`, `hydrate` (shrink or normalize).
+     - For `child-add` → delegate to the new incremental rule (Step 3) and **flush** (no debounce).
+
+3. **Incremental growth rule (+5%)**
    - In `resizeCompositeToChildren(parentId, reason)`:
-     - Collect **direct children** of types: `smdInitial`, `smdState`, `smdComposite`, `smdFinal`, `smdChoice`.
-     - For each child, build bounds in **parent-local** coordinates:
-       ```ts
-       const x = child.position.x;
-       const y = child.position.y;
-       const w = child.width  ?? measuredWidthByType(child.type)  ?? DEFAULTS[child.type].w;
-       const h = child.height ?? measuredHeightByType(child.type) ?? DEFAULTS[child.type].h;
-       ```
-       (No viewport/world transforms; avoid 0×0.)
-     - Compute `bbox = union(childrenBounds)`; if no children → handle as in step 4.
+     - Get `children = directChildren(parentId)`.
+     - If `reason === 'child-add'`:
+       - If `children.length === 1`: **no-op** (first child doesn’t change size).
+       - Else (length ≥ 2):
+         ```ts
+         const GROW = 1.05; // +5%
+         const nextW = Math.ceil(currentW * GROW);
+         const nextH = Math.ceil(currentH * GROW);
+         // Clamp to sensible bounds:
+         const MIN_W = 220, MIN_H = 120;
+         const INITIAL_W = node.data.initialW ?? 320;
+         const INITIAL_H = node.data.initialH ?? 200;
+         const MAX_W = (node.data.maxW ?? INITIAL_W * 4);
+         const MAX_H = (node.data.maxH ?? INITIAL_H * 4);
 
-3. **Resize math + no-shrink guard**
-   - Constants:
-     ```ts
-     const HEADER_H = 28;
-     const PAD_X = 16, PAD_Y = 20;
-     const MIN_W = 220, MIN_H = 120;
-     const INITIAL_W = node.data.initialW ?? 320;
-     const INITIAL_H = node.data.initialH ?? 200;
-     ```
-   - Targets:
-     ```ts
-     let targetW = Math.max(MIN_W, INITIAL_W, bbox.w + PAD_X * 2);
-     let targetH = Math.max(MIN_H, INITIAL_H, HEADER_H + bbox.h + PAD_Y * 2);
-     if (reason === 'child-add') {
-       targetW = Math.max(targetW, currentW);
-       targetH = Math.max(targetH, currentH);
-     }
-     if (Math.abs(targetW - currentW) < 1 && Math.abs(targetH - currentH) < 1) return; // no-op
-     ```
-   - Apply the new size in a **single store transaction** together with any clamps (next step).
+         targetW = Math.min(Math.max(nextW, Math.max(MIN_W, INITIAL_W)), MAX_W);
+         targetH = Math.min(Math.max(nextH, Math.max(MIN_H, INITIAL_H)), MAX_H);
+         ```
+         - Apply resize in a **single store transaction**, then run **clampChildren** to keep nodes inside the new innerRect.
+     - If `reason === 'child-delete'` or `layout-done` or `hydrate`:
+       - Allow **shrink-to-fit** or **normalize** to:
+         ```ts
+         targetW = Math.max(MIN_W, INITIAL_W, bboxFitW);
+         targetH = Math.max(MIN_H, INITIAL_H, HEADER_H + bboxFitH);
+         ```
+       - (This preserves your current “shrink works” behavior.)
 
-4. **Clamp children after resize & zero-children behavior**
-   - After applying `targetW/H`, clamp all children into:
-     ```ts
-     const inner = {
-       x: PAD_X,
-       y: HEADER_H + PAD_Y,
-       w: targetW - PAD_X * 2,
-       h: targetH - HEADER_H - PAD_Y * 2,
-     };
-     ```
-   - If `children.length === 0`, set size to:
-     ```ts
-     { w: Math.max(MIN_W, INITIAL_W), h: Math.max(MIN_H, INITIAL_H) }
-     ```
-     (never smaller than initial size).
+4. **Disable drag-driven growth**
+   - For `reason === 'dragging'` and `reason === 'drag-end'`:
+     - **Do not** change width/height.
+     - Only compute `innerRect` from the **current** composite size and **clamp** child positions.
+     - Keep debounce for performance but it should **not** call resize.
 
-5. **Events & debounce policy**
-   - **Flush (no debounce)** on: palette drop, dragEnd, delete, auto-layout done, hydrate (one time).
-   - **Debounce 150ms** only during **dragging/moving**.
-   - Clear pending timers on Composite unmount.
+5. **Events wiring (palette drop path)**
+   - In the palette drop handler (child creation with `parentNode` already set and parent-local position):
+     - `scheduleCompositeResize(parentId, { reason: 'child-add', flush: true })`.
 
-6. **Persistence & hydration**
-   - Persist updated `width/height`.
-   - On tab open/rehydration call:
+6. **Zero-children stabilization**
+   - When `children.length === 0`, keep:
      ```ts
-     scheduleCompositeResize(parentId, { reason: 'hydrate', flush: true })
+     targetW = Math.max(MIN_W, INITIAL_W);
+     targetH = Math.max(MIN_H, INITIAL_H);
      ```
-     to re-sync with actual child sizes.
+   - This prevents lingering tiny sizes.
 
 ## Acceptance Criteria
-- [ ] Dropping any of **Initial / State / Choice / Final** into a Composite increases its size to include the child with padding; it **never shrinks** on add.
-- [ ] Subsequent adds keep growing as needed; no “only first time” effect.
-- [ ] Deleting children may shrink the Composite but not below **initial size** (and never below min).
-- [ ] With zero children, Composite returns to its **initial size** (≥ min).
-- [ ] No flicker; updates are immediate on drop/dragEnd; bounding boxes are parent-local and non-zero.
+- [ ] Adding the **first** child to a Composite: size unchanged.
+- [ ] Adding the **second and every subsequent** child via palette drop inside the Composite: width & height grow by **exactly +5%** of the current size (bounded by MAX).
+- [ ] **Drag/move** inside Composite never changes Composite size; only clamping occurs.
+- [ ] Deleting children can shrink the Composite, but not below initial/min; deleting all returns to initial (≥ min).
+- [ ] Behavior is consistent across sessions (after refresh/hydration).
 
 ## Testing
-- Manual
-  1. New Composite → drop 3 States sequentially → Composite grows each time.
-  2. Add Initial, then Choice → grows; delete nodes → Composite shrinks but not below initial size; delete all → returns to initial size.
-  3. Fast add of 5+ nodes → final size fits all; no missed updates.
-  4. Reload tab (hydrate) → size matches children (no unexpected shrink).
-- Unit
-  - BBox union (parent-local) with default size fallbacks.
-  - No-shrink guard for `reason: 'child-add'`.
-  - Debounce/flush logic for drop vs drag.
+- Manual:
+  1. New Composite → add first child → size unchanged.
+  2. Add a second child → size grows by ~5%; add third → +5% again; etc.
+  3. Drag children to borders → Composite size remains fixed; nodes get clamped.
+  4. Delete one child → size may shrink to fit; delete all → size returns to initial/min.
+  5. Reload tab → sizes persist and rules remain consistent.
+- Unit:
+  - Incremental growth math (+5% with min/initial/max clamps).
+  - Scheduler gating: `child-add` grows; `dragging/drag-end` don’t.
+  - Zero-children normalization.
 
 ## Files to Touch (indicative)
-- `frontend/src/features/smd/composite/resizeService.ts`
-- `frontend/src/features/dnd/paletteDrop.ts` (or the module that creates nodes from the palette)
-- `frontend/src/store/diagramStore.ts` (scheduler hooks, hydration)
-- `frontend/src/utils/geometry.ts`
+- `frontend/src/features/smd/composite/resizeService.ts` (policy, incremental rule, zero-children)
+- `frontend/src/features/dnd/paletteDrop.ts` (reason: `child-add`, flush)
+- `frontend/src/store/diagramStore.ts` (scheduler gating, reasons propagation)
+- `frontend/src/utils/geometry.ts` (innerRect calc + clamp)
 
 ## Risks & Notes
-- Measuring too early causes “shrink once”: enforce microtask + **double RAF** before resize.
-- Keep all math strictly **parent-local**. Mixing world/viewport coords leads to negative or tiny bboxes.
-- Batch resize + clamp in a single transaction to avoid intermediate layouts.
+- Fixed-step growth trades exact fit for determinism; set `MAX_W/H` to prevent runaway growth when adding many nodes.
+- Ensure all palette adds carry `reason: 'child-add'`. Reparenting flows remain out of scope.
 
 ## Post-merge Checklist
-- [ ] `CHANGELOG.md` → **Fixed:** Composite grows on palette child add; stable parent-local auto-resize.
+- [ ] `CHANGELOG.md` → **Changed:** Composite grows deterministically by +5% on child add; drag no longer drives growth.
 - [ ] Bump patch version and update `.env` (`APP_VERSION`, `VITE_APP_VERSION`).
+
 

@@ -611,14 +611,36 @@ const DiagramWorkspace: React.FC = () => {
 
         if (activeDiagram?.type === 'smd') {
           if (nodeType === 'smdComposite') {
+            const initialWidth =
+              (typeof newNode.data?.initialW === 'number' && Number.isFinite(newNode.data.initialW))
+                ? newNode.data.initialW
+                : COMPOSITE_DEFAULT_WIDTH;
+            const initialHeight =
+              (typeof newNode.data?.initialH === 'number' && Number.isFinite(newNode.data.initialH))
+                ? newNode.data.initialH
+                : COMPOSITE_DEFAULT_HEIGHT;
+            const maxWidth =
+              (typeof newNode.data?.maxW === 'number' && Number.isFinite(newNode.data.maxW))
+                ? Math.max(newNode.data.maxW, initialWidth)
+                : initialWidth * 4;
+            const maxHeight =
+              (typeof newNode.data?.maxH === 'number' && Number.isFinite(newNode.data.maxH))
+                ? Math.max(newNode.data.maxH, initialHeight)
+                : initialHeight * 4;
+
             newNode.style = {
-              width: COMPOSITE_DEFAULT_WIDTH,
-              height: COMPOSITE_DEFAULT_HEIGHT,
+              width: initialWidth,
+              height: initialHeight,
             };
             newNode.data = {
               ...newNode.data,
-              width: COMPOSITE_DEFAULT_WIDTH,
-              height: COMPOSITE_DEFAULT_HEIGHT,
+              width: initialWidth,
+              height: initialHeight,
+              initialW: initialWidth,
+              initialH: initialHeight,
+              maxW: maxWidth,
+              maxH: maxHeight,
+              autoResizePolicy: 'incrementalOnAdd',
               name: newNode.data?.name || 'Composite',
               label: newNode.data?.label || 'Composite',
             };

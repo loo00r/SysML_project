@@ -57,6 +57,11 @@ export interface NodeData {
   stateType?: 'initial' | 'final' | 'choice' | 'state';
   width?: number;
   height?: number;
+  initialW?: number;
+  initialH?: number;
+  maxW?: number;
+  maxH?: number;
+  autoResizePolicy?: 'incrementalOnAdd';
 }
 
 // Define diagram types
@@ -946,10 +951,10 @@ const useDiagramStore = create<DiagramStoreState>()(
     get().updateActiveDiagram({ nodes: adjustedNodes });
 
     if (immediateParents.size > 0) {
-      requestResizeMany(immediateParents, { reason: 'child-remove', flush: true });
+      requestResizeMany(immediateParents, { reason: 'child-delete', flush: true });
     }
     if (affectedParents.size > 0) {
-      requestResizeMany(affectedParents, { reason: 'move' });
+      requestResizeMany(affectedParents, { reason: 'dragging' });
     }
   },
   
@@ -1072,7 +1077,7 @@ const useDiagramStore = create<DiagramStoreState>()(
     get().updateActiveDiagram({ nodes: newNodes, edges: newEdges });
 
     if (nodeToRemove?.parentNode) {
-      requestResize(nodeToRemove.parentNode, { reason: 'child-remove', flush: true });
+      requestResize(nodeToRemove.parentNode, { reason: 'child-delete', flush: true });
     }
   },
   scheduleCompositeResize: (parentId, options) => requestResize(parentId, options),
@@ -1216,7 +1221,7 @@ const useDiagramStore = create<DiagramStoreState>()(
         edges: layoutedEdges
       });
       get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
-      flushAll({ reason: 'layout', flush: true });
+      flushAll({ reason: 'layout-done', flush: true });
         
         // Validate the generated diagram
         const errors = get().validateDiagram();

@@ -6,12 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Fixed
-- Composite auto-resize now waits for stable frames, uses parent-local bounding boxes, clamps children post-resize, and blocks shrink on palette drops.
+### Changed
+- Composite states now grow deterministically by 5% on the second and subsequent palette drops while drags only clamp positions.
+
+## [1.2.5] - 2025-10-21
+### Changed
+- Composite states now grow deterministically by 5% on the second and subsequent palette drops while drags only clamp positions.
 
 ## [1.2.4] - 2025-10-21
 ### Fixed
-- Composite auto-resize now waits for stable frames, uses parent-local bounding boxes, clamps children post-resize, and blocks shrink on palette drops.
+- Composite states now wait for child measurement, using parent-local bounding boxes and no-shrink guards so palette drops always grow the container.
+- Auto-resize scheduling flushes immediately on child add/drag-end via double-RAF, preventing the first child from collapsing the composite.
 
 ## [1.2.3] - 2025-10-21
 ### Fixed

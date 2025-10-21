@@ -55,45 +55,59 @@ const toParentLocalPosition = (
 
 export type CompositeResizeReason =
   | 'child-add'
-  | 'child-remove'
+  | 'child-delete'
+  | 'dragging'
   | 'drag-end'
-  | 'layout'
+  | 'layout-done'
   | 'hydrate'
-  | 'move'
   | 'unknown';
 
 export interface ResizeCompositeOptions {
   reason?: CompositeResizeReason;
 }
 
-export const resizeCompositeToChildren = (
-  parentId: string,
-  nodes: Node<NodeData>[],
-  options: ResizeCompositeOptions = {}
-): CompositeResizeResult => {
-  const parentIndex = nodes.findIndex(node => node.id === parentId && isSmdCompositeNode(node));
+const AUTO_RESIZE_POLICY = 'incrementalOnAdd' as const;
+const GROWTH_FACTOR = 1.05;
+const SIZE_EPSILON = 0.5;
 
-  if (parentIndex === -1) {
-    return { updatedNodes: nodes, width: 0, height: 0, changed: false };
-  }
+interface ChildEntry {
+  node: Node<NodeData>;
+  index: number;
+}
 
-  const parent = nodes[parentIndex];
-  const childEntries = nodes
-    .map((node, index) => ({ node, index }))
-    .filter(
-      ({ node }) => node.parentNode === parentId && isSmdChildNode(node)
-    );
+const resolveDimension = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
+const getCompositeSizeBounds = (parent: Node<NodeData>) => {
   const { width: currentWidth, height: currentHeight } = getCompositeDimensions(parent);
-  const reason = options.reason ?? 'unknown';
-  const allowShrink = reason === 'child-remove' || reason === 'layout' || reason === 'hydrate';
+  const initialWidth = resolveDimension(parent.data?.initialW, currentWidth);
+  const initialHeight = resolveDimension(parent.data?.initialH, currentHeight);
+  const maxWidth = resolveDimension(parent.data?.maxW, initialWidth * 4);
+  const maxHeight = resolveDimension(parent.data?.maxH, initialHeight * 4);
+  const minWidth = Math.max(COMPOSITE_MIN_WIDTH, initialWidth);
+  const minHeight = Math.max(COMPOSITE_MIN_HEIGHT, initialHeight);
+  const boundedMaxWidth = Math.max(maxWidth, minWidth);
+  const boundedMaxHeight = Math.max(maxHeight, minHeight);
 
+  return {
+    currentWidth,
+    currentHeight,
+    initialWidth,
+    initialHeight,
+    minWidth,
+    minHeight,
+    maxWidth: boundedMaxWidth,
+    maxHeight: boundedMaxHeight,
+  };
+};
+
+const computeChildrenBounds = (children: ChildEntry[], parent: Node<NodeData>) => {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
 
-  childEntries.forEach(({ node }) => {
+  children.forEach(({ node }) => {
     const localPosition = toParentLocalPosition(node, parent);
     const { width: childWidth, height: childHeight } = getNodeDimensions(node);
 
@@ -116,68 +130,112 @@ export const resizeCompositeToChildren = (
     if (bottom > maxY) maxY = bottom;
   });
 
-  const hasChildren =
-    childEntries.length > 0 &&
+  const hasBounds =
     Number.isFinite(minX) &&
     Number.isFinite(minY) &&
     Number.isFinite(maxX) &&
     Number.isFinite(maxY);
 
-  let targetWidth: number;
-  let targetHeight: number;
+  if (!hasBounds) {
+    return {
+      hasChildren: false,
+      width: 0,
+      height: 0,
+    };
+  }
 
-  if (hasChildren) {
-    const bboxWidth = Math.max(0, maxX - minX);
-    const bboxHeight = Math.max(0, maxY - minY);
+  return {
+    hasChildren: true,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  };
+};
 
-    targetWidth = Math.max(COMPOSITE_MIN_WIDTH, bboxWidth + COMPOSITE_PADDING_X * 2);
-    targetHeight = Math.max(
-      COMPOSITE_MIN_HEIGHT,
-      COMPOSITE_HEADER_HEIGHT + bboxHeight + COMPOSITE_PADDING_Y * 2
+export const resizeCompositeToChildren = (
+  parentId: string,
+  nodes: Node<NodeData>[],
+  options: ResizeCompositeOptions = {}
+): CompositeResizeResult => {
+  const parentIndex = nodes.findIndex(node => node.id === parentId && isSmdCompositeNode(node));
+
+  if (parentIndex === -1) {
+    return { updatedNodes: nodes, width: 0, height: 0, changed: false };
+  }
+
+  const parent = nodes[parentIndex];
+  const childEntries = nodes
+    .map((node, index) => ({ node, index }))
+    .filter(
+      ({ node }) => node.parentNode === parentId && isSmdChildNode(node)
     );
-  } else {
-    targetWidth = allowShrink ? COMPOSITE_MIN_WIDTH : Math.max(COMPOSITE_MIN_WIDTH, currentWidth);
-    targetHeight = allowShrink ? COMPOSITE_MIN_HEIGHT : Math.max(COMPOSITE_MIN_HEIGHT, currentHeight);
+
+  const {
+    currentWidth,
+    currentHeight,
+    initialWidth,
+    initialHeight,
+    minWidth,
+    minHeight,
+    maxWidth,
+    maxHeight,
+  } = getCompositeSizeBounds(parent);
+
+  const reason = options.reason ?? 'unknown';
+  const childCount = childEntries.length;
+  const bounds = computeChildrenBounds(childEntries, parent);
+  const policy = parent.data?.autoResizePolicy ?? AUTO_RESIZE_POLICY;
+
+  let targetWidth = currentWidth;
+  let targetHeight = currentHeight;
+
+  if (policy === AUTO_RESIZE_POLICY) {
+    if (reason === 'child-add') {
+      if (childCount >= 2) {
+        const grownWidth = Math.ceil(currentWidth * GROWTH_FACTOR);
+        const grownHeight = Math.ceil(currentHeight * GROWTH_FACTOR);
+        targetWidth = clampValue(grownWidth, minWidth, maxWidth);
+        targetHeight = clampValue(grownHeight, minHeight, maxHeight);
+      }
+    } else if (reason === 'child-delete' || reason === 'layout-done' || reason === 'hydrate') {
+      if (childCount === 0) {
+        targetWidth = clampValue(Math.ceil(initialWidth), minWidth, maxWidth);
+        targetHeight = clampValue(Math.ceil(initialHeight), minHeight, maxHeight);
+      } else if (bounds.hasChildren) {
+        const fitWidth = Math.ceil(bounds.width + COMPOSITE_PADDING_X * 2);
+        const fitHeight = Math.ceil(COMPOSITE_HEADER_HEIGHT + bounds.height + COMPOSITE_PADDING_Y * 2);
+        targetWidth = clampValue(fitWidth, minWidth, maxWidth);
+        targetHeight = clampValue(fitHeight, minHeight, maxHeight);
+      }
+    } else {
+      // dragging, drag-end, unknown => keep current size but still clamp children below.
+      targetWidth = currentWidth;
+      targetHeight = currentHeight;
+    }
   }
 
-  if (!allowShrink) {
-    targetWidth = Math.max(targetWidth, currentWidth);
-    targetHeight = Math.max(targetHeight, currentHeight);
-  }
-
-  const widthDelta = Math.abs(targetWidth - currentWidth);
-  const heightDelta = Math.abs(targetHeight - currentHeight);
-
-  if (widthDelta < 1) {
-    targetWidth = currentWidth;
-  }
-  if (heightDelta < 1) {
-    targetHeight = currentHeight;
-  }
-
-  const roundedCurrentWidth = roundToPixel(currentWidth);
-  const roundedCurrentHeight = roundToPixel(currentHeight);
-  const roundedWidth = roundToPixel(targetWidth);
-  const roundedHeight = roundToPixel(targetHeight);
+  const widthChanged = Math.abs(targetWidth - currentWidth) >= SIZE_EPSILON;
+  const heightChanged = Math.abs(targetHeight - currentHeight) >= SIZE_EPSILON;
+  const finalWidth = widthChanged ? roundToPixel(targetWidth) : roundToPixel(currentWidth);
+  const finalHeight = heightChanged ? roundToPixel(targetHeight) : roundToPixel(currentHeight);
 
   const updatedNodes = [...nodes];
   let changed = false;
 
-  if (roundedWidth !== roundedCurrentWidth || roundedHeight !== roundedCurrentHeight) {
+  if (widthChanged || heightChanged) {
     const updatedParent: Node<NodeData> = {
       ...parent,
       style: {
         ...parent.style,
-        width: roundedWidth,
-        height: roundedHeight,
+        width: finalWidth,
+        height: finalHeight,
       },
       data: {
         ...parent.data,
-        width: roundedWidth,
-        height: roundedHeight,
+        width: finalWidth,
+        height: finalHeight,
       },
-      width: roundedWidth,
-      height: roundedHeight,
+      width: finalWidth,
+      height: finalHeight,
     };
     updatedNodes[parentIndex] = updatedParent;
     changed = true;
@@ -186,8 +244,8 @@ export const resizeCompositeToChildren = (
   const innerRect = {
     x: COMPOSITE_PADDING_X,
     y: COMPOSITE_HEADER_HEIGHT + COMPOSITE_PADDING_Y,
-    width: Math.max(roundedWidth - COMPOSITE_PADDING_X * 2, 0),
-    height: Math.max(roundedHeight - COMPOSITE_HEADER_HEIGHT - COMPOSITE_PADDING_Y * 2, 0),
+    width: Math.max(finalWidth - COMPOSITE_PADDING_X * 2, 0),
+    height: Math.max(finalHeight - COMPOSITE_HEADER_HEIGHT - COMPOSITE_PADDING_Y * 2, 0),
   };
 
   childEntries.forEach(({ node, index }) => {
@@ -214,8 +272,8 @@ export const resizeCompositeToChildren = (
 
   return {
     updatedNodes: changed ? updatedNodes : nodes,
-    width: roundedWidth,
-    height: roundedHeight,
+    width: finalWidth,
+    height: finalHeight,
     changed,
   };
 };
