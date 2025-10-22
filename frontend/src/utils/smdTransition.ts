@@ -6,6 +6,10 @@ export interface SmdTransitionData {
 
 export type SmdTransitionDraft = Partial<SmdTransitionData>;
 
+export const SMD_EDGE_MARKER_ID = 'smdArrowHead';
+export const SMD_EDGE_MARKER_URL = `url(#${SMD_EDGE_MARKER_ID})`;
+export const USE_SMD_EDGE_MARKERS = true;
+
 export const ensureSmdTransitionData = (data?: SmdTransitionDraft): Required<SmdTransitionData> => ({
   event: data?.event?.trim() ?? '',
   guard: data?.guard?.trim() ?? '',

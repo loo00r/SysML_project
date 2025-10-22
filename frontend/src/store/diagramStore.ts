@@ -15,6 +15,8 @@ import {
   ensureSmdTransitionData,
   composeSmdTransitionLabel,
   parseSmdTransitionLabel,
+  SMD_EDGE_MARKER_URL,
+  USE_SMD_EDGE_MARKERS,
 } from '../utils/smdTransition';
 import { applyDagreLayout } from '../utils/dagreLayout';
 import {
@@ -109,8 +111,6 @@ export interface DiagramState {
   parentDiagramId?: string;
 }
 
-const SMD_EDGE_MARKER = 'url(#smdArrowHead)';
-
 const withSmdTransitionDefaults = (edge: Edge, patchData?: SmdTransitionDraft): Edge => {
   const initialData = edge.data
     ? ensureSmdTransitionData(edge.data as SmdTransitionDraft)
@@ -123,7 +123,7 @@ const withSmdTransitionDefaults = (edge: Edge, patchData?: SmdTransitionDraft): 
     type: 'smdTransition',
     data: mergedData,
     label: computedLabel || undefined,
-    markerEnd: SMD_EDGE_MARKER,
+    markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : edge.markerEnd,
     style: {
       ...(edge.style ?? {}),
       stroke: '#37474f',
@@ -170,7 +170,6 @@ const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
           type: 'smdTransition',
           sourceHandle: 'out-right',
           targetHandle: 'in-left',
-          markerEnd: SMD_EDGE_MARKER,
           label: normalizedLabel,
         }),
       );
@@ -183,7 +182,6 @@ const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
         withSmdTransitionDefaults({
           ...edge,
           type: 'smdTransition',
-          markerEnd: SMD_EDGE_MARKER,
           label: normalizedLabel,
         }),
       );
@@ -890,7 +888,7 @@ const useDiagramStore = create<DiagramStoreState>()(
         target: stateNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
-        markerEnd: SMD_EDGE_MARKER,
+        markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       },
       {
         id: `${stateNodeId}-${finalNodeId}`,
@@ -898,7 +896,7 @@ const useDiagramStore = create<DiagramStoreState>()(
         target: finalNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
-        markerEnd: SMD_EDGE_MARKER,
+        markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       }
     ];
 

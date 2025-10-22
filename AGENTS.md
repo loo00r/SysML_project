@@ -55,164 +55,116 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-Task SMD-04 — Transition label and direction style
+Task SMD-04a — Target-side arrows for SMD transitions (BDD-parity)
 
-Goal
-Render smdTransition labels in the canonical “event \[guard\] / action” format and make these fields editable both inline (on the label) and in the right-side inspector. Also, ensure the transition direction is visually explicit by adding an arrow marker at the edge’s target endpoint.
+GoalMake SMD transition direction obvious by drawing a small arrowhead at the target node’s connection point, the same way BDD blocks show direction. The arrow should appear whenever a node has at least one incoming smdTransition, aligned to the handle side where the edge lands.
 
 Scope of Work
 
-1.  Data model (TypeScript)
+1.  Reuse the BDD arrow overlay pattern
     
 
-*   Extend the SMD transition edge data to carry structured fields:interface SmdTransitionData {event?: string; // default: ""guard?: string; // default: ""action?: string; // default: ""}
+*   Locate the BDD component that draws the target-side arrow (the tiny triangle rendered by the block when it detects an incoming connection).
     
-*   Migrate existing SMD edges: if any of these fields are undefined, initialize them to empty strings to avoid build-time union issues and to keep rendering deterministic.
+*   Extract it into a reusable component, e.g. ArrowHeadOverlay.tsx, with props:
     
-*   Ensure persistence/rehydration includes these fields in the diagram JSON.
+    *   side: 'left' | 'right' | 'top' | 'bottom'
+        
+    *   offset?: number (pixel nudges away from the node border)
+        
+    *   className? (for size/theme tweaks)
+        
+*   Ensure it renders in the **node layer**, with pointer-events: none and a z-index above node chrome, matching the BDD look.
     
 
-2.  Label rendering rules
+2.  Detect inbound edges per side on SMD nodes
     
 
-*   Computed label text uses this template (spaces matter):event \[guard\] / action
+*   In each SMD node component that can be a transition target (smdState, smdComposite, smdFinal, and choice if present; skip smdInitial), select edges from the store and filter:
     
-*   Omit optional parts cleanly:
+    *   edge.type === 'smdTransition' && edge.target === node.id
+        
+*   For every inbound edge, read edge.targetPosition (React Flow side hint). Build a set of sides {left,right,top,bottom} that have at least one inbound.
     
-    *   If guard is empty: render just “event” or “event / action” (no brackets).
-        
-    *   If action is empty: render “event \[guard\]”.
-        
-    *   If both guard and action are empty: render “event” or empty if event is also empty.
-        
-*   Never render stray “\[\]” or a lone slash; collapse multiple spaces.
-    
-*   Keep the current SMD visual style (rounded state nodes, existing edge stroke). No extra BDD-specific stripes for now.
+*   Render one ArrowHeadOverlay per occupied side (not per edge) to avoid clutter.
     
 
-3.  Edge component and arrow direction
+3.  Positioning/alignment
     
 
-*   Use React Flow’s BaseEdge for the path and EdgeLabelRenderer for the label (consistent with our previous fixes).
+*   Place the overlay just outside the node border on the selected side (e.g., 6–8px).
     
-*   Add a markerEnd arrow on the path that visually points to the target handle. Use a dedicated marker id (e.g., url(#smdArrowHead)) and ensure:
+*   Rotation:
     
-    *   It rotates with the edge so the direction is unambiguous.
+    *   right → 0°, left → 180°, top → -90°, bottom → 90°.
         
-    *   It remains visible above composites and nodes (z-index/pointer-events as we already do for labels/edges).
-        
-    *   For self-loops, the arrow appears on the segment closest to the target anchor and does not overlap the node border excessively.
-        
-*   Keep existing hit-testing (pointerEvents) consistent so labels are clickable without breaking edge interactions.
+*   For composites, clamp the arrow within the composite “workspace” frame and ensure it stays visible above child edges (keep pointer-events: none).
     
 
-4.  Inline editing (label)
+4.  Reactivity
     
 
-*   Clicking (or double-clicking) the label enters an inline edit mode.
+*   When edges move or re-route, the set of inbound sides should recompute and the arrows update immediately (subscribe to edges; avoid heavy computations).
     
-*   Provide three small inputs or a segmented editor that maps to: Event, Guard, Action.
-    
-    *   Simple, frictionless UX: Enter/Blur saves, Escape cancels, Tab moves between fields.
-        
-    *   Debounce saves lightly (e.g., 150 ms) to avoid thrashing.
-        
-*   On save, update edge data (event/guard/action) and recompute the label string.
+*   Self-loops: if the loop targets the node’s right handle, show the right-side arrow, etc.
     
 
-5.  Inspector editing (right panel)
+5.  Feature toggle (optional)
     
 
-*   When an smdTransition is selected, the Properties panel shows a “Transition” section with three fields:
-    
-    *   Event (text)
-        
-    *   Guard (text)
-        
-    *   Action (text)
-        
-*   Two-way binding with the inline editor:
-    
-    *   Editing in the inspector immediately updates the on-canvas label.
-        
-    *   Editing inline immediately reflects in the inspector inputs.
-        
-*   Optionally display a read-only “Preview” of the composed label string under the fields.
-    
-
-6.  Accessibility and UX consistency
-    
-
-*   Provide a subtle placeholder in empty fields (e.g., “event”, “guard”, “action”) but do not serialize placeholders—only actual user text.
-    
-*   Keep current fonts, paddings, rounded label capsule etc., to match the existing SMD aesthetics.
-    
-*   Keyboard: Enter saves the active field; Shift+Enter inserts a newline is NOT needed here—single-line inputs only.
+*   Keep any previous markerEnd work behind a flag (e.g., USE\_SMD\_EDGE\_MARKERS=false) so we can switch approaches later if desired. This task’s acceptance focuses on the node-drawn overlay.
     
 
 Acceptance Criteria
 
-1.  An smdTransition shows a label in the format “event \[guard\] / action”, with optional parts omitted gracefully when empty.
+1.  Every smdTransition visibly terminates with a small arrow at the **target node**, aligned to the correct side.
     
-2.  Editing Event/Guard/Action inline immediately updates the rendered label and stays in sync with the inspector fields.
+2.  Multiple inbound edges to the same side show **one** arrow on that side; inbound edges on different sides show arrows on each occupied side.
     
-3.  Editing Event/Guard/Action in the inspector immediately updates the on-canvas label (two-way sync).
+3.  Arrows update live when edges are created, moved, or deleted, and after undo/redo or rehydrate.
     
-4.  The edge clearly displays an arrow marker at its target endpoint. Direction is obvious even when the path is curved or for self-loops.
+4.  Arrows are always visible (no z-index issues), non-interactive (pointer-events: none), and match the BDD arrow look.
     
-5.  No regressions to existing SMD visuals and interactions (dragging, selecting, composite internals).
-    
-6.  Diagram save/rehydrate preserves the three fields and the label renders identically after reload.
+5.  No regressions to SMD labels, inspector sync, or composite interactions.
     
 
 Manual Test Plan
 
-1.  Create a simple SMD: Initial -> State. Confirm the transition shows an arrow pointing into the State.
+1.  Initial → State (straight). Expect a right/left/top/bottom arrow on State matching the target handle used.
     
-2.  Inline-edit the label to set:
+2.  State → Final. Expect arrow on Final at the targeted side.
     
-    *   event = “tick”, guard = “x > 0”, action = “inc()”Expect: “tick \[x > 0\] / inc()”.
-        
-3.  Clear guard: Expect: “tick / inc()” (no brackets).
+3.  Create two inbound transitions to the same side of a State. Expect a single arrow on that side.
     
-4.  Clear action: Expect: “tick \[x > 0\]”.
+4.  Create inbound transitions to two different sides. Expect two arrows (one per side).
     
-5.  Clear event: Expect:
+5.  Make a self-loop on a State targeting its right handle. Expect one right-side arrow.
     
-    *   If guard only: “\[x > 0\]” (no leading space or slash).
-        
-    *   If action only: “/ inc()”.
-        
-    *   If all empty: label area renders minimal empty capsule or nothing, but selection/inspector still work.
-        
-6.  Select the edge and edit fields in the inspector. Verify real-time sync with the canvas label and that persistence survives page reload.
+6.  Drag targets around and undo/redo. Arrows should update without flicker.
     
-7.  Create a self-loop on a State and a transition crossing a Composite. Verify arrow head visibility and correct orientation in both cases.
+7.  Create transitions inside a Composite. Arrows should render in front of internals and remain visible.
     
 
 Files Likely Touched
 
-*   frontend/src/edges/smdTransition/SmdTransitionEdge.tsx (or equivalent component)
+*   frontend/src/components/smd/StateNode.tsx
     
-*   frontend/src/edges/smdTransition/utils.ts (label formatter, optional)
+*   frontend/src/components/smd/CompositeNode.tsx
     
-*   frontend/src/types/smd.ts (or wherever the edge data interface lives)
+*   frontend/src/components/smd/FinalNode.tsx
     
-*   frontend/src/store/diagramStore.ts (data updates, persist)
+*   frontend/src/components/smd/ChoiceNode.tsx (if applicable)
     
-*   frontend/src/components/inspector/TransitionInspector.tsx (or existing inspector module)
+*   frontend/src/components/shared/ArrowHeadOverlay.tsx (new; extracted from BDD)
     
-*   frontend/src/styles/smd.css (only if minor tweaks needed)
-    
-*   Any edge factory or adapter that maps persisted JSON to React Flow edges
+*   frontend/src/styles/smd.css (minor positioning helpers, pointer-events: none)
     
 
-Changelog (prepare after merge)Version: 1.2.7Added
+Changelog (prepare after merge)Version: 1.2.8Added
 
-*   Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+*   Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.Improved
     
-*   Arrow marker at the transition’s target endpoint to make direction explicit.Improved
+*   Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
     
-*   Robust label composition: clean omission of optional parts, no stray brackets or slashes.Persistence
-    
-*   Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
+
+—

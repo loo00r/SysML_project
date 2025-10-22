@@ -10,6 +10,8 @@ import {
   COMPOSITE_PADDING_Y,
 } from '../../utils/smdComposite';
 import type { CSSProperties } from 'react';
+import ArrowHeadOverlay from '../shared/ArrowHeadOverlay';
+import useSmdInboundSides from '../../hooks/useSmdInboundSides';
 
 const CompositeContainer = styled(Paper)<{ isSelected: boolean; width: number; height: number }>(
   ({ theme, isSelected, width, height }) => ({
@@ -86,6 +88,7 @@ const rightHandleStyle: CSSProperties = {
 const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?: number }>> = ({
   data,
   selected,
+  id,
 }) => {
   const name = data?.name || data?.label || 'Composite';
   const entry = data?.entry;
@@ -94,6 +97,7 @@ const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?:
 
   const width = data?.width ?? COMPOSITE_DEFAULT_WIDTH;
   const height = data?.height ?? COMPOSITE_DEFAULT_HEIGHT;
+  const inboundSides = useSmdInboundSides(id);
 
   return (
     <CompositeContainer elevation={selected ? 6 : 2} isSelected={!!selected} width={width} height={height}>
@@ -118,6 +122,9 @@ const SmdCompositeNode: React.FC<NodeProps<NodeData & { width?: number; height?:
       )}
 
       <Handle id="out-right" type="source" position={Position.Right} style={rightHandleStyle} />
+      {inboundSides.map((side) => (
+        <ArrowHeadOverlay key={side} side={side} offset={18} color="#37474f" size={12} />
+      ))}
     </CompositeContainer>
   );
 };

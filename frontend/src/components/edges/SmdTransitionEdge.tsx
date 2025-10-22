@@ -18,11 +18,23 @@ import type { SmdTransitionDraft } from '../../utils/smdTransition';
 import {
   ensureSmdTransitionData,
   composeSmdTransitionLabel,
+  SMD_EDGE_MARKER_URL,
+  USE_SMD_EDGE_MARKERS,
 } from '../../utils/smdTransition';
 
 const LABEL_PLACEHOLDER = 'event [guard] / action';
 const SAVE_DEBOUNCE_MS = 150;
-const SMD_MARKER = 'url(#smdArrowHead)';
+const resolvedMarker = (incoming?: string) => {
+  if (!USE_SMD_EDGE_MARKERS) {
+    return undefined;
+  }
+
+  if (incoming && typeof incoming === 'string') {
+    return incoming;
+  }
+
+  return SMD_EDGE_MARKER_URL;
+};
 
 const SmdTransitionEdge: React.FC<EdgeProps> = (props) => {
   const {
@@ -165,7 +177,7 @@ const SmdTransitionEdge: React.FC<EdgeProps> = (props) => {
     borderRadius: 16,
   });
 
-  const resolvedMarkerEnd = typeof markerEnd === 'string' ? markerEnd : SMD_MARKER;
+  const resolvedMarkerEnd = resolvedMarker(markerEnd);
   const mergedStyle: CSSProperties = {
     stroke: '#37474f',
     strokeWidth: 2,

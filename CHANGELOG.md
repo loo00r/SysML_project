@@ -7,13 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
 - Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
 
 ### Improved
+- Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
 - Robust label composition: clean omission of optional parts, no stray brackets or slashes.
 
 ### Persistence
 - Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
+
+## [1.2.8] - 2025-10-22
+### Added
+- Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
+
+### Improved
+- Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
 
 ## [1.2.7] - 2025-10-22
 ### Added

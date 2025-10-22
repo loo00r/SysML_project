@@ -2,6 +2,8 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Box, Paper, Typography, styled } from '@mui/material';
 import { NodeData } from '../../store/diagramStore';
+import ArrowHeadOverlay from '../shared/ArrowHeadOverlay';
+import useSmdInboundSides from '../../hooks/useSmdInboundSides';
 
 const Container = styled(Box)({
   position: 'relative',
@@ -46,11 +48,12 @@ const MetaTypography = styled(Typography)(({ theme }) => ({
   whiteSpace: 'pre-wrap',
 }));
 
-const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) => {
+const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected, id }) => {
   const name = data?.name || data?.label || 'State';
   const entry = data?.entry;
   const exit = data?.exit;
   const doActivity = data?.do;
+  const inboundSides = useSmdInboundSides(id);
 
   const hasBehavior =
     (entry && entry.trim().length > 0) ||
@@ -59,7 +62,7 @@ const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) => {
 
   return (
     <Container>
-      <Handle type="target" position={Position.Top} style={handleStyle} />
+      <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} />
       <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
       <Handle type="source" position={Position.Right} style={handleStyle} />
       <Handle type="source" position={Position.Bottom} style={handleStyle} />
@@ -81,6 +84,10 @@ const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) => {
           </Section>
         )}
       </StateCard>
+
+      {inboundSides.map((side) => (
+        <ArrowHeadOverlay key={side} side={side} offset={16} color="#37474f" size={12} />
+      ))}
     </Container>
   );
 };

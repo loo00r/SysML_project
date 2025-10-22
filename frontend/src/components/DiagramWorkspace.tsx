@@ -34,6 +34,7 @@ import {
   toParentLocalPoint,
 } from '../utils/smdComposite';
 import { isSmdChildNode } from '../features/smd/composite/resizeService';
+import { SMD_EDGE_MARKER_ID, SMD_EDGE_MARKER_URL, USE_SMD_EDGE_MARKERS } from '../utils/smdTransition';
 
 // Unified node types object - includes all node components to prevent rendering issues
 const unifiedNodeTypes = {
@@ -231,7 +232,7 @@ const DiagramWorkspace: React.FC = () => {
         },
         type: 'smdTransition' as const,
         animated: false,
-        markerEnd: 'url(#smdArrowHead)',
+        markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       };
     }
 
@@ -929,7 +930,7 @@ const DiagramWorkspace: React.FC = () => {
         >
           <defs>
             <marker
-              id="smdArrowHead"
+              id={SMD_EDGE_MARKER_ID}
               markerWidth="12"
               markerHeight="12"
               viewBox="0 0 12 12"

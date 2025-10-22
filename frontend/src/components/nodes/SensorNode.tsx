@@ -6,6 +6,7 @@ import { AddCircleOutline, ChangeCircle } from '@mui/icons-material';
 import { AdaptiveIbdIcon } from '../icons/AdaptiveIbdIcon';
 import { nodeColors } from '../icons/nodeColors';
 import useDiagramStore from '../../store/diagramStore';
+import ArrowHeadOverlay from '../shared/ArrowHeadOverlay';
 
 const STANDARD_NODE_WIDTH = 260;
 
@@ -269,25 +270,14 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
               position={Position.Bottom}
               style={{ 
                 background: '#555',
-                bottom: -10, // Розташування нижче границі блока
+                bottom: -10,
                 top: 'auto'
               }}
             />
-            {/* Triangle arrow indicator - only shown if the node has incoming connections */}
-            {hasIncomingConnections && (              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                style={{
-                  position: 'absolute', 
-                  left: '50%', 
-                  bottom: '-24px', // Розташування нижче під точкою з'єднання
-                  transform: 'translateX(-50%)' 
-                }}
-              >
-                <polygon points="7,0 14,14 0,14" fill="#555" />
-              </svg>
-            )}          </div>
+            {hasIncomingConnections && (
+              <ArrowHeadOverlay side="bottom" offset={24} color="#555" />
+            )}
+          </div>
         </SensorPaper>
       </NodeWrapper>
       
