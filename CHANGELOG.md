@@ -7,11 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
+- Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
 
-### Changed
-- Composite states now grow deterministically by 5% on the second and subsequent palette drops while drags only clamp positions.
-- Consistent SMD affordances across all BDD block types with a hover "+" trigger on the bottom-left corner.
+### Improved
+- Robust label composition: clean omission of optional parts, no stray brackets or slashes.
+
+### Persistence
+- Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
+
+## [1.2.7] - 2025-10-22
+### Added
+- Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+
+### Improved
+- Robust label composition: clean omission of optional parts, no stray brackets or slashes.
+
+### Persistence
+- Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
 
 ## [1.2.6] - 2025-10-22
 ### Added

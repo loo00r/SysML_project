@@ -55,122 +55,164 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-Task SMD-03a - SMD for Sensor & Processor on BDD
-================================================
+Task SMD-04 — Transition label and direction style
 
 Goal
-----
-
-Enable creating/opening SMD diagrams for **Sensor** and **Processor** blocks directly from the BDD canvas with the same UX already implemented for **System Block**:
-
-*   a hover-revealed **“+”** affordance at the **bottom-left** of the block opens SMD;
-    
-*   the SMD tab is **reused** per **(parentDiagramId, blockId)** pair rather than creating duplicates.
-    
+Render smdTransition labels in the canonical “event \[guard\] / action” format and make these fields editable both inline (on the label) and in the right-side inspector. Also, ensure the transition direction is visually explicit by adding an arrow marker at the edge’s target endpoint.
 
 Scope of Work
--------------
 
-### 1. Node components (frontend)
-
-*   Update SensorNode.tsx and ProcessorNode.tsx:
-    
-    *   Add the bottom-left **“+”** trigger for SMD with the same hover/reveal behavior and styling as in SystemBlockNode.
-        
-    *   On click, call openSmdForBlock({ parentDiagramId, blockId, blockName }).
-        
-    *   Optionally show a small indicator (e.g., “View SMD” icon) when an SMD already exists for this block.
-        
-
-### 2. State store (Zustand)
-
-*   In diagramStore.ts:
-    
-    *   Ensure the openSmdForBlock action exists or add it.
-        
-    *   The SMD diagram **ID** must be deterministic and namespaced per parent:smd-for-{parentDiagramId}-{blockId}.
-        
-    *   If such a tab is already open, **activate** it.If a saved diagram exists, **rehydrate** it.Otherwise, **create an empty SMD** scaffold (Initial/State/Composite/Final available in palette).
-        
-    *   Diagram type must be 'smd'.
-        
-    *   Reuse tabs consistently for the **(parentDiagramId, blockId)** pair.
-        
-
-### 3. Type registrations
-
-*   Verify DiagramWorkspace (React Flow setup) always registers SMD node/edge types:
-    
-    *   smdInitial, smdState, smdComposite, smdFinal, and smdTransition.
-        
-*   Ensure nothing conditionally disables these when switching diagram types.
+1.  Data model (TypeScript)
     
 
-### 4. UX polish
+*   Extend the SMD transition edge data to carry structured fields:interface SmdTransitionData {event?: string; // default: ""guard?: string; // default: ""action?: string; // default: ""}
+    
+*   Migrate existing SMD edges: if any of these fields are undefined, initialize them to empty strings to avoid build-time union issues and to keep rendering deterministic.
+    
+*   Ensure persistence/rehydration includes these fields in the diagram JSON.
+    
 
-*   Optional tooltip for the button: “Add SMD”.
+2.  Label rendering rules
     
-*   Tab title format:
+
+*   Computed label text uses this template (spaces matter):event \[guard\] / action
     
-    *   SMD for {blockName} or SMD for {parentName} · {blockName} (follow the existing naming convention).
+*   Omit optional parts cleanly:
+    
+    *   If guard is empty: render just “event” or “event / action” (no brackets).
         
+    *   If action is empty: render “event \[guard\]”.
+        
+    *   If both guard and action are empty: render “event” or empty if event is also empty.
+        
+*   Never render stray “\[\]” or a lone slash; collapse multiple spaces.
+    
+*   Keep the current SMD visual style (rounded state nodes, existing edge stroke). No extra BDD-specific stripes for now.
+    
+
+3.  Edge component and arrow direction
+    
+
+*   Use React Flow’s BaseEdge for the path and EdgeLabelRenderer for the label (consistent with our previous fixes).
+    
+*   Add a markerEnd arrow on the path that visually points to the target handle. Use a dedicated marker id (e.g., url(#smdArrowHead)) and ensure:
+    
+    *   It rotates with the edge so the direction is unambiguous.
+        
+    *   It remains visible above composites and nodes (z-index/pointer-events as we already do for labels/edges).
+        
+    *   For self-loops, the arrow appears on the segment closest to the target anchor and does not overlap the node border excessively.
+        
+*   Keep existing hit-testing (pointerEvents) consistent so labels are clickable without breaking edge interactions.
+    
+
+4.  Inline editing (label)
+    
+
+*   Clicking (or double-clicking) the label enters an inline edit mode.
+    
+*   Provide three small inputs or a segmented editor that maps to: Event, Guard, Action.
+    
+    *   Simple, frictionless UX: Enter/Blur saves, Escape cancels, Tab moves between fields.
+        
+    *   Debounce saves lightly (e.g., 150 ms) to avoid thrashing.
+        
+*   On save, update edge data (event/guard/action) and recompute the label string.
+    
+
+5.  Inspector editing (right panel)
+    
+
+*   When an smdTransition is selected, the Properties panel shows a “Transition” section with three fields:
+    
+    *   Event (text)
+        
+    *   Guard (text)
+        
+    *   Action (text)
+        
+*   Two-way binding with the inline editor:
+    
+    *   Editing in the inspector immediately updates the on-canvas label.
+        
+    *   Editing inline immediately reflects in the inspector inputs.
+        
+*   Optionally display a read-only “Preview” of the composed label string under the fields.
+    
+
+6.  Accessibility and UX consistency
+    
+
+*   Provide a subtle placeholder in empty fields (e.g., “event”, “guard”, “action”) but do not serialize placeholders—only actual user text.
+    
+*   Keep current fonts, paddings, rounded label capsule etc., to match the existing SMD aesthetics.
+    
+*   Keyboard: Enter saves the active field; Shift+Enter inserts a newline is NOT needed here—single-line inputs only.
+    
 
 Acceptance Criteria
--------------------
 
-1.  **Sensor** and **Processor** blocks on BDD show the **bottom-left “+”** SMD affordance on hover.
+1.  An smdTransition shows a label in the format “event \[guard\] / action”, with optional parts omitted gracefully when empty.
     
-2.  Clicking the affordance opens a **single** SMD tab per **(parentDiagramId, blockId)**. Repeated clicks switch to the existing tab (no duplicates).
+2.  Editing Event/Guard/Action inline immediately updates the rendered label and stays in sync with the inspector fields.
     
-3.  The opened diagram has type = "smd" and the standard SMD scaffold/palette is available.
+3.  Editing Event/Guard/Action in the inspector immediately updates the on-canvas label (two-way sync).
     
-4.  After closing the SMD tab, clicking the affordance again reopens the **same** diagram state via persistence.
+4.  The edge clearly displays an arrow marker at its target endpoint. Direction is obvious even when the path is curved or for self-loops.
     
-5.  A small indicator denotes that an SMD already exists for the block (optional but recommended).
+5.  No regressions to existing SMD visuals and interactions (dragging, selecting, composite internals).
     
-6.  No regressions for **System Block** SMD behavior.
+6.  Diagram save/rehydrate preserves the three fields and the label renders identically after reload.
     
 
 Manual Test Plan
-----------------
 
-1.  Open the BDD containing **System Block**, **Sensor**, **Processor**.
+1.  Create a simple SMD: Initial -> State. Confirm the transition shows an arrow pointing into the State.
     
-2.  Hover **Sensor** → click SMD “+” → a tab SMD for Sensor opens.
+2.  Inline-edit the label to set:
     
-3.  Add a node inside SMD, switch tabs, return → changes persist (rehydrated).
+    *   event = “tick”, guard = “x > 0”, action = “inc()”Expect: “tick \[x > 0\] / inc()”.
+        
+3.  Clear guard: Expect: “tick / inc()” (no brackets).
     
-4.  Close SMD for Sensor tab, click “+” again → the same diagram reopens with your previous changes.
+4.  Clear action: Expect: “tick \[x > 0\]”.
     
-5.  Repeat steps 2–4 for **Processor** (tab SMD for Processor).
+5.  Clear event: Expect:
     
-6.  Verify **System Block** SMD still works as before (no regressions).
+    *   If guard only: “\[x > 0\]” (no leading space or slash).
+        
+    *   If action only: “/ inc()”.
+        
+    *   If all empty: label area renders minimal empty capsule or nothing, but selection/inspector still work.
+        
+6.  Select the edge and edit fields in the inspector. Verify real-time sync with the canvas label and that persistence survives page reload.
     
-7.  Open all three SMD tabs and switch between them → rendering is correct, no crashes, node/edge types load properly.
+7.  Create a self-loop on a State and a transition crossing a Composite. Verify arrow head visibility and correct orientation in both cases.
     
 
-Files Likely Affected
----------------------
+Files Likely Touched
 
-*   frontend/src/components/nodes/SensorNode.tsx
+*   frontend/src/edges/smdTransition/SmdTransitionEdge.tsx (or equivalent component)
     
-*   frontend/src/components/nodes/ProcessorNode.tsx
+*   frontend/src/edges/smdTransition/utils.ts (label formatter, optional)
     
-*   frontend/src/store/diagramStore.ts
+*   frontend/src/types/smd.ts (or wherever the edge data interface lives)
     
-*   frontend/src/components/DiagramWorkspace.tsx (only if needed)
+*   frontend/src/store/diagramStore.ts (data updates, persist)
     
-*   Styles/icons for the SMD affordance (only if needed)
+*   frontend/src/components/inspector/TransitionInspector.tsx (or existing inspector module)
+    
+*   frontend/src/styles/smd.css (only if minor tweaks needed)
+    
+*   Any edge factory or adapter that maps persisted JSON to React Flow edges
+    
 
-Changelog prepare after merge
-## [1.2.6] - 2025-10-22
-### Added
-- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
-### Improved
-- Consistent SMD affordances across all BDD block types with a hover “+” trigger on the bottom-left corner.
+Changelog (prepare after merge)Version: 1.2.7Added
 
-Version bump
-
-APP_VERSION=1.2.6
-VITE_APP_VERSION=1.2.6
-
+*   Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+    
+*   Arrow marker at the transition’s target endpoint to make direction explicit.Improved
+    
+*   Robust label composition: clean omission of optional parts, no stray brackets or slashes.Persistence
+    
+*   Event/Guard/Action serialized in diagram JSON and restored on rehydrate.

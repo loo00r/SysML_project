@@ -210,6 +210,39 @@ body {
   white-space: nowrap;
 }
 
+.smd-edge-label--placeholder {
+  color: #90a4ae;
+  font-style: italic;
+}
+
+.smd-edge-label-editor {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: #eceff1;
+  border: 1px solid #90a4ae;
+  border-radius: 4px;
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(55, 71, 79, 0.25);
+}
+
+.smd-edge-label-editor__input {
+  width: 92px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  padding: 4px 6px;
+  border: 1px solid #b0bec5;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #37474f;
+}
+
+.smd-edge-label-editor__input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2);
+}
+
 /* Modal animations */
 .modal-overlay {
   opacity: 0;

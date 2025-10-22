@@ -10,6 +10,12 @@ import {
   applyEdgeChanges,
   Viewport,
 } from 'reactflow';
+import type { SmdTransitionDraft } from '../utils/smdTransition';
+import {
+  ensureSmdTransitionData,
+  composeSmdTransitionLabel,
+  parseSmdTransitionLabel,
+} from '../utils/smdTransition';
 import { applyDagreLayout } from '../utils/dagreLayout';
 import {
   clampPositionWithinComposite,
@@ -103,6 +109,29 @@ export interface DiagramState {
   parentDiagramId?: string;
 }
 
+const SMD_EDGE_MARKER = 'url(#smdArrowHead)';
+
+const withSmdTransitionDefaults = (edge: Edge, patchData?: SmdTransitionDraft): Edge => {
+  const initialData = edge.data
+    ? ensureSmdTransitionData(edge.data as SmdTransitionDraft)
+    : parseSmdTransitionLabel(typeof edge.label === 'string' ? edge.label : undefined);
+  const mergedData = ensureSmdTransitionData({ ...initialData, ...(patchData ?? {}) });
+  const computedLabel = composeSmdTransitionLabel(mergedData);
+
+  return {
+    ...edge,
+    type: 'smdTransition',
+    data: mergedData,
+    label: computedLabel || undefined,
+    markerEnd: SMD_EDGE_MARKER,
+    style: {
+      ...(edge.style ?? {}),
+      stroke: '#37474f',
+      strokeWidth: 2,
+    },
+  };
+};
+
 const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
   if (!edges?.length) {
     return edges || [];
@@ -135,25 +164,29 @@ const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
         return;
       }
 
-      normalized.push({
-        ...edge,
-        type: 'smdTransition',
-        sourceHandle: 'out-right',
-        targetHandle: 'in-left',
-        markerEnd: 'url(#smd-arrowhead)',
-        label: normalizedLabel,
-      });
+      normalized.push(
+        withSmdTransitionDefaults({
+          ...edge,
+          type: 'smdTransition',
+          sourceHandle: 'out-right',
+          targetHandle: 'in-left',
+          markerEnd: SMD_EDGE_MARKER,
+          label: normalizedLabel,
+        }),
+      );
       return;
     }
 
     if (isSmdEdge) {
       const normalizedLabel = typeof edge.label === 'string' && edge.label.trim().length > 0 ? edge.label : undefined;
-      normalized.push({
-        ...edge,
-        type: 'smdTransition',
-        markerEnd: 'url(#smd-arrowhead)',
-        label: normalizedLabel,
-      });
+      normalized.push(
+        withSmdTransitionDefaults({
+          ...edge,
+          type: 'smdTransition',
+          markerEnd: SMD_EDGE_MARKER,
+          label: normalizedLabel,
+        }),
+      );
       return;
     }
 
@@ -238,6 +271,7 @@ interface DiagramStoreState {
   
   addEdge: (edge: Edge) => void;
   updateEdge: (id: string, data: Partial<Edge>) => void;
+  updateSmdTransitionEdge: (id: string, data: SmdTransitionDraft) => void;
   removeEdge: (id: string) => void;
   
   setSelectedNodes: (nodeIds: string[]) => void;
@@ -368,11 +402,19 @@ const useDiagramStore = create<DiagramStoreState>()(
   
   // Multi-diagram actions
   openDiagram: (diagramData) => {
+    const baseNodes = diagramData.nodes ?? [];
+    const baseEdges = diagramData.edges ?? [];
+    const resolvedEdges = diagramData.type === 'smd'
+      ? normalizeSmdEdges(baseNodes, baseEdges)
+      : baseEdges;
+
     const newDiagram: DiagramInstance = {
       id: `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
       modifiedAt: new Date(),
-      ...diagramData
+      ...diagramData,
+      nodes: baseNodes,
+      edges: resolvedEdges,
     };
     
     set(state => ({
@@ -380,7 +422,7 @@ const useDiagramStore = create<DiagramStoreState>()(
       activeDiagramId: newDiagram.id,
       // Update computed state
       nodes: newDiagram.nodes,
-      edges: newDiagram.edges,
+      edges: resolvedEdges,
       diagramType: newDiagram.type,
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
@@ -389,11 +431,19 @@ const useDiagramStore = create<DiagramStoreState>()(
 
   openNewDiagramTab: (diagramData) => {
     const { customId, ...rest } = diagramData;
+    const baseNodes = rest.nodes ?? [];
+    const baseEdges = rest.edges ?? [];
+    const resolvedEdges = rest.type === 'smd'
+      ? normalizeSmdEdges(baseNodes, baseEdges)
+      : baseEdges;
+
     const newDiagram: DiagramInstance = {
       id: customId || `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
       modifiedAt: new Date(),
-      ...rest
+      ...rest,
+      nodes: baseNodes,
+      edges: resolvedEdges,
     };
     
     set(state => ({
@@ -401,7 +451,7 @@ const useDiagramStore = create<DiagramStoreState>()(
       activeDiagramId: newDiagram.id,
       // Update computed state
       nodes: newDiagram.nodes,
-      edges: newDiagram.edges,
+      edges: resolvedEdges,
       diagramType: newDiagram.type,
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
@@ -839,18 +889,16 @@ const useDiagramStore = create<DiagramStoreState>()(
         source: initialNodeId,
         target: stateNodeId,
         type: 'smdTransition',
-        markerEnd: 'url(#smd-arrowhead)',
-        label: 'event [guard] / action',
-        style: { stroke: '#37474f', strokeWidth: 2 }
+        data: ensureSmdTransitionData(),
+        markerEnd: SMD_EDGE_MARKER,
       },
       {
         id: `${stateNodeId}-${finalNodeId}`,
         source: stateNodeId,
         target: finalNodeId,
         type: 'smdTransition',
-        markerEnd: 'url(#smd-arrowhead)',
-        label: 'event [guard] / action',
-        style: { stroke: '#37474f', strokeWidth: 2 }
+        data: ensureSmdTransitionData(),
+        markerEnd: SMD_EDGE_MARKER,
       }
     ];
 
@@ -978,40 +1026,47 @@ const useDiagramStore = create<DiagramStoreState>()(
     // Save current state before connecting nodes
     get().saveToHistory();
     
-    // Get current diagram type and node count to determine edge style
-    const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
+    const state = get();
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
     const isIBD = activeDiagram?.type === 'ibd';
     const isSMD = activeDiagram?.type === 'smd';
+
+    let newEdge: Edge;
     
-    const newEdge: Edge = {
-      id: `e-${connection.source}-${connection.target}-${Date.now()}`,
-      source: connection.source || '',
-      target: connection.target || '',
-      sourceHandle: connection.sourceHandle,
-      targetHandle: connection.targetHandle,
-      // For IBD: always use smoothstep (orthogonal lines). For BDD: always smoothstep
-      type: isSMD ? 'smdTransition' : 'smoothstep',
-      animated: isIBD ? true : false,
-      style: isIBD
-        ? {
-            stroke: '#555',
-            strokeWidth: 2,
-            strokeDasharray: '8 4'
-          }
-        : isSMD
-        ? {
-            stroke: '#37474f',
-            strokeWidth: 2
-          }
-        : { stroke: '#555', strokeWidth: 1 },
-      className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
-      markerEnd: isSMD ? 'url(#smd-arrowhead)' : undefined,
-      label: isIBD ? 'IBD Blocks' : isSMD ? 'event [guard] / action' : undefined
-    };
+    if (isSMD) {
+      newEdge = withSmdTransitionDefaults({
+        id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+        source: connection.source || '',
+        target: connection.target || '',
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        type: 'smdTransition',
+        data: ensureSmdTransitionData(),
+      });
+    } else {
+      newEdge = {
+        id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+        source: connection.source || '',
+        target: connection.target || '',
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        type: 'smoothstep',
+        animated: isIBD ? true : false,
+        style: isIBD
+          ? {
+              stroke: '#555',
+              strokeWidth: 2,
+              strokeDasharray: '8 4'
+            }
+          : { stroke: '#555', strokeWidth: 1 },
+        className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
+        label: isIBD ? 'IBD Blocks' : undefined,
+      };
+    }
     
-    const newEdges = [...get().edges, newEdge];
+    const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
-    get().updateActiveDiagram({ edges: newEdges });
+    state.updateActiveDiagram({ edges: newEdges });
   },
   
   // Node operations
@@ -1099,8 +1154,9 @@ const useDiagramStore = create<DiagramStoreState>()(
   addEdge: (edge) => {
     // Save current state before adding edge
     get().saveToHistory();
-    
-    const newEdges = [...get().edges, edge];
+
+    const newEdge = edge.type === 'smdTransition' ? withSmdTransitionDefaults(edge) : edge;
+    const newEdges = [...get().edges, newEdge];
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
   },
@@ -1108,10 +1164,38 @@ const useDiagramStore = create<DiagramStoreState>()(
   updateEdge: (id, data) => {
     // Save current state before updating edge
     get().saveToHistory();
-    
-    const newEdges = get().edges.map(edge => 
-      edge.id === id ? { ...edge, ...data } : edge
-    );
+
+    const newEdges = get().edges.map(edge => {
+      if (edge.id !== id) {
+        return edge;
+      }
+
+      const patch = data as Partial<Edge>;
+      const mergedEdge = { ...edge, ...patch };
+      const nextType = patch?.type ?? edge.type;
+
+      if (nextType === 'smdTransition') {
+        const patchData = patch?.data as SmdTransitionDraft | undefined;
+        return withSmdTransitionDefaults(mergedEdge, patchData);
+      }
+
+      return mergedEdge;
+    });
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
+  },
+
+  updateSmdTransitionEdge: (id, data) => {
+    get().saveToHistory();
+
+    const newEdges = get().edges.map(edge => {
+      if (edge.id !== id) {
+        return edge;
+      }
+
+      return withSmdTransitionDefaults(edge, data);
+    });
+
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
   },

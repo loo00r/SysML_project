@@ -23,6 +23,7 @@ import { BlockNode, SensorNode, ProcessorNode, PortNode, ConnectionNode, IBDNode
 import SmdTransitionEdge from './edges/SmdTransitionEdge';
 import useDiagramStore, { DiagramType, type NodeData } from '../store/diagramStore';
 import PropertiesPanel from './PropertiesPanel';
+import TransitionPanel from './TransitionPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
 import {
@@ -124,6 +125,7 @@ const DiagramWorkspace: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [showPropertiesPanel, setShowPropertiesPanel] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{
     open: boolean;
     message: string;
@@ -229,6 +231,7 @@ const DiagramWorkspace: React.FC = () => {
         },
         type: 'smdTransition' as const,
         animated: false,
+        markerEnd: 'url(#smdArrowHead)',
       };
     }
 
@@ -242,16 +245,18 @@ const DiagramWorkspace: React.FC = () => {
   // Handle node selection
   const onNodeClick = useCallback((_: React.MouseEvent, node: any) => {
     setSelectedNodeId(node.id);
+    setSelectedEdgeId(null);
     setShowPropertiesPanel(true);
-  }, []);
+  }, [setSelectedEdgeId, setShowPropertiesPanel]);
 
   // Handle background click to deselect
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    setSelectedEdgeId(null);
     setShowPropertiesPanel(false);
     setSelectedNodes([]);
     setSelectedEdges([]);
-  }, [setSelectedNodes, setSelectedEdges]);
+  }, [setSelectedEdgeId, setSelectedEdges, setSelectedNodes, setShowPropertiesPanel]);
 
   // Handle node selection changes
   const onSelectionChange = useCallback(
@@ -259,16 +264,32 @@ const DiagramWorkspace: React.FC = () => {
       setSelectedNodes(nodes.map((node) => node.id));
       setSelectedEdges(edges.map((edge) => edge.id));
 
-      if (nodes.length === 1) {
+      if (nodes.length === 1 && edges.length === 0) {
         setSelectedNodeId(nodes[0].id);
+        setSelectedEdgeId(null);
         setShowPropertiesPanel(true);
-      } else if (nodes.length === 0) {
+      } else if (edges.length === 1 && nodes.length === 0) {
+        setSelectedEdgeId(edges[0].id);
         setSelectedNodeId(null);
+        setShowPropertiesPanel(true);
+      } else if (nodes.length === 0 && edges.length === 0) {
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+        setShowPropertiesPanel(false);
+      } else {
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
         setShowPropertiesPanel(false);
       }
     },
-    [setSelectedNodes, setSelectedEdges]
+    [setSelectedEdges, setSelectedNodes, setSelectedEdgeId, setSelectedNodeId, setShowPropertiesPanel]
   );
+
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: any) => {
+    setSelectedEdgeId(edge.id);
+    setSelectedNodeId(null);
+    setShowPropertiesPanel(true);
+  }, [setSelectedEdgeId, setSelectedNodeId, setShowPropertiesPanel]);
 
   // Show notification
   const showNotification = (message: string, severity: 'success' | 'info' | 'warning' | 'error') => {
@@ -890,6 +911,7 @@ const DiagramWorkspace: React.FC = () => {
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onSelectionChange={onSelectionChange}
+          onEdgeClick={onEdgeClick}
           nodeTypes={unifiedNodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
@@ -907,7 +929,7 @@ const DiagramWorkspace: React.FC = () => {
         >
           <defs>
             <marker
-              id="smd-arrowhead"
+              id="smdArrowHead"
               markerWidth="12"
               markerHeight="12"
               viewBox="0 0 12 12"
@@ -973,6 +995,16 @@ const DiagramWorkspace: React.FC = () => {
         <PropertiesPanel
           nodeId={selectedNodeId}
           onClose={() => setShowPropertiesPanel(false)}
+        />
+      )}
+
+      {showPropertiesPanel && !selectedNodeId && selectedEdgeId && (
+        <TransitionPanel
+          edgeId={selectedEdgeId}
+          onClose={() => {
+            setShowPropertiesPanel(false);
+            setSelectedEdgeId(null);
+          }}
         />
       )}
       
