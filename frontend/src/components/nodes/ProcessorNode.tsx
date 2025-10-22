@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps, useStore } from 'reactflow';
 import { styled } from '@mui/material/styles';
-import { Paper, Typography, Box, IconButton } from '@mui/material';
-import { AddCircleOutline } from '@mui/icons-material';
+import { Paper, Typography, Box, IconButton, Tooltip } from '@mui/material';
+import { AddCircleOutline, ChangeCircle } from '@mui/icons-material';
 import { AdaptiveIbdIcon } from '../icons/AdaptiveIbdIcon';
 import { nodeColors } from '../icons/nodeColors';
 import useDiagramStore from '../../store/diagramStore';
@@ -56,7 +56,7 @@ const NodeContainer = styled(Box)({
   position: 'relative',
   display: 'inline-block',
   // KEY FIX: Creates an invisible hover area below the node
-  paddingBottom: '40px',
+  paddingBottom: '48px',
 });
 
 // Styled wrapper for the actual node content
@@ -104,9 +104,46 @@ const IBDIndicatorIcon = styled(IconButton)(({ theme }) => ({
   },
 }));
 
+const SMDIndicatorIcon = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  bottom: '5px',
+  left: '10px',
+  background: theme.palette.background.paper,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: '50%',
+  width: '24px',
+  height: '24px',
+  padding: '4px',
+  boxShadow: theme.shadows[2],
+  zIndex: 999,
+  transition: 'all 0.2s ease-in-out',
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+    boxShadow: theme.shadows[4],
+  },
+  '&.add-smd': {
+    display: 'none',
+  },
+  '&.view-smd': {
+    display: 'flex',
+    backgroundColor: 'transparent',
+    border: 'none',
+    boxShadow: 'none',
+    color: theme.palette.secondary.main,
+    '&:hover': {
+      filter: 'brightness(0.85)',
+      backgroundColor: 'rgba(0, 0, 0, 0.04)',
+      boxShadow: theme.shadows[1],
+    },
+  },
+}));
+
 // THE CRITICAL CHANGE: The hover selector is now on the parent container
 const StyledNodeContainer = styled(NodeContainer)({
   '&:hover .add-ibd': {
+    display: 'flex',
+  },
+  '&:hover .add-smd': {
     display: 'flex',
   },
 });
@@ -119,7 +156,7 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
     description = '', 
     properties = {} 
   } = data || {};
-  const { openDiagrams, setActiveDiagram, openIbdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
+  const { openDiagrams, openIbdForBlock, openSmdForBlock, diagramsData, activeDiagramId } = useDiagramStore();
   
   // Check if this node has any incoming connections
   const edges = useStore((state) => state.edges);
@@ -127,6 +164,8 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
   
   // Check if there's already an IBD diagram for this processor in the current diagram context
   const ibdId = activeDiagramId ? `ibd-for-${activeDiagramId}-${id}` : null;
+  const activeDiagram = activeDiagramId ? openDiagrams.find(diagram => diagram.id === activeDiagramId) : undefined;
+  const isBddContext = activeDiagram?.type === 'bdd' || activeDiagram?.type === 'bdd_enhanced';
   const ibdExistsManually = ibdId && (
     openDiagrams.some(diagram => 
       diagram.type === 'ibd' && 
@@ -136,10 +175,27 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
   
   // The key change: check for the new flag from the node's data prop
   const hasIbd = ibdExistsManually || data.has_ibd;
-  
+  const smdId = activeDiagramId ? `smd-for-${activeDiagramId}-${id}` : null;
+  const hasSmd = smdId ? (
+    openDiagrams.some(diagram =>
+      diagram.id === smdId ||
+      (diagram.type === 'smd' && diagram.parentBlockId === id && diagram.parentDiagramId === activeDiagramId)
+    ) || !!diagramsData[smdId]
+  ) : false;
+
   const handleOpenIBD = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await openIbdForBlock(id);
+  };
+
+  const handleOpenSMD = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    openSmdForBlock({
+      blockId: id,
+      parentDiagramId: activeDiagramId ?? undefined,
+      blockName: label,
+      parentName: activeDiagram?.name,
+    });
   };
   
   return (
@@ -241,6 +297,26 @@ const ProcessorNode = ({ data, selected, id }: NodeProps) => {
           <AddCircleOutline fontSize="small" />
         </IBDIndicatorIcon>
       )}
+
+      {isBddContext && (hasSmd ? (
+        <Tooltip title="View State Machine Diagram" placement="top">
+          <SMDIndicatorIcon
+            className="view-smd"
+            onClick={handleOpenSMD}
+          >
+            <ChangeCircle fontSize="small" />
+          </SMDIndicatorIcon>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Add SMD" placement="top">
+          <SMDIndicatorIcon
+            className="add-smd"
+            onClick={handleOpenSMD}
+          >
+            <AddCircleOutline fontSize="small" />
+          </SMDIndicatorIcon>
+        </Tooltip>
+      ))}
     </StyledNodeContainer>
   );
 };

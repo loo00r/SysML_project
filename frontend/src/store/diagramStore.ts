@@ -214,7 +214,12 @@ interface DiagramStoreState {
   // Persistent state actions
   saveDiagramState: (diagramId: string, state: DiagramState) => void;
   openIbdForBlock: (bddBlockId: string) => Promise<void>;
-  openSmdForBlock: (bddBlockId: string) => void;
+  openSmdForBlock: (params: {
+    blockId: string;
+    parentDiagramId?: string;
+    blockName?: string;
+    parentName?: string;
+  }) => void;
   
   // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
@@ -727,17 +732,19 @@ const useDiagramStore = create<DiagramStoreState>()(
     }
   },
 
-  openSmdForBlock: (bddBlockId) => {
+  openSmdForBlock: ({ blockId, parentDiagramId, blockName, parentName }) => {
     const { openDiagrams, diagramsData, activeDiagramId, openNewDiagramTab, setActiveDiagram } = get();
 
-    if (!activeDiagramId) {
+    const effectiveParentId = parentDiagramId || activeDiagramId;
+
+    if (!effectiveParentId) {
       console.error('❌ [SMD] Cannot create SMD: no active diagram');
       return;
     }
 
-    const parentDiagram = openDiagrams.find(d => d.id === activeDiagramId);
+    const parentDiagram = openDiagrams.find(d => d.id === effectiveParentId);
     if (!parentDiagram) {
-      console.error('❌ [SMD] Parent diagram not found for active diagram id:', activeDiagramId);
+      console.error('❌ [SMD] Parent diagram not found for id:', effectiveParentId);
       return;
     }
 
@@ -746,7 +753,7 @@ const useDiagramStore = create<DiagramStoreState>()(
       return;
     }
 
-    const smdId = `smd-for-${activeDiagramId}-${bddBlockId}`;
+    const smdId = `smd-for-${effectiveParentId}-${blockId}`;
 
     // If already open, focus it
     const existingTab = openDiagrams.find(d => d.id === smdId);
@@ -755,9 +762,12 @@ const useDiagramStore = create<DiagramStoreState>()(
       return;
     }
 
-    const parentNode = parentDiagram.nodes.find(node => node.id === bddBlockId);
-    const blockLabel = parentNode?.data?.label || parentNode?.data?.name || 'Block';
-    const smdName = `SMD for ${blockLabel}`;
+    const parentNode = parentDiagram.nodes.find(node => node.id === blockId);
+    const resolvedBlockName = blockName || parentNode?.data?.label || parentNode?.data?.name || 'Block';
+    const resolvedParentName = parentName || parentDiagram.name;
+    const smdName = resolvedParentName && resolvedParentName !== resolvedBlockName
+      ? `SMD for ${resolvedParentName} - ${resolvedBlockName}`
+      : `SMD for ${resolvedBlockName}`;
 
     // Try to restore from cache
     const cachedState = diagramsData[smdId];
@@ -769,11 +779,11 @@ const useDiagramStore = create<DiagramStoreState>()(
         type: 'smd',
         nodes: cachedNodes,
         edges: normalizedEdges,
-        description: `State Machine Diagram for ${blockLabel}`,
+        description: `State Machine Diagram for ${resolvedBlockName}`,
         customId: smdId,
         needsCentering: true,
-        parentBlockId: cachedState.parentBlockId || bddBlockId,
-        parentDiagramId: cachedState.parentDiagramId || activeDiagramId
+        parentBlockId: cachedState.parentBlockId || blockId,
+        parentDiagramId: cachedState.parentDiagramId || effectiveParentId
       });
       setActiveDiagram(smdId);
       return;
@@ -858,11 +868,11 @@ const useDiagramStore = create<DiagramStoreState>()(
       type: 'smd',
       nodes: layoutedNodes,
       edges: normalizedEdges,
-      description: `State Machine Diagram for ${blockLabel}`,
+      description: `State Machine Diagram for ${resolvedBlockName}`,
       customId: smdId,
       needsCentering: true,
-      parentBlockId: bddBlockId,
-      parentDiagramId: activeDiagramId
+      parentBlockId: blockId,
+      parentDiagramId: effectiveParentId
     });
 
     get().saveDiagramState(smdId, {
@@ -870,8 +880,8 @@ const useDiagramStore = create<DiagramStoreState>()(
       edges: normalizedEdges,
       type: 'smd',
       name: smdName,
-      parentBlockId: bddBlockId,
-      parentDiagramId: activeDiagramId
+      parentBlockId: blockId,
+      parentDiagramId: effectiveParentId
     });
   },
   

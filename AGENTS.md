@@ -55,116 +55,122 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-# SMD-03-TUNE — Deterministic composite growth on child add (+5%), never on drag
+Task SMD-03a - SMD for Sensor & Processor on BDD
+================================================
 
-## Goal
-Make **Composite** resizing predictable:
-- **No growth on drag/move** of children — drag only clamps.
-- On **palette drop inside Composite**:
-  - If this is the **first** child → size stays unchanged.
-  - For **every next** child (2nd, 3rd, …) → Composite **grows by +5%** from its current width/height.
-- On **delete** → Composite may shrink (to fit or to initial/min), as it already does.
+Goal
+----
 
-## Rationale
-Current auto-resize sometimes grows during drag and inconsistently on add. We want a stable rule: growth happens **only** on add, by a fixed step, and never as a side-effect of moving nodes.
+Enable creating/opening SMD diagrams for **Sensor** and **Processor** blocks directly from the BDD canvas with the same UX already implemented for **System Block**:
 
-## Scope
-- In scope: resize scheduler gating by event `reason`, fixed-step growth (+5%) on `child-add` when `childCount >= 2`, no growth on `move/drag`.
-- Out of scope: geometry-based “fit-to-children” growth on add (keep for future mode), reparenting from canvas, multi-region logic.
+*   a hover-revealed **“+”** affordance at the **bottom-left** of the block opens SMD;
+    
+*   the SMD tab is **reused** per **(parentDiagramId, blockId)** pair rather than creating duplicates.
+    
 
-## Implementation Steps
+Scope of Work
+-------------
 
-1. **Resize policy switch**
-   - Add a policy flag in composite data (or service constant):  
-     `AUTO_RESIZE_POLICY = 'incrementalOnAdd'`.
-   - The service will branch on policy; default to this policy for SMD composites.
+### 1. Node components (frontend)
 
-2. **Scheduler gating**
-   - Ensure all resize scheduling calls pass a `reason`:
-     - `child-add`, `child-delete`, `dragging`, `drag-end`, `layout-done`, `hydrate`.
-   - Update the central scheduler:
-     - **Ignore growth** for `dragging` and `drag-end`. (Still run **clamp** without size change.)
-     - Allow resize for `child-delete`, `layout-done`, `hydrate` (shrink or normalize).
-     - For `child-add` → delegate to the new incremental rule (Step 3) and **flush** (no debounce).
+*   Update SensorNode.tsx and ProcessorNode.tsx:
+    
+    *   Add the bottom-left **“+”** trigger for SMD with the same hover/reveal behavior and styling as in SystemBlockNode.
+        
+    *   On click, call openSmdForBlock({ parentDiagramId, blockId, blockName }).
+        
+    *   Optionally show a small indicator (e.g., “View SMD” icon) when an SMD already exists for this block.
+        
 
-3. **Incremental growth rule (+5%)**
-   - In `resizeCompositeToChildren(parentId, reason)`:
-     - Get `children = directChildren(parentId)`.
-     - If `reason === 'child-add'`:
-       - If `children.length === 1`: **no-op** (first child doesn’t change size).
-       - Else (length ≥ 2):
-         ```ts
-         const GROW = 1.05; // +5%
-         const nextW = Math.ceil(currentW * GROW);
-         const nextH = Math.ceil(currentH * GROW);
-         // Clamp to sensible bounds:
-         const MIN_W = 220, MIN_H = 120;
-         const INITIAL_W = node.data.initialW ?? 320;
-         const INITIAL_H = node.data.initialH ?? 200;
-         const MAX_W = (node.data.maxW ?? INITIAL_W * 4);
-         const MAX_H = (node.data.maxH ?? INITIAL_H * 4);
+### 2. State store (Zustand)
 
-         targetW = Math.min(Math.max(nextW, Math.max(MIN_W, INITIAL_W)), MAX_W);
-         targetH = Math.min(Math.max(nextH, Math.max(MIN_H, INITIAL_H)), MAX_H);
-         ```
-         - Apply resize in a **single store transaction**, then run **clampChildren** to keep nodes inside the new innerRect.
-     - If `reason === 'child-delete'` or `layout-done` or `hydrate`:
-       - Allow **shrink-to-fit** or **normalize** to:
-         ```ts
-         targetW = Math.max(MIN_W, INITIAL_W, bboxFitW);
-         targetH = Math.max(MIN_H, INITIAL_H, HEADER_H + bboxFitH);
-         ```
-       - (This preserves your current “shrink works” behavior.)
+*   In diagramStore.ts:
+    
+    *   Ensure the openSmdForBlock action exists or add it.
+        
+    *   The SMD diagram **ID** must be deterministic and namespaced per parent:smd-for-{parentDiagramId}-{blockId}.
+        
+    *   If such a tab is already open, **activate** it.If a saved diagram exists, **rehydrate** it.Otherwise, **create an empty SMD** scaffold (Initial/State/Composite/Final available in palette).
+        
+    *   Diagram type must be 'smd'.
+        
+    *   Reuse tabs consistently for the **(parentDiagramId, blockId)** pair.
+        
 
-4. **Disable drag-driven growth**
-   - For `reason === 'dragging'` and `reason === 'drag-end'`:
-     - **Do not** change width/height.
-     - Only compute `innerRect` from the **current** composite size and **clamp** child positions.
-     - Keep debounce for performance but it should **not** call resize.
+### 3. Type registrations
 
-5. **Events wiring (palette drop path)**
-   - In the palette drop handler (child creation with `parentNode` already set and parent-local position):
-     - `scheduleCompositeResize(parentId, { reason: 'child-add', flush: true })`.
+*   Verify DiagramWorkspace (React Flow setup) always registers SMD node/edge types:
+    
+    *   smdInitial, smdState, smdComposite, smdFinal, and smdTransition.
+        
+*   Ensure nothing conditionally disables these when switching diagram types.
+    
 
-6. **Zero-children stabilization**
-   - When `children.length === 0`, keep:
-     ```ts
-     targetW = Math.max(MIN_W, INITIAL_W);
-     targetH = Math.max(MIN_H, INITIAL_H);
-     ```
-   - This prevents lingering tiny sizes.
+### 4. UX polish
 
-## Acceptance Criteria
-- [ ] Adding the **first** child to a Composite: size unchanged.
-- [ ] Adding the **second and every subsequent** child via palette drop inside the Composite: width & height grow by **exactly +5%** of the current size (bounded by MAX).
-- [ ] **Drag/move** inside Composite never changes Composite size; only clamping occurs.
-- [ ] Deleting children can shrink the Composite, but not below initial/min; deleting all returns to initial (≥ min).
-- [ ] Behavior is consistent across sessions (after refresh/hydration).
+*   Optional tooltip for the button: “Add SMD”.
+    
+*   Tab title format:
+    
+    *   SMD for {blockName} or SMD for {parentName} · {blockName} (follow the existing naming convention).
+        
 
-## Testing
-- Manual:
-  1. New Composite → add first child → size unchanged.
-  2. Add a second child → size grows by ~5%; add third → +5% again; etc.
-  3. Drag children to borders → Composite size remains fixed; nodes get clamped.
-  4. Delete one child → size may shrink to fit; delete all → size returns to initial/min.
-  5. Reload tab → sizes persist and rules remain consistent.
-- Unit:
-  - Incremental growth math (+5% with min/initial/max clamps).
-  - Scheduler gating: `child-add` grows; `dragging/drag-end` don’t.
-  - Zero-children normalization.
+Acceptance Criteria
+-------------------
 
-## Files to Touch (indicative)
-- `frontend/src/features/smd/composite/resizeService.ts` (policy, incremental rule, zero-children)
-- `frontend/src/features/dnd/paletteDrop.ts` (reason: `child-add`, flush)
-- `frontend/src/store/diagramStore.ts` (scheduler gating, reasons propagation)
-- `frontend/src/utils/geometry.ts` (innerRect calc + clamp)
+1.  **Sensor** and **Processor** blocks on BDD show the **bottom-left “+”** SMD affordance on hover.
+    
+2.  Clicking the affordance opens a **single** SMD tab per **(parentDiagramId, blockId)**. Repeated clicks switch to the existing tab (no duplicates).
+    
+3.  The opened diagram has type = "smd" and the standard SMD scaffold/palette is available.
+    
+4.  After closing the SMD tab, clicking the affordance again reopens the **same** diagram state via persistence.
+    
+5.  A small indicator denotes that an SMD already exists for the block (optional but recommended).
+    
+6.  No regressions for **System Block** SMD behavior.
+    
 
-## Risks & Notes
-- Fixed-step growth trades exact fit for determinism; set `MAX_W/H` to prevent runaway growth when adding many nodes.
-- Ensure all palette adds carry `reason: 'child-add'`. Reparenting flows remain out of scope.
+Manual Test Plan
+----------------
 
-## Post-merge Checklist
-- [ ] `CHANGELOG.md` → **Changed:** Composite grows deterministically by +5% on child add; drag no longer drives growth.
-- [ ] Bump patch version and update `.env` (`APP_VERSION`, `VITE_APP_VERSION`).
+1.  Open the BDD containing **System Block**, **Sensor**, **Processor**.
+    
+2.  Hover **Sensor** → click SMD “+” → a tab SMD for Sensor opens.
+    
+3.  Add a node inside SMD, switch tabs, return → changes persist (rehydrated).
+    
+4.  Close SMD for Sensor tab, click “+” again → the same diagram reopens with your previous changes.
+    
+5.  Repeat steps 2–4 for **Processor** (tab SMD for Processor).
+    
+6.  Verify **System Block** SMD still works as before (no regressions).
+    
+7.  Open all three SMD tabs and switch between them → rendering is correct, no crashes, node/edge types load properly.
+    
 
+Files Likely Affected
+---------------------
+
+*   frontend/src/components/nodes/SensorNode.tsx
+    
+*   frontend/src/components/nodes/ProcessorNode.tsx
+    
+*   frontend/src/store/diagramStore.ts
+    
+*   frontend/src/components/DiagramWorkspace.tsx (only if needed)
+    
+*   Styles/icons for the SMD affordance (only if needed)
+
+Changelog prepare after merge
+## [1.2.6] - 2025-10-22
+### Added
+- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
+### Improved
+- Consistent SMD affordances across all BDD block types with a hover “+” trigger on the bottom-left corner.
+
+Version bump
+
+APP_VERSION=1.2.6
+VITE_APP_VERSION=1.2.6
 

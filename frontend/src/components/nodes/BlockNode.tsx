@@ -211,7 +211,12 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
   const handleOpenSMD = (e: React.MouseEvent) => {
     setContextMenuAnchor(null);
     e.stopPropagation();
-    openSmdForBlock(id);
+    openSmdForBlock({
+      blockId: id,
+      parentDiagramId: activeDiagramId ?? undefined,
+      blockName: label,
+      parentName: activeDiagram?.name,
+    });
   };
 
   const handleContextMenu = (event: React.MouseEvent) => {
@@ -228,7 +233,12 @@ const BlockNode = ({ data, selected, id }: NodeProps) => {
   };
 
   const handleContextOpenSmd = () => {
-    openSmdForBlock(id);
+    openSmdForBlock({
+      blockId: id,
+      parentDiagramId: activeDiagramId ?? undefined,
+      blockName: label,
+      parentName: activeDiagram?.name,
+    });
     handleCloseContextMenu();
   };
   

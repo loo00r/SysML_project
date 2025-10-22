@@ -6,8 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
+
 ### Changed
 - Composite states now grow deterministically by 5% on the second and subsequent palette drops while drags only clamp positions.
+- Consistent SMD affordances across all BDD block types with a hover "+" trigger on the bottom-left corner.
+
+## [1.2.6] - 2025-10-22
+### Added
+- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
+
+### Changed
+- Consistent SMD affordances across all BDD block types with a hover "+" trigger on the bottom-left corner.
 
 ## [1.2.5] - 2025-10-21
 ### Changed
