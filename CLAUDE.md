@@ -210,64 +210,37 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### NEW TASK
-## State Machine Diagrams (SMD) - PLANNED
+### TASK-3: Implement generate_ibd_diagram() function
+**Type**: Task
+**Priority**: High
+**Story Points**: 5
 
-### Overview
-**Status**: Planning phase - See `SMD_IMPLEMENTATION_PLAN.md` for complete specification
+**Description**:
+Create new function `generate_ibd_diagram()` that generates IBD for a single block using chain prompting with full context from BDD.
 
-State Machine Diagrams (SMD) will be added to show **behavioral aspects** of system blocks, complementing the structural views provided by BDD and IBD.
+**Files to modify**:
+- `backend/app/AI/diagram_generation.py`
 
-### Key Concept
-**Chain Prompting Architecture**:
-```
-BDD Generation → Block Identification → SMD Generation for each block
-```
-
-Unlike IBD (generated in single AI call with BDD), SMD uses **sequential prompting**:
-1. First AI call generates BDD structure
-2. Second AI call(s) generate SMD for specific blocks, using BDD context
-
-### Example Use Case
-**User**: "Create SysML diagrams for Tesla car"
-
-**System generates**:
-- **BDD**: Shows blocks (Battery, Motor, Autopilot, Sensors)
-- **IBD**: Shows internal structure (e.g., Battery → Cells, BMS, Cooling)
-- **SMD**: Shows behavior (e.g., Autopilot: Off → Standby → Active → Manual/Emergency → Parking)
-
-### SMD Structure
-```json
-{
-  "diagram_type": "smd",
-  "parent_block_id": "autopilot-system",
-  "states": [
-    {"id": "initial", "type": "initial"},
-    {"id": "state-off", "type": "state", "name": "Off"},
-    {"id": "state-active", "type": "state", "name": "Active",
-     "entry_action": "activate_sensors()", "do_action": "monitor()"}
-  ],
-  "transitions": [
-    {"source": "state-off", "target": "state-active",
-     "trigger": "engage", "guard": "speed > 30"}
-  ]
-}
+**Function signature**:
+```python
+def generate_ibd_diagram(
+    block_id: str,
+    block_name: str,
+    block_description: str,
+    block_type: str,
+    system_context: str,
+    parent_relationships: List[Dict],
+    one_shot_examples: List[Dict] = None
+) -> Dict[str, Any]
 ```
 
-### Implementation Plan
-See **SMD_IMPLEMENTATION_PLAN.md** for:
-- Database schema (`state_machine_diagrams` table)
-- AI prompt templates for SMD
-- Chain prompting implementation
-- RAG integration for SMD
-- Frontend visualization
-- 4-week phased rollout
+**Acceptance Criteria**:
+- [ ] Function created with all parameters
+- [ ] Uses OpenAI API with IBD_PROMPT_TEMPLATE
+- [ ] Returns {ibd_raw, block_id, block_name, model_used, rag_used}
+- [ ] Error handling included
+- [ ] Validates output has nodes and edges
 
-### Why Chain Prompting?
-- ✅ Better quality: Specialized prompts for behavior vs. structure
-- ✅ Context-aware: Uses actual BDD blocks as input
-- ✅ Flexible: Generate SMD only for selected blocks
-- ✅ Scalable: Easy to add more diagram types (Sequence, Activity)
-- ✅ Research-backed: 2024 best practices for LLM workflows
+**Reference**: `docs/UNIFIED_CHAIN_PROMPTING_PLAN.md` (Backend Changes, section 1)
 
-=======
-### new task
+**Dependencies**: TASK-2

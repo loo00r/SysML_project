@@ -398,26 +398,148 @@ def generate_sysml_diagram(
         print(f"\n==== ERROR in generate_sysml_diagram: {str(e)} ====")
         return {"error": str(e), "diagram_raw": {}}
 
+def generate_ibd_diagram(
+    block_id: str,
+    block_name: str,
+    block_description: str,
+    block_type: str,
+    system_context: str,
+    parent_relationships: List[Dict],
+    one_shot_examples: List[Dict] = None
+) -> Dict[str, Any]:
+    """
+    Generate IBD for a specific block using chain prompting with full context from BDD.
+
+    This is the SECOND step in chain prompting:
+    BDD Generation → IBD Generation (this function)
+
+    Args:
+        block_id: ID of the block from BDD
+        block_name: Name of the block
+        block_description: Description from BDD
+        block_type: Type (block, processor, etc.)
+        system_context: Overall system description
+        parent_relationships: How this block connects to others in BDD
+        one_shot_examples: RAG examples of similar IBDs
+
+    Returns:
+        Dictionary containing:
+        - ibd_raw: The generated IBD structure
+        - block_id: ID of parent block
+        - block_name: Name of parent block
+        - model_used: OpenAI model used
+        - rag_used: Whether RAG examples were used
+    """
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    # Format relationships for context
+    rel_text = "\n".join([
+        f"- {r.get('source', 'Unknown')} → {r.get('target', 'Unknown')}: {r.get('label', 'Connection')}"
+        for r in parent_relationships
+    ]) if parent_relationships else "None"
+
+    # Build context-aware prompt using the existing IBD_ONLY_PROMPT_TEMPLATE
+    # Add context information before the template
+    context_intro = f"""
+CONTEXT FOR THIS IBD GENERATION:
+- Parent System: {system_context}
+- Block Name: {block_name}
+- Block ID: {block_id}
+- Block Type: {block_type}
+- Block Description: {block_description}
+- Block Connections in Parent BDD:
+{rel_text}
+
+TASK: Generate an Internal Block Diagram for the block "{block_name}" showing its internal components and their connections.
+
+"""
+
+    # Combine context with the existing template
+    system_prompt = context_intro + IBD_ONLY_PROMPT_TEMPLATE
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    # Add RAG examples if provided
+    if one_shot_examples and len(one_shot_examples) > 0:
+        print(f"\n==== Using {len(one_shot_examples)} RAG examples for IBD ====")
+        for example in one_shot_examples:
+            example_input = f"Generate IBD for block: {example.get('input', 'Example block')}"
+            messages.append({"role": "user", "content": example_input})
+            example_output = json.dumps(example.get('output', {}), indent=2)
+            messages.append({"role": "assistant", "content": example_output})
+
+    # User prompt
+    user_prompt = f"Generate internal block diagram for '{block_name}'."
+    messages.append({"role": "user", "content": user_prompt})
+
+    print(f"\n==== Generating IBD for block: {block_name} (ID: {block_id}) ====")
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_GENERATIVE_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1
+        )
+
+        response_text = response.choices[0].message.content
+        ibd_data = json.loads(response_text)
+
+        # Validate output structure
+        if "nodes" not in ibd_data or "edges" not in ibd_data:
+            raise ValueError("IBD must contain 'nodes' and 'edges' fields")
+
+        if not isinstance(ibd_data["nodes"], list) or not isinstance(ibd_data["edges"], list):
+            raise ValueError("IBD 'nodes' and 'edges' must be arrays")
+
+        if len(ibd_data["nodes"]) == 0:
+            raise ValueError("IBD must contain at least one node")
+
+        # Build result
+        result = {
+            "ibd_raw": ibd_data,
+            "block_id": block_id,
+            "block_name": block_name,
+            "model_used": settings.OPENAI_GENERATIVE_MODEL,
+            "rag_used": bool(one_shot_examples),
+        }
+
+        print(f"\n==== IBD Generation Successful for {block_name} ====")
+        print(f"Generated {len(ibd_data['nodes'])} nodes and {len(ibd_data['edges'])} edges")
+
+        return result
+
+    except json.JSONDecodeError as e:
+        print(f"\n==== ERROR: Invalid JSON in IBD generation for {block_name}: {str(e)} ====")
+        return {"error": f"Invalid JSON response: {str(e)}", "ibd_raw": {}}
+    except ValueError as e:
+        print(f"\n==== ERROR: Validation failed for {block_name}: {str(e)} ====")
+        return {"error": str(e), "ibd_raw": {}}
+    except Exception as e:
+        print(f"\n==== ERROR generating IBD for {block_name}: {str(e)} ====")
+        return {"error": str(e), "ibd_raw": {}}
+
+
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
     """
     Legacy function for backward compatibility.
     Generate a diagram based on the provided prompt using OpenAI's API.
-    
+
     Args:
         prompt: The text description of the system to model
         one_shot_examples: Optional list of example inputs and outputs for one-shot learning
         additional_context: Optional additional context to include in the prompt
-        
+
     Returns:
         Dictionary containing the diagram elements and metadata
     """
     # Use the new function with standard BDD type
     result = generate_sysml_diagram(prompt, "bdd", one_shot_examples)
-    
+
     # If we got raw data, we need to process it for backward compatibility
     if "diagram_raw" in result and not result.get("error"):
         raw_diagram_data = result["diagram_raw"]
-        
+
         # Validate and correct element types to ensure they are only 'block', 'sensor', or 'processor'
         def validate_element_types(diagram):
             valid_types = ['block', 'sensor', 'processor']
@@ -430,13 +552,13 @@ def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None
                         element['type'] = 'block'
                         print(f"Warning: Changed invalid element type '{original_type}' to 'block' for element {element.get('id', 'unknown')}")
             return diagram
-        
+
         # Apply validation to ensure only allowed types are used
         validated_diagram = validate_element_types(raw_diagram_data)
-        
+
         # Apply automatic positioning to the diagram elements
         positioned_diagram = DiagramPositioning.apply_positioning(validated_diagram)
-        
+
         # Return in legacy format
         return {
             "diagram": positioned_diagram,

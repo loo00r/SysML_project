@@ -6,8 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.1.96] - 2025-10-23
+
+### Added
+- Implemented `generate_ibd_diagram()` function for chain prompting architecture with full BDD context
+- Context-aware IBD generation receiving block ID, name, description, type, system context, and parent relationships
+- Support for RAG one-shot examples in IBD generation for improved quality
+- Comprehensive error handling for IBD generation with JSON validation and structure verification
+- Output validation ensuring IBD contains nodes and edges arrays with at least one node
+
 ### Changed
-- Tightened the IBD-only prompt instructions so every internal component must be connected with meaningful, labeled edges.
+- Enhanced IBD generation to use specialized prompting with complete block context from parent BDD
+- Added contextual information injection before existing IBD_ONLY_PROMPT_TEMPLATE
+- Function returns structured dictionary with ibd_raw, block_id, block_name, model_used, and rag_used fields
+
+### Improved
+- Better IBD quality through specialized chain prompting vs nested generation approach
+- Enhanced AI understanding of block context through detailed relationship information
+- More reliable IBD generation with comprehensive validation and error handling
 
 ## [1.1.95] - 2025-10-23
 
