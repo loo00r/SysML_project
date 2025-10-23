@@ -269,7 +269,7 @@ Required output format:
 }
 
 Rules:
-1. Create 3-6 internal components that match the block description. All nodes MUST use type "ibd_block".
+1. Create 1-6 internal components that match the block description. All nodes MUST use type "ibd_block".
 2. Provide concise descriptions and include properties when the prompt supplies useful details.
 3. Connect every internal component with meaningful edges so no node is isolated. Edge labels must explain the interaction (e.g., "Power Supply", "Data Bus").
 4. Use unique IDs across all nodes and edges.
