@@ -242,6 +242,41 @@ Examples may be provided in the conversation before the actual request.  Use the
 to guide your structure, then return only a single JSON object in your final reply.
 """
 
+IBD_ONLY_PROMPT_TEMPLATE = """
+You are a SysML expert specializing in Internal Block Diagrams (IBD).
+
+TASK: Produce an Internal Block Diagram in JSON format for a single block.
+
+GOAL:
+Describe ONLY the internal components and their connections that exist inside the block the user mentions. Do not generate any surrounding BDD context.
+
+Required output format:
+{
+  "diagram_type": "ibd",
+  "parent_block_id": "...",  # include when the block identifier is provided
+  "nodes": [
+    {
+      "id": "component-1",
+      "type": "ibd_block",
+      "name": "Component Name",
+      "description": "Concise explanation of the component's role",
+      "properties": {"optional_key": "value"}  # include only when relevant
+    }
+  ],
+  "edges": [
+    {"id": "edge-1", "source": "component-1", "target": "component-2", "label": "Connection description"}
+  ]
+}
+
+Rules:
+1. Create 3-6 internal components that match the block description. All nodes MUST use type "ibd_block".
+2. Provide concise descriptions and include properties when the prompt supplies useful details.
+3. Connect every internal component with meaningful edges so no node is isolated. Edge labels must explain the interaction (e.g., "Power Supply", "Data Bus").
+4. Use unique IDs across all nodes and edges.
+5. Do **not** include position or layout data.
+6. Return exactly one valid JSON object following the required format.
+"""
+
 BDD_ENHANCED_PROMPT_TEMPLATE = """
 You are an expert SysML architect. Your task is to generate a comprehensive system diagram
 in JSON format based on a user's description. The output must be a Block Definition
@@ -300,7 +335,7 @@ def generate_sysml_diagram(
 
     Args:
         prompt: The text description of the system to model.
-        diagram_type: The type of diagram to generate ('bdd' or 'bdd_enhanced').
+        diagram_type: The type of diagram to generate ('bdd', 'bdd_enhanced', or 'ibd').
         one_shot_examples: Optional list of RAG examples.
 
     Returns:
@@ -312,6 +347,9 @@ def generate_sysml_diagram(
     if diagram_type == "bdd_enhanced":
         system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
         print("\n==== Using BDD_ENHANCED prompt template ====")
+    elif diagram_type == "ibd":
+        system_prompt = IBD_ONLY_PROMPT_TEMPLATE
+        print("\n==== Using IBD prompt template ====")
     else:  # Default to standard BDD
         system_prompt = BDD_ONLY_PROMPT_TEMPLATE
         print("\n==== Using standard BDD prompt template ====")
