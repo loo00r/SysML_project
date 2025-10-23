@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import type { Edge, Node, XYPosition } from 'reactflow';
 import useDiagramStore from '../store/diagramStore';
 import type { ArrowSide } from '../components/shared/ArrowHeadOverlay';
@@ -70,6 +70,26 @@ const inferSide = (edge: Edge, source: Node | undefined, target: Node | undefine
 const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
   const edges = useDiagramStore((state) => state.edges as Edge[]);
   const nodes = useDiagramStore((state) => state.nodes as Node[]);
+  const [frameTick, setFrameTick] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      setFrameTick((tick) => tick + 1);
+      return;
+    }
+
+    let cancelled = false;
+    const raf = window.requestAnimationFrame(() => {
+      if (!cancelled) {
+        setFrameTick((tick) => tick + 1);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf);
+    };
+  }, [edges, nodes]);
 
   return useMemo(() => {
     const nodeMap = new Map(nodes.map((node) => [node.id, node]));
@@ -87,7 +107,7 @@ const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
     });
 
     return ORDER.filter((side) => sideSet.has(side));
-  }, [edges, nodes, nodeId]);
+  }, [edges, nodes, nodeId, frameTick]);
 };
 
 export default useSmdInboundSides;

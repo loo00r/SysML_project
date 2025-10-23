@@ -9,6 +9,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   Viewport,
+  Position,
 } from 'reactflow';
 import type { SmdTransitionDraft } from '../utils/smdTransition';
 import {
@@ -111,6 +112,179 @@ export interface DiagramState {
   parentDiagramId?: string;
 }
 
+type SmdSide = 'left' | 'right' | 'top' | 'bottom';
+
+const HANDLE_SIDE_LOOKUP: Record<string, SmdSide> = {
+  left: 'left',
+  right: 'right',
+  top: 'top',
+  bottom: 'bottom',
+  'in-left': 'left',
+  'in-right': 'right',
+  'in-top': 'top',
+  'in-bottom': 'bottom',
+  'out-left': 'left',
+  'out-right': 'right',
+  'out-top': 'top',
+  'out-bottom': 'bottom',
+};
+
+const HANDLE_NORMALIZATION_MAP: Record<string, string> = {
+  left: 'in-left',
+  right: 'in-right',
+  top: 'in-top',
+  bottom: 'in-bottom',
+  'in-left': 'in-left',
+  'in-right': 'in-right',
+  'in-top': 'in-top',
+  'in-bottom': 'in-bottom',
+};
+
+const SIDE_TO_POSITION: Record<SmdSide, Position> = {
+  left: Position.Left,
+  right: Position.Right,
+  top: Position.Top,
+  bottom: Position.Bottom,
+};
+
+const POSITION_SIDE_LOOKUP: Record<string, SmdSide> = {
+  left: 'left',
+  right: 'right',
+  top: 'top',
+  bottom: 'bottom',
+};
+
+const normalizeHandleKey = (value?: string | null): string | null =>
+  value ? value.toLowerCase() : null;
+
+const normalizePositionKey = (value?: Position | string | null): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value.toLowerCase();
+  }
+
+  return `${value}`.toLowerCase();
+};
+
+const getSideFromHandle = (handle?: string | null): SmdSide | null => {
+  const key = normalizeHandleKey(handle);
+  return key ? HANDLE_SIDE_LOOKUP[key] ?? null : null;
+};
+
+const getSideFromPosition = (position?: Position | string | null): SmdSide | null => {
+  const key = normalizePositionKey(position);
+  return key ? POSITION_SIDE_LOOKUP[key] ?? null : null;
+};
+
+type EdgeWithPositions = Edge & {
+  targetPosition?: Position | string;
+  sourcePosition?: Position | string;
+};
+
+const deriveSideFromGeometry = (
+  edge: Edge,
+  sourceNode: Node<NodeData> | undefined,
+  targetNode: Node<NodeData> | undefined,
+): SmdSide | null => {
+  if (!sourceNode || !targetNode) {
+    return null;
+  }
+
+  if (edge.source === edge.target) {
+    const handleSide = getSideFromHandle(edge.targetHandle);
+    if (handleSide) {
+      return handleSide;
+    }
+    return 'right';
+  }
+
+  const dx = (sourceNode.position?.x ?? 0) - (targetNode.position?.x ?? 0);
+  const dy = (sourceNode.position?.y ?? 0) - (targetNode.position?.y ?? 0);
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+
+  return dy > 0 ? 'bottom' : 'top';
+};
+
+const applySmdEdgeMetadata = (
+  edge: Edge,
+  sourceNode: Node<NodeData> | undefined,
+  targetNode: Node<NodeData> | undefined,
+): Edge => {
+  const edgeWithPositions = edge as EdgeWithPositions;
+  const targetSide =
+    getSideFromHandle(edge.targetHandle) ??
+    getSideFromPosition(edgeWithPositions.targetPosition ?? null) ??
+    getSideFromPosition(
+      typeof edge.data === 'object' && edge.data
+        ? ((edge.data as Record<string, unknown>).targetPosition as Position | string | null)
+        : null,
+    ) ??
+    deriveSideFromGeometry(edge, sourceNode, targetNode);
+
+  if (!targetSide) {
+    return edge;
+  }
+
+  const normalizedTargetHandleKey = normalizeHandleKey(edge.targetHandle);
+  const canonicalTargetHandle = normalizedTargetHandleKey
+    ? HANDLE_NORMALIZATION_MAP[normalizedTargetHandleKey] ?? edge.targetHandle
+    : HANDLE_NORMALIZATION_MAP[targetSide] ?? edge.targetHandle;
+
+  const sourceSideHint =
+    getSideFromHandle(edge.sourceHandle) ??
+    getSideFromPosition(edgeWithPositions.sourcePosition ?? null) ??
+    getSideFromPosition(
+      typeof edge.data === 'object' && edge.data
+        ? ((edge.data as Record<string, unknown>).sourcePosition as Position | string | null)
+        : null,
+    );
+
+  const baseData =
+    typeof edge.data === 'object' && edge.data ? (edge.data as Record<string, unknown>) : {};
+  const nextData: Record<string, unknown> = {
+    ...baseData,
+    targetPosition: targetSide,
+  };
+
+  if (sourceSideHint) {
+    nextData.sourcePosition = sourceSideHint;
+  }
+
+  const existingTargetSide = getSideFromPosition(edgeWithPositions.targetPosition ?? null);
+  const existingSourceSide = getSideFromPosition(edgeWithPositions.sourcePosition ?? null);
+
+  const nextTargetPosition = existingTargetSide
+    ? SIDE_TO_POSITION[existingTargetSide]
+    : SIDE_TO_POSITION[targetSide];
+
+  const fallbackSourcePosition =
+    typeof edgeWithPositions.sourcePosition === 'number'
+      ? (edgeWithPositions.sourcePosition as Position)
+      : existingSourceSide
+        ? SIDE_TO_POSITION[existingSourceSide]
+        : undefined;
+
+  const nextSourcePosition = sourceSideHint
+    ? SIDE_TO_POSITION[sourceSideHint]
+    : fallbackSourcePosition;
+
+  const result: EdgeWithPositions = {
+    ...edge,
+    targetHandle: canonicalTargetHandle ?? edge.targetHandle,
+    data: nextData,
+    targetPosition: nextTargetPosition,
+    sourcePosition: nextSourcePosition ?? edgeWithPositions.sourcePosition,
+  };
+
+  return result;
+};
+
 const withSmdTransitionDefaults = (edge: Edge, patchData?: SmdTransitionDraft): Edge => {
   const initialData = edge.data
     ? ensureSmdTransitionData(edge.data as SmdTransitionDraft)
@@ -165,13 +339,17 @@ const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
       }
 
       normalized.push(
-        withSmdTransitionDefaults({
-          ...edge,
-          type: 'smdTransition',
-          sourceHandle: 'out-right',
-          targetHandle: 'in-left',
-          label: normalizedLabel,
-        }),
+        applySmdEdgeMetadata(
+          withSmdTransitionDefaults({
+            ...edge,
+            type: 'smdTransition',
+            sourceHandle: 'out-right',
+            targetHandle: 'in-left',
+            label: normalizedLabel,
+          }),
+          sourceNode,
+          targetNode,
+        ),
       );
       return;
     }
@@ -179,11 +357,15 @@ const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
     if (isSmdEdge) {
       const normalizedLabel = typeof edge.label === 'string' && edge.label.trim().length > 0 ? edge.label : undefined;
       normalized.push(
-        withSmdTransitionDefaults({
-          ...edge,
-          type: 'smdTransition',
-          label: normalizedLabel,
-        }),
+        applySmdEdgeMetadata(
+          withSmdTransitionDefaults({
+            ...edge,
+            type: 'smdTransition',
+            label: normalizedLabel,
+          }),
+          sourceNode,
+          targetNode,
+        ),
       );
       return;
     }
@@ -881,13 +1063,16 @@ const useDiagramStore = create<DiagramStoreState>()(
       }
     ];
 
-    const seedEdges: Edge[] = [
+    const seedEdges: EdgeWithPositions[] = [
       {
         id: `${initialNodeId}-${stateNodeId}`,
         source: initialNodeId,
         target: stateNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
+        targetHandle: 'in-top',
+        sourcePosition: Position.Right,
+        targetPosition: Position.Top,
         markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       },
       {
@@ -896,6 +1081,9 @@ const useDiagramStore = create<DiagramStoreState>()(
         target: finalNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
+        targetHandle: 'in-top',
+        sourcePosition: Position.Right,
+        targetPosition: Position.Top,
         markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       }
     ];
@@ -1032,15 +1220,21 @@ const useDiagramStore = create<DiagramStoreState>()(
     let newEdge: Edge;
     
     if (isSMD) {
-      newEdge = withSmdTransitionDefaults({
-        id: `e-${connection.source}-${connection.target}-${Date.now()}`,
-        source: connection.source || '',
-        target: connection.target || '',
-        sourceHandle: connection.sourceHandle,
-        targetHandle: connection.targetHandle,
-        type: 'smdTransition',
-        data: ensureSmdTransitionData(),
-      });
+      const sourceNode = state.nodes.find(node => node.id === connection.source);
+      const targetNode = state.nodes.find(node => node.id === connection.target);
+      newEdge = applySmdEdgeMetadata(
+        withSmdTransitionDefaults({
+          id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+          source: connection.source || '',
+          target: connection.target || '',
+          sourceHandle: connection.sourceHandle,
+          targetHandle: connection.targetHandle,
+          type: 'smdTransition',
+          data: ensureSmdTransitionData(),
+        }),
+        sourceNode,
+        targetNode,
+      );
     } else {
       newEdge = {
         id: `e-${connection.source}-${connection.target}-${Date.now()}`,
@@ -1153,8 +1347,13 @@ const useDiagramStore = create<DiagramStoreState>()(
     // Save current state before adding edge
     get().saveToHistory();
 
-    const newEdge = edge.type === 'smdTransition' ? withSmdTransitionDefaults(edge) : edge;
-    const newEdges = [...get().edges, newEdge];
+    const state = get();
+    const sourceNode = state.nodes.find(node => node.id === edge.source);
+    const targetNode = state.nodes.find(node => node.id === edge.target);
+    const newEdge = edge.type === 'smdTransition'
+      ? applySmdEdgeMetadata(withSmdTransitionDefaults(edge), sourceNode, targetNode)
+      : edge;
+    const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
   },
@@ -1163,7 +1362,10 @@ const useDiagramStore = create<DiagramStoreState>()(
     // Save current state before updating edge
     get().saveToHistory();
 
-    const newEdges = get().edges.map(edge => {
+    const state = get();
+    const nodeMap = new Map(state.nodes.map(node => [node.id, node]));
+
+    const newEdges = state.edges.map(edge => {
       if (edge.id !== id) {
         return edge;
       }
@@ -1174,7 +1376,11 @@ const useDiagramStore = create<DiagramStoreState>()(
 
       if (nextType === 'smdTransition') {
         const patchData = patch?.data as SmdTransitionDraft | undefined;
-        return withSmdTransitionDefaults(mergedEdge, patchData);
+        return applySmdEdgeMetadata(
+          withSmdTransitionDefaults(mergedEdge, patchData),
+          nodeMap.get(mergedEdge.source),
+          nodeMap.get(mergedEdge.target),
+        );
       }
 
       return mergedEdge;
@@ -1186,12 +1392,19 @@ const useDiagramStore = create<DiagramStoreState>()(
   updateSmdTransitionEdge: (id, data) => {
     get().saveToHistory();
 
-    const newEdges = get().edges.map(edge => {
+    const state = get();
+    const nodeMap = new Map(state.nodes.map(node => [node.id, node]));
+
+    const newEdges = state.edges.map(edge => {
       if (edge.id !== id) {
         return edge;
       }
 
-      return withSmdTransitionDefaults(edge, data);
+      return applySmdEdgeMetadata(
+        withSmdTransitionDefaults(edge, data),
+        nodeMap.get(edge.source),
+        nodeMap.get(edge.target),
+      );
     });
 
     set({ edges: newEdges });

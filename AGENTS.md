@@ -55,116 +55,91 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-Task SMD-04a — Target-side arrows for SMD transitions (BDD-parity)
+Task SMD-04b — Fix arrow side on the auto-seeded SMD template
 
-GoalMake SMD transition direction obvious by drawing a small arrowhead at the target node’s connection point, the same way BDD blocks show direction. The arrow should appear whenever a node has at least one incoming smdTransition, aligned to the handle side where the edge lands.
+GoalWhen a new SMD is auto-seeded (Initial → State → Final), both transitions should show the arrow on the target node’s top side (as the template connects into top handles). Today, the arrow sometimes appears on the left side only for this seeded example, while manually created edges behave correctly.
 
-Scope of Work
+HypothesisThe seeded transitions do not set explicit targetHandle/targetPosition, or they’re normalized after mount with a default fallback (“left”), so the node-level arrow overlay picks the wrong side. Manual edges carry the correct metadata, hence they render fine.
 
-1.  Reuse the BDD arrow overlay pattern
+Scope of work
+
+1.  Seed data: set explicit handle metadata
     
 
-*   Locate the BDD component that draws the target-side arrow (the tiny triangle rendered by the block when it detects an incoming connection).
+*   In the SMD scaffold builder that creates Initial → State and State → Final, set both:
     
-*   Extract it into a reusable component, e.g. ArrowHeadOverlay.tsx, with props:
-    
-    *   side: 'left' | 'right' | 'top' | 'bottom'
+    *   targetHandle: "top"
         
-    *   offset?: number (pixel nudges away from the node border)
+    *   targetPosition: Position.Top
         
-    *   className? (for size/theme tweaks)
+*   Also set the source side explicitly (e.g., sourceHandle: "right", sourcePosition: Position.Right) to keep the graph fully deterministic.
+    
+
+2.  Normalization guard (store/utils)
+    
+
+*   In the SMD transition normalizer (the code path that runs on create/rehydrate), add:
+    
+    *   If targetHandle is set to "top"|"right"|"bottom"|"left" and targetPosition is missing, derive Position.\* from the handle.
         
-*   Ensure it renders in the **node layer**, with pointer-events: none and a z-index above node chrome, matching the BDD look.
-    
-
-2.  Detect inbound edges per side on SMD nodes
-    
-
-*   In each SMD node component that can be a transition target (smdState, smdComposite, smdFinal, and choice if present; skip smdInitial), select edges from the store and filter:
-    
-    *   edge.type === 'smdTransition' && edge.target === node.id
+    *   If neither is present, derive the side from the target node’s nearest handle (distance check) and persist it.This ensures older diagrams or partial data can’t regress to “left”.
         
-*   For every inbound edge, read edge.targetPosition (React Flow side hint). Build a set of sides {left,right,top,bottom} that have at least one inbound.
-    
-*   Render one ArrowHeadOverlay per occupied side (not per edge) to avoid clutter.
+
+3.  Node overlay side resolution (arrow renderer)
     
 
-3.  Positioning/alignment
+*   Side detection priority:
     
-
-*   Place the overlay just outside the node border on the selected side (e.g., 6–8px).
-    
-*   Rotation:
-    
-    *   right → 0°, left → 180°, top → -90°, bottom → 90°.
+    1.  from targetHandle (if one of "top"|"right"|"bottom"|"left")
         
-*   For composites, clamp the arrow within the composite “workspace” frame and ensure it stays visible above child edges (keep pointer-events: none).
+    2.  else from targetPosition (Position.Top|Right|Bottom|Left)
+        
+    3.  else compute by geometry (endpoint vs. node center → pick nearest side)
+        
+*   Keep pointer-events: none, and ensure overlays re-evaluate on edge add/update/rehydrate.
     
 
-4.  Reactivity
+4.  Mount timing
     
 
-*   When edges move or re-route, the set of inbound sides should recompute and the arrows update immediately (subscribe to edges; avoid heavy computations).
-    
-*   Self-loops: if the loop targets the node’s right handle, show the right-side arrow, etc.
+*   After seeding the diagram, schedule a one-tick RAF to ensure edges are mounted before computing inbound-sides for overlays. This avoids reading undefined positions on first paint.
     
 
-5.  Feature toggle (optional)
+Acceptance criteria
+
+*   Creating a fresh SMD shows arrows on the top edge of State and Final in the seed (Initial → State → Final).
+    
+*   Manually drawn transitions continue to show correct arrows for left/right/top/bottom and self-loops.
+    
+*   After reload (rehydrate), the seed still shows top arrows (no fallback to left).
+    
+*   No visual regressions inside composites or across different tabs.
     
 
-*   Keep any previous markerEnd work behind a flag (e.g., USE\_SMD\_EDGE\_MARKERS=false) so we can switch approaches later if desired. This task’s acceptance focuses on the node-drawn overlay.
+Manual test plan
+
+1.  Create a new SMD: verify both seeded transitions point to the target node’s top side.
+    
+2.  Draw new transitions into each side of a State: arrows appear on matching sides.
+    
+3.  Reload the page (rehydrate): seeded arrows remain on top.
+    
+4.  Undo/redo movements of the State/Final: arrows keep correct sides.
+    
+5.  Repeat inside a Composite to confirm overlays stay above internals.
     
 
-Acceptance Criteria
+Files likely touched
 
-1.  Every smdTransition visibly terminates with a small arrow at the **target node**, aligned to the correct side.
+*   frontend/src/services/smdScaffold.ts (or wherever the seed SMD is built)
     
-2.  Multiple inbound edges to the same side show **one** arrow on that side; inbound edges on different sides show arrows on each occupied side.
+*   frontend/src/utils/smdTransition.ts (normalizer/derivation helpers)
     
-3.  Arrows update live when edges are created, moved, or deleted, and after undo/redo or rehydrate.
+*   frontend/src/components/shared/ArrowHeadOverlay.tsx (side resolution tweak)
     
-4.  Arrows are always visible (no z-index issues), non-interactive (pointer-events: none), and match the BDD arrow look.
-    
-5.  No regressions to SMD labels, inspector sync, or composite interactions.
+*   frontend/src/store/diagramStore.ts (if normalization lives here)
     
 
-Manual Test Plan
+Changelog (prepare)Version: 1.2.9 - 2025-10-23 Fixed
 
-1.  Initial → State (straight). Expect a right/left/top/bottom arrow on State matching the target handle used.
-    
-2.  State → Final. Expect arrow on Final at the targeted side.
-    
-3.  Create two inbound transitions to the same side of a State. Expect a single arrow on that side.
-    
-4.  Create inbound transitions to two different sides. Expect two arrows (one per side).
-    
-5.  Make a self-loop on a State targeting its right handle. Expect one right-side arrow.
-    
-6.  Drag targets around and undo/redo. Arrows should update without flicker.
-    
-7.  Create transitions inside a Composite. Arrows should render in front of internals and remain visible.
-    
-
-Files Likely Touched
-
-*   frontend/src/components/smd/StateNode.tsx
-    
-*   frontend/src/components/smd/CompositeNode.tsx
-    
-*   frontend/src/components/smd/FinalNode.tsx
-    
-*   frontend/src/components/smd/ChoiceNode.tsx (if applicable)
-    
-*   frontend/src/components/shared/ArrowHeadOverlay.tsx (new; extracted from BDD)
-    
-*   frontend/src/styles/smd.css (minor positioning helpers, pointer-events: none)
-    
-
-Changelog (prepare after merge)Version: 1.2.8Added
-
-*   Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.Improved
-    
-*   Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
-    
-
-—
+*   Seeded SMD template now renders arrowheads on the correct top side of target nodes; added robust target side derivation and rehydrate-safe normalization.

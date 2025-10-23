@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Persistence
 - Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
 
+### Fixed
+- Seeded SMD template transitions now persist top-side metadata so node overlays render arrows on the intended handles after creation and reload.
+
+## [1.2.9] - 2025-10-23
+### Fixed
+- Seeded SMD template transitions now persist top-side metadata so node overlays render arrows on the intended handles after creation and reload.
+
 ## [1.2.8] - 2025-10-22
 ### Added
 - Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
