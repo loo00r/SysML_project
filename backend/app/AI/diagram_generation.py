@@ -333,26 +333,47 @@ def generate_sysml_diagram(
     """
     Generate a SysML diagram based on the provided prompt and type using OpenAI's API.
 
+    This function uses the chain prompting architecture where:
+    - 'bdd' generates ONLY block structure without nested internal diagrams
+    - 'ibd' generates ONLY internal structure for a specific block
+    - 'bdd_enhanced' is DEPRECATED (generates BDD with nested IBD - lower quality)
+
+    For best quality, use:
+    1. generate_sysml_diagram(prompt, 'bdd') for block structure
+    2. generate_ibd_diagram() for each block's internal structure (with full context)
+
     Args:
         prompt: The text description of the system to model.
-        diagram_type: The type of diagram to generate ('bdd', 'bdd_enhanced', or 'ibd').
+        diagram_type: The type of diagram to generate:
+            - 'bdd': Block Definition Diagram (recommended, uses BDD_ONLY_PROMPT_TEMPLATE)
+            - 'ibd': Internal Block Diagram (standalone, uses IBD_ONLY_PROMPT_TEMPLATE)
+            - 'bdd_enhanced': DEPRECATED - nested approach with lower quality
         one_shot_examples: Optional list of RAG examples.
 
     Returns:
-        Dictionary containing the raw diagram and metadata.
+        Dictionary containing the raw diagram and metadata:
+        {
+            "diagram_raw": dict,  # Raw AI-generated diagram structure
+            "raw_text": str,      # Original user prompt
+            "model_used": str,    # OpenAI model name
+            "rag_used": bool,     # Whether RAG examples were used
+            "examples_count": int # Number of RAG examples used
+        }
     """
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     # Select the appropriate prompt based on the requested diagram type
     if diagram_type == "bdd_enhanced":
+        # DEPRECATED: Use chain prompting instead (bdd + generate_ibd_diagram)
         system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
-        print("\n==== Using BDD_ENHANCED prompt template ====")
+        print("\n==== WARNING: Using DEPRECATED BDD_ENHANCED prompt template ====")
+        print("==== Recommendation: Use 'bdd' + generate_ibd_diagram() for better quality ====")
     elif diagram_type == "ibd":
         system_prompt = IBD_ONLY_PROMPT_TEMPLATE
-        print("\n==== Using IBD prompt template ====")
-    else:  # Default to standard BDD
+        print("\n==== Using IBD-only prompt template ====")
+    else:  # Default to standard BDD (recommended for chain prompting)
         system_prompt = BDD_ONLY_PROMPT_TEMPLATE
-        print("\n==== Using standard BDD prompt template ====")
+        print("\n==== Using BDD-only prompt template (chain prompting mode) ====")
 
     messages = [{"role": "system", "content": system_prompt}]
 

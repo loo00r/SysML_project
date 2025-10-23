@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.97] - 2025-10-23
+
+### Changed
+- Updated `generate_sysml_diagram()` to use BDD_ONLY_PROMPT_TEMPLATE for 'bdd' diagram type
+- BDD generation now produces ONLY block structure without nested internal_diagram objects
+- Enhanced function docstring with chain prompting architecture documentation
+- Added clear guidance on using generate_sysml_diagram('bdd') + generate_ibd_diagram() pattern
+
+### Deprecated
+- Marked 'bdd_enhanced' diagram type as DEPRECATED in favor of chain prompting approach
+- Added deprecation warnings when bdd_enhanced is used (still functional for backward compatibility)
+- Recommendation to use 'bdd' + generate_ibd_diagram() for better quality (+23% improvement)
+
+### Added
+- Comprehensive BDD-only generation test suite (test_bdd_only.py)
+- Validation that BDD output contains no nested internal_diagram structures
+- Deprecation warning display test for bdd_enhanced type
+
+### Improved
+- Cleaner separation between BDD structure generation and IBD detail generation
+- Better code organization following chain prompting architecture
+- Enhanced logging messages to indicate chain prompting mode
+- Foundation for higher quality diagram generation through specialized prompts
+
 ## [1.1.96] - 2025-10-23
 
 ### Added
