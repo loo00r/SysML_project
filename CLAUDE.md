@@ -210,37 +210,28 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### NEW TASK
-### TASK-3: Implement generate_ibd_diagram() function
-**Type**: Task
+### TASK-4: Test IBD quality improvement
+**Type**: Testing
 **Priority**: High
-**Story Points**: 5
+**Story Points**: 3
 
 **Description**:
-Create new function `generate_ibd_diagram()` that generates IBD for a single block using chain prompting with full context from BDD.
+Test new IBD generation vs old nested approach. Measure quality, detail level, and correctness.
 
-**Files to modify**:
-- `backend/app/AI/diagram_generation.py`
-
-**Function signature**:
-```python
-def generate_ibd_diagram(
-    block_id: str,
-    block_name: str,
-    block_description: str,
-    block_type: str,
-    system_context: str,
-    parent_relationships: List[Dict],
-    one_shot_examples: List[Dict] = None
-) -> Dict[str, Any]
-```
+**Test cases**:
+- Battery Pack IBD (automotive domain)
+- Flight Controller IBD (aerospace domain)
+- Server IBD (IT domain)
 
 **Acceptance Criteria**:
-- [ ] Function created with all parameters
-- [ ] Uses OpenAI API with IBD_PROMPT_TEMPLATE
-- [ ] Returns {ibd_raw, block_id, block_name, model_used, rag_used}
-- [ ] Error handling included
-- [ ] Validates output has nodes and edges
+- [ ] 3+ test cases documented
+- [ ] Quality comparison: nested vs chain (target: 70% → 90%+)
+- [ ] IBD has 3-7 components (vs 1-3 in nested)
+- [ ] Edges have meaningful labels
+- [ ] Components have descriptions and properties
 
-**Reference**: `docs/UNIFIED_CHAIN_PROMPTING_PLAN.md` (Backend Changes, section 1)
+**Reference**: `docs/CHAIN_PROMPTING_COMPARISON.md` (Real-World Example)
 
-**Dependencies**: TASK-2
+**Dependencies**: TASK-3
+
+---
