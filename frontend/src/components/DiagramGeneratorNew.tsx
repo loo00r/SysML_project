@@ -88,6 +88,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const [text, setText] = useState('');
   const [includeRelationships, setIncludeRelationships] = useState(true);
   const [generateEnhanced, setGenerateEnhanced] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   
   // Use our custom AI generation hook
   const { generateDiagram, isGenerating, progress, error } = useAIGeneration();
@@ -102,7 +103,8 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
         prompt: text,
         complexity: 'medium',
         includeRelationships,
-        isEnhanced: generateEnhanced
+        isEnhanced: generateEnhanced,
+        testMode,
       });
       
       // Reset the form after successful generation
@@ -128,10 +130,21 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const handleTextChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setText(event.target.value);
   };
-  
   const toggleExpanded = () => {
     setIsExpanded((prev) => !prev);
   };
+
+  const handleTestModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.checked;
+    setTestMode(next);
+    if (next) {
+      setGenerateEnhanced(false);
+    }
+  };
+
+  const textPlaceholder = testMode
+    ? 'Paste SMD JSON here. Expected keys: "nodes" (or "states") and optional "edges"/"transitions".'
+    : 'Enter your system description here. The AI will analyze your text and generate a SysML diagram automatically.';
 
   return (
     <>
@@ -172,10 +185,21 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
               <FormControlLabel
                 control={
+                  <Switch
+                    checked={testMode}
+                    onChange={handleTestModeToggle}
+                    disabled={isGenerating}
+                    name="testMode"
+                  />
+                }
+                label="Test Mode (JSON → SMD)"
+              />
+              <FormControlLabel
+                control={
                   <Checkbox
                     checked={includeRelationships}
                     onChange={(e) => setIncludeRelationships(e.target.checked)}
-                    disabled={isGenerating}
+                    disabled={isGenerating || testMode}
                   />
                 }
                 label="Include Relationships"
@@ -185,20 +209,35 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                   <Switch
                     checked={generateEnhanced}
                     onChange={(e) => setGenerateEnhanced(e.target.checked)}
-                    disabled={isGenerating}
+                    disabled={isGenerating || testMode}
                     name="generateEnhanced"
                   />
                 }
                 label="Generate with Internal Diagrams"
               />
             </Stack>
+            {testMode && (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  fontFamily: 'Roboto Mono, monospace',
+                  backgroundColor: 'rgba(13, 71, 161, 0.06)',
+                  borderRadius: 1,
+                  padding: 1,
+                  mb: 1,
+                }}
+              >
+                Example: {"{ \"name\": \"Driving\", \"nodes\": [{\"id\":\"init\",\"type\":\"initial\"},{\"id\":\"drive\",\"type\":\"state\"}], \"edges\": [{\"source\":\"init\",\"target\":\"drive\",\"event\":\"start\"}] }"}
+              </Typography>
+            )}
             <TextField
               multiline
               rows={5}
               fullWidth
               value={text}
               onChange={handleTextChange}
-              placeholder="Enter your system description here. The AI will analyze your text and generate a SysML diagram automatically."
+              placeholder={textPlaceholder}
               disabled={isGenerating}
               variant="outlined"
               sx={{ mb: 2 }}
