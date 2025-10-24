@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.13] - 2025-10-24
+### Removed
+- SMD Composite State and all related behaviors (containment, workspace overlay, auto-resize, boundary policies).
+- Composite node type from SMD palette and type registrations.
+- Composite-specific services: resize scheduler, layout scheduler, and Dagre integration.
+- Composite containment logic (parentNode usage for SMD children).
+- Composite-aware edge routing and connection validation.
+
+### Changed
+- Legacy diagrams with composites are migrated on load by flattening children to the root; composite-bound edges are reattached when possible or removed with a migration note.
+- Simplified SMD state machine to support only Initial, State, Final, and Choice pseudo-states.
+
+## [1.2.12]
 ### Added
 - Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
 

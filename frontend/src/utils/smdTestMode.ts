@@ -6,10 +6,6 @@ import {
   SMD_EDGE_MARKER_URL,
   USE_SMD_EDGE_MARKERS,
 } from './smdTransition';
-import {
-  COMPOSITE_DEFAULT_HEIGHT,
-  COMPOSITE_DEFAULT_WIDTH,
-} from './smdComposite';
 
 const NODE_TYPE_MAP: Record<string, NodeData['type']> = {
   initial: 'smdInitial',
@@ -24,9 +20,6 @@ const NODE_TYPE_MAP: Record<string, NodeData['type']> = {
   choice: 'smdChoice',
   junction: 'smdChoice',
   smdchoice: 'smdChoice',
-  composite: 'smdComposite',
-  smdcomposite: 'smdComposite',
-  region: 'smdComposite',
 };
 
 const toTrimmedString = (value: unknown): string | undefined => {
@@ -138,7 +131,7 @@ const createDefaultPositionFactory = () => {
     if (parentId === null) {
       return {
         x: count * 220,
-        y: nodeType === 'smdComposite' ? 40 : 0,
+        y: 0,
       };
     }
 
@@ -289,15 +282,6 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
       toTrimmedString(nodeRecord['doActivity']) ??
       toTrimmedString(nodeRecord['activity']);
 
-    const width =
-      nodeType === 'smdComposite'
-        ? toFiniteNumber(nodeRecord['width']) ?? COMPOSITE_DEFAULT_WIDTH
-        : undefined;
-    const height =
-      nodeType === 'smdComposite'
-        ? toFiniteNumber(nodeRecord['height']) ?? COMPOSITE_DEFAULT_HEIGHT
-        : undefined;
-
     const nodeData: NodeData = {
       label: name,
       name,
@@ -308,8 +292,6 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
       do: doActivity,
       properties: extractProperties(nodeRecord['properties']),
       stateType: stateTypeForNode(nodeType),
-      width,
-      height,
     };
 
     const node: Node<NodeData> = {

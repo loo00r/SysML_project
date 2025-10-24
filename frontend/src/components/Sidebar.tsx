@@ -182,48 +182,6 @@ const Sidebar: React.FC = () => {
         </ListItem>
 
         <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
-          <Tooltip title="Composite state containing nested states" placement="right">
-            <DraggableItem
-              draggable
-              onDragStart={(e) =>
-                onDragStart(e, 'smdComposite', {
-                  type: 'smdComposite',
-                  label: 'Composite',
-                  name: 'Composite',
-                  entry: '',
-                  exit: '',
-                  do: '',
-                  width: 360,
-                  height: 260,
-                  stateType: 'composite',
-                })
-              }
-            >
-              <Box sx={{
-                width: 32,
-                height: 24,
-                borderRadius: '8px',
-                border: '2px solid #1e88e5',
-                backgroundColor: '#e3f2fd',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-              }}>
-                <Box sx={{
-                  width: 18,
-                  height: 12,
-                  borderRadius: '4px',
-                  border: '1px dashed #1e88e5',
-                  backgroundColor: 'rgba(30, 136, 229, 0.12)',
-                }} />
-              </Box>
-              <Typography variant="body2">Composite</Typography>
-            </DraggableItem>
-          </Tooltip>
-        </ListItem>
-
-        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
           <Tooltip title="Branching choice pseudo-state" placement="right">
             <DraggableItem
               draggable

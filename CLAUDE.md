@@ -178,3 +178,139 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### new task
+
+Task SMD-05R — Remove Composite State from SMD (and all dependencies)
+
+Goal
+Fully remove the SMD Composite State feature. That includes the node type, palette item, containment/parenting, auto-resize, overlays, policies, and any code paths that assume children inside a composite. Existing diagrams that contain composites must load without crashing; their contents should be flattened into the SMD root.
+
+Scope of Work
+
+1.  De-register and delete the Composite node type
+    
+
+*   Remove smdComposite from SMD nodeTypes registration and palette.
+    
+*   Delete/retire the component (e.g., CompositeNode.tsx) and styles/icons tied to it.
+    
+*   Remove Composite from seeded SMD examples and creation handles.
+    
+*   Update SMD unions/types so SmdNodeType no longer includes "composite".
+    
+
+2.  Remove Composite-specific behaviors
+    
+
+*   Delete/disable composite containment (no more parentNode usage for SMD children).
+    
+*   Remove composite workspace overlay (“hollow frame”, header), internal drag clamps, soft boundary rules, and external-connection policies.
+    
+*   Delete the composite auto-resize service and its debounced triggers (e.g., resizeCompositeToChildren, RAF schedulers).
+    
+*   Remove any composite-aware edge routing/port logic.
+    
+
+3.  Data model & migration (rehydrate-time)
+    
+
+*   On load, detect any smdComposite in persisted SMD diagrams and **flatten** them:
+    
+    *   Promote each child (nodes whose parentNode === composite.id) to the diagram root: clear parentNode.
+        
+    *   Convert child positions from parent-local to absolute by adding the composite’s top-left workspace offset + padding (ensure they remain within canvas bounds).
+        
+    *   Internal transitions between children remain as normal transitions (source/target now refer to root-level nodes).
+        
+    *   Edges that referenced the composite directly as source or target:
+        
+        *   Try to reattach to the nearest former child (by center distance to the original attach side).
+            
+        *   If no valid child exists, drop the edge and record a non-blocking migration note (collect into a banner/toast with the list of removed edge IDs).
+            
+*   After migration, persist the new diagram JSON immediately to avoid re-running migration.
+    
+
+4.  Store, selectors, and inspectors
+    
+
+*   Remove composite-specific selectors and inspector panels.
+    
+*   Ensure SMD edge label editing, arrows, selection, and pointer-events continue to work without any composite checks.
+    
+*   Keep any generic parentNode logic that is used by other diagram types (e.g., IBD) intact—scope deletions only to SMD.
+    
+
+5.  Event wiring & triggers
+    
+
+*   Remove any event subscriptions that referenced composite internals (child add/move/delete, internal connections) and their resize/layout side-effects.
+    
+*   Ensure that undo/redo and rehydrate paths no longer call composite services.
+    
+
+6.  Styling & assets
+    
+
+*   Delete composite CSS classes, header chrome, and overlay art.
+    
+*   Confirm that SMD nodes (initial/state/final/choice) and transitions render identically as before.
+    
+
+Acceptance Criteria
+
+1.  No “Composite” item in the SMD palette; attempts to add a composite do nothing and produce no console errors.
+    
+2.  Building/running the app produces no imports or type references to smdComposite.
+    
+3.  Opening a saved diagram that previously contained composites succeeds without errors and shows all former child nodes at the root with preserved relative positions (visually similar layout).
+    
+4.  Internal transitions formerly inside the composite still connect the same child nodes at root level.
+    
+5.  Edges that previously targeted the composite are either reattached to the nearest former child or removed with a visible one-time migration note; the diagram remains valid and interactive.
+    
+6.  No regressions to SMD transitions (labels, arrows), selection, undo/redo, or performance.
+    
+
+Manual Test Plan
+
+*   Confirm the SMD palette: Initial, State, Final, (Choice if present). No Composite.
+    
+*   Load an older SMD with a composite containing several states and internal transitions:
+    
+    *   Children appear at root, positions look reasonable; transitions preserved.
+        
+    *   Any composite-boundary edges are reattached or listed in a migration banner.
+        
+*   Create new SMDs and verify basic flow (Initial → State → Final) works as before.
+    
+*   Run undo/redo after moving nodes—no composite code paths are invoked; no errors.
+    
+*   Validate that arrows and labels still render and remain synced with the inspector.
+    
+
+Files Likely Touched
+
+*   frontend/src/components/nodes/smd/CompositeNode.tsx (delete or archive)
+    
+*   frontend/src/components/palette/… (remove Composite from SMD section)
+    
+*   frontend/src/store/diagramStore.ts (types/registrations; remove composite triggers; add migration on rehydrate)
+    
+*   frontend/src/services/smd/autoResizeComposite\*.ts (remove)
+    
+*   frontend/src/utils/smdContainment.ts, smdConnectionPolicy.ts (remove/neutralize)
+    
+*   frontend/src/components/inspector/\* (remove composite inspector)
+    
+*   frontend/src/styles/\* (remove composite styles)
+    
+*   Any tests referencing composites; update snapshots/fixtures.
+    
+
+Changelog (prepare after merge)Version: 1.2.13
+
+Removed
+
+*   SMD Composite State and all related behaviors (containment, workspace overlay, auto-resize, boundary policies).Changed
+    
+*   Legacy diagrams with composites are migrated on load by flattening children to the root; composite-bound edges are reattached when possible or removed with a migration note.
