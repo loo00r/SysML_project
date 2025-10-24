@@ -34,9 +34,25 @@ const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGeneration
     };
   }
 
+  // Apply Dagre layout for better structure with SMD-specific adaptations
+  // Use Left-to-Right direction for natural state machine flow
+  // flexiblePositions allows using all 4 connection sides (top, left, right, bottom)
+  const layouted = applyDagreLayout(
+    parsed.nodes,
+    parsed.edges,
+    'LR', // Left to Right for natural state machine flow
+    {
+      nodeWidth: 180,           // Wider for state names
+      nodeHeight: 80,           // Taller for state content
+      nodeSep: 100,             // Vertical spacing between nodes (increased for top/bottom connections)
+      rankSep: 150,             // Horizontal spacing between ranks (increased for clarity)
+      flexiblePositions: true,  // Allow SMD to use all 4 sides for connections
+    }
+  );
+
   return {
-    nodes: parsed.nodes,
-    edges: parsed.edges,
+    nodes: layouted.nodes,
+    edges: layouted.edges,
     diagramType: 'smd',
     name: parsed.name,
     description: parsed.description,

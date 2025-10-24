@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.16] - 2025-10-24
+### Improved
+- SMD Test Mode layout now supports flexible 4-directional connections (top, left, right, bottom).
+- Dagre layout algorithm adapted for SMD with increased spacing (nodeSep: 100, rankSep: 150) for better clarity.
+- SMD nodes can now utilize all available connection sides based on geometric positioning, not just left-right.
+
+### Changed
+- Added `flexiblePositions` parameter to Dagre layout utility to disable fixed target/source positions for SMD diagrams.
+- Enhanced automatic edge routing to leverage top and left (inbound) and right and bottom (outbound) connections.
+
+## [1.2.15] - 2025-10-24
+### Changed
+- SMD Test Mode (JSON → SMD) now uses Dagre layout algorithm for improved diagram structure.
+- Applied Left-to-Right (LR) flow direction for natural state machine progression.
+- Configured optimized spacing for SMD diagrams: nodeWidth: 180, nodeHeight: 80, nodeSep: 80, rankSep: 120.
+
+### Fixed
+- SMD Test Mode diagrams now have proper hierarchical layout instead of random positioning.
+- State connections are automatically organized for better readability and visual coherence.
+
 ## [1.2.14] - 2025-10-24
 ### Changed
 - SMD nodes now accept inbound transitions only on LEFT and TOP sides; RIGHT and BOTTOM are source-only.
