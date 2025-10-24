@@ -232,8 +232,15 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
 
   const defaultPositionFor = createDefaultPositionFactory();
   const nodes: Node<NodeData>[] = [];
-  const parentRelations: Array<{ childId: string; parentId: string }> = [];
   const seenNodeIds = new Set<string>();
+  const createdNodes = new Map<string, Node<NodeData>>();
+
+  type PendingNode = {
+    record: Record<string, unknown>;
+    parentId: string | null;
+  };
+
+  const pending: PendingNode[] = [];
 
   for (const rawNode of rawNodes) {
     if (!isPlainObject(rawNode)) {
@@ -242,8 +249,15 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
         error: 'Each node must be an object.',
       };
     }
+    pending.push({ record: rawNode, parentId: null });
+  }
 
-    const nodeRecord = rawNode as Record<string, unknown>;
+  const childArrayKeys: Array<'children' | 'states'> = ['children', 'states'];
+
+  while (pending.length > 0) {
+    const next = pending.shift()!;
+    const nodeRecord = next.record;
+    const parentId = next.parentId;
 
     const id = toTrimmedString(nodeRecord['id']) ?? toTrimmedString(nodeRecord['uuid']);
     if (!id) {
@@ -273,8 +287,26 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
       };
     }
 
-    const parentId = extractParentId(nodeRecord);
-    const fallbackPosition = defaultPositionFor(parentId ?? null, nodeType);
+    if (parentId) {
+      const parentNode = createdNodes.get(parentId);
+      if (!parentNode) {
+        return {
+          success: false,
+          error: `Node "${id}" references missing parent "${parentId}".`,
+        };
+      }
+      if (parentNode.type !== 'smdComposite') {
+        return {
+          success: false,
+          error: `Node "${id}" references parent "${parentId}" which is not a composite state.`,
+        };
+      }
+    }
+
+    const explicitParentId = extractParentId(nodeRecord);
+    const resolvedParentId = explicitParentId ?? parentId;
+
+    const fallbackPosition = defaultPositionFor(resolvedParentId ?? null, nodeType);
     const position = normalizePosition(nodeRecord, fallbackPosition);
 
     const name =
@@ -320,33 +352,34 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
       draggable: true,
     };
 
-    if (parentId) {
-      node.parentNode = parentId;
+    if (resolvedParentId) {
+      node.parentNode = resolvedParentId;
       node.extent = 'parent';
-      parentRelations.push({ childId: id, parentId });
     }
 
     nodes.push(node);
     seenNodeIds.add(id);
+    createdNodes.set(id, node);
+
+    if (nodeType === 'smdComposite') {
+      childArrayKeys.forEach(key => {
+        const candidates = nodeRecord[key];
+        if (Array.isArray(candidates)) {
+          candidates.forEach(child => {
+            if (!isPlainObject(child)) {
+              return;
+            }
+            pending.push({
+              record: child,
+              parentId: id,
+            });
+          });
+        }
+      });
+    }
   }
 
   const nodeMap = new Map(nodes.map(node => [node.id, node]));
-
-  for (const relation of parentRelations) {
-    const parent = nodeMap.get(relation.parentId);
-    if (!parent) {
-      return {
-        success: false,
-        error: `Node "${relation.childId}" references missing parent "${relation.parentId}".`,
-      };
-    }
-    if (parent.type !== 'smdComposite') {
-      return {
-        success: false,
-        error: `Node "${relation.childId}" references parent "${relation.parentId}" which is not a composite state.`,
-      };
-    }
-  }
 
   const edges: Edge[] = [];
   const seenEdgeIds = new Set<string>();

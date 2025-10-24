@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
+- Test mode JSON parser now understands nested composite `children` arrays and assigns parent relationships automatically.
 
 ## [1.2.11] - 2025-10-24
 ### Added
