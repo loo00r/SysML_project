@@ -60,6 +60,8 @@ export type CompositeResizeReason =
   | 'drag-end'
   | 'layout-done'
   | 'hydrate'
+  | 'edge-add'
+  | 'edge-remove'
   | 'unknown';
 
 export interface ResizeCompositeOptions {
@@ -196,7 +198,12 @@ export const resizeCompositeToChildren = (
         targetWidth = clampValue(grownWidth, minWidth, maxWidth);
         targetHeight = clampValue(grownHeight, minHeight, maxHeight);
       }
-    } else if (reason === 'child-delete' || reason === 'layout-done' || reason === 'hydrate') {
+    } else if (
+      reason === 'child-delete' ||
+      reason === 'layout-done' ||
+      reason === 'hydrate' ||
+      reason === 'edge-remove'
+    ) {
       if (childCount === 0) {
         targetWidth = clampValue(Math.ceil(initialWidth), minWidth, maxWidth);
         targetHeight = clampValue(Math.ceil(initialHeight), minHeight, maxHeight);

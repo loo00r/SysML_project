@@ -55,91 +55,115 @@ Copy `.env.example` to `.env` and supply OpenAI keys plus database URLs before l
 
 ### new task
 
-Task SMD-04b — Fix arrow side on the auto-seeded SMD template
+Task SMD-05 — Auto-layout children inside CompositeState (basic)
 
-GoalWhen a new SMD is auto-seeded (Initial → State → Final), both transitions should show the arrow on the target node’s top side (as the template connects into top handles). Today, the arrow sometimes appears on the left side only for this seeded example, while manually created edges behave correctly.
+Goal
+Automatically arrange children of an SMD CompositeState from left to right using a Dagre profile (rankdir = LR), producing compact columns with a stable horizontal step and minimal crossings. This runs automatically (no UI control).
 
-HypothesisThe seeded transitions do not set explicit targetHandle/targetPosition, or they’re normalized after mount with a default fallback (“left”), so the node-level arrow overlay picks the wrong side. Manual edges carry the correct metadata, hence they render fine.
+Approach 
+Use dagre to compute ranks/order only for nodes that are direct children of a given composite and for transitions whose source and target are both those children. Convert the result to parent-local positions, snap to a fixed grid/step, write positions back to the store, and then call the existing resizeCompositeToChildren() to fit the container.
 
-Scope of work
+Scope of Work
 
-1.  Seed data: set explicit handle metadata
-    
-
-*   In the SMD scaffold builder that creates Initial → State and State → Final, set both:
-    
-    *   targetHandle: "top"
-        
-    *   targetPosition: Position.Top
-        
-*   Also set the source side explicitly (e.g., sourceHandle: "right", sourcePosition: Position.Right) to keep the graph fully deterministic.
+1.  Layout service
     
 
-2.  Normalization guard (store/utils)
+*   Add layoutSmdComposite(parentId: string, opts?) → Promise.
+    
+*   Build a dagre.graphlib.Graph({ multigraph: true, compound: false }).
+    
+*   Graph config: rankdir: "LR", nodesep: 48, ranksep: 96. Add a deterministic “stepX” of 180 to quantize x positions later for stability.
+    
+*   Filter children = nodes where node.parentNode === parentId and allowed types: initial, state, composite, final, choice.
+    
+*   Filter internal edges = edges with type === "smdTransition" and both endpoints in children.
+    
+*   For each child, provide width/height using measured node sizes from the store; if missing, use defaults: initial/final: 40×40; state: 160×64; composite: current measured or 220×150; choice: 28×28.
+    
+*   Run dagre.layout(g), read computed x/y for each child.
+    
+*   Convert to parent-local coordinates with padding: left/top = 24. Snap x to stepX multiples, y to 8px grid. Maintain deterministic ordering within the same rank by child.id (stable sort) before snapping.
+    
+*   Write back positions via a batched store update; afterwards call resizeCompositeToChildren(parentId).
     
 
-*   In the SMD transition normalizer (the code path that runs on create/rehydrate), add:
-    
-    *   If targetHandle is set to "top"|"right"|"bottom"|"left" and targetPosition is missing, derive Position.\* from the handle.
-        
-    *   If neither is present, derive the side from the target node’s nearest handle (distance check) and persist it.This ensures older diagrams or partial data can’t regress to “left”.
-        
-
-3.  Node overlay side resolution (arrow renderer)
+2.  Event wiring (no UI button)
     
 
-*   Side detection priority:
+*   Automatically run layoutSmdComposite(parentId) after:
+a. child add/remove,
+b. child move end,
+c. connect/disconnect internal transitions,
+d. undo/redo involving the composite’s internals,e. composite open/rehydrate (run once after children measured).
     
-    1.  from targetHandle (if one of "top"|"right"|"bottom"|"left")
-        
-    2.  else from targetPosition (Position.Top|Right|Bottom|Left)
-        
-    3.  else compute by geometry (endpoint vs. node center → pick nearest side)
-        
-*   Keep pointer-events: none, and ensure overlays re-evaluate on edge add/update/rehydrate.
+*   Debounce per-parent 150 ms and coalesce multiple triggers. Guard against re-entrancy (ignore triggers while a layout run is pending).
     
 
-4.  Mount timing
+3.  Safety/edge cases
     
 
-*   After seeding the diagram, schedule a one-tick RAF to ensure edges are mounted before computing inbound-sides for overlays. This avoids reading undefined positions on first paint.
+*   If dagre detects cycles, allow its acyclic pass; do not throw. Still produce a layout.
+    
+*   If there are zero or one internal edges, still arrange children in left-to-right columns by id order.
+    
+*   Ignore edges that cross the composite boundary (child ↔ outside) for ranking to avoid false constraints.
+    
+*   Do not move the composite itself; only children inside it.
+    
+*   Preserve user manual placement if an explicit “lockPosition” flag is set on a child (future-proofing). For now, all children are auto-placed.
     
 
-Acceptance criteria
-
-*   Creating a fresh SMD shows arrows on the top edge of State and Final in the seed (Initial → State → Final).
-    
-*   Manually drawn transitions continue to show correct arrows for left/right/top/bottom and self-loops.
-    
-*   After reload (rehydrate), the seed still shows top arrows (no fallback to left).
-    
-*   No visual regressions inside composites or across different tabs.
+4.  Interop with existing features
     
 
-Manual test plan
-
-1.  Create a new SMD: verify both seeded transitions point to the target node’s top side.
+*   Ensure overlay arrows and edge labels reflow correctly after node position updates.
     
-2.  Draw new transitions into each side of a State: arrows appear on matching sides.
+*   After layout, call resizeCompositeToChildren(parentId) so the container grows/shrinks to fit.
     
-3.  Reload the page (rehydrate): seeded arrows remain on top.
-    
-4.  Undo/redo movements of the State/Final: arrows keep correct sides.
-    
-5.  Repeat inside a Composite to confirm overlays stay above internals.
+*   Keep pointer events and selection state intact (no flicker).
     
 
-Files likely touched
+Acceptance Criteria
 
-*   frontend/src/services/smdScaffold.ts (or wherever the seed SMD is built)
+1.  On a representative example, children inside a CompositeState are arranged left → right with compact columns and no edge crossings in the common cases.
     
-*   frontend/src/utils/smdTransition.ts (normalizer/derivation helpers)
+2.  Layout runs automatically after adding/moving/deleting children, changing internal transitions, undo/redo, and on initial open after measurement.
     
-*   frontend/src/components/shared/ArrowHeadOverlay.tsx (side resolution tweak)
+3.  Horizontal spacing is stable and deterministic between runs (quantized to the fixed step).
     
-*   frontend/src/store/diagramStore.ts (if normalization lives here)
+4.  Composite resizes to fit the new arrangement (padding respected, no overlaps, children clamped inside).
+    
+5.  No regressions for SMD labels, arrows, or composite interactions.
     
 
-Changelog (prepare)Version: 1.2.9 - 2025-10-23 Fixed
+Manual Test Plan
 
-*   Seeded SMD template now renders arrowheads on the correct top side of target nodes; added robust target side derivation and rehydrate-safe normalization.
+*   Use the provided input (VehicleSystem): ensure the top-level flow is left → right (init → off → driving → charging → final). Inside “Driving”, its children (“Manual”, “Autopilot”, “Parking”) are arranged left → right with minimal crossings.
+    
+*   Add an extra transition inside Driving that could cause crossings; verify Dagre reduces crossings and positions remain stable.
+    
+*   Drag a child; on drag-end, auto-layout re-applies and composite resizes.
+    
+*   Add/remove a child; verify layout updates and remains deterministic across reload (rehydrate).
+    
+*   Create a child transition to an outside node; confirm it does not distort the internal layout.
+    
+
+Files Likely Touched
+
+*   frontend/src/services/layout/smdDagre.ts (new)
+    
+*   frontend/src/store/diagramStore.ts (layout triggers and batched updates)
+    
+*   frontend/src/components/nodes/smdComposite/\* (subscribe to measurement and fire initial layout)
+    
+*   frontend/src/utils/geometry.ts (parent-local snaps / quantization helpers)
+    
+*   package.json: add dependency “dagre” if not already present
+    
+
+Changelog (prepare after merge)Version: 1.3.0 - 2025-10-23 Added
+
+*   Automatic Dagre-based layout for children inside SMD CompositeState (LR ranks, compact columns, stable horizontal spacing).Improved
+    
+*   Composite containers now reflow automatically after child/edge edits with no manual UI action.

@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
+
+## [1.2.11] - 2025-10-24
+### Added
 - Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
 - Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+- Automatic Dagre-based layout for CompositeState children with per-parent debouncing and resize integration.
+- Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
 
 ### Improved
 - Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
@@ -19,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Seeded SMD template transitions now persist top-side metadata so node overlays render arrows on the intended handles after creation and reload.
+
+## [1.2.10] - 2025-10-24
+### Added
+- Automatic Dagre-based layout for CompositeState children with per-parent debouncing and resize integration.
 
 ## [1.2.9] - 2025-10-23
 ### Fixed

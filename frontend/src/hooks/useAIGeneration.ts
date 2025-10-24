@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import useDiagramStore from '../store/diagramStore';
+import useDiagramStore, { type DiagramType } from '../store/diagramStore';
 import { applyDagreLayout } from '../utils/dagreLayout';
+import { parseSmdTestModeInput } from '../utils/smdTestMode';
 
 // Types for AI generation
 interface AIGenerationOptions {
@@ -9,6 +10,7 @@ interface AIGenerationOptions {
   includeRelationships?: boolean;
   style?: 'technical' | 'conceptual';
   isEnhanced?: boolean;
+  testMode?: boolean;
 }
 
 interface AIGenerationResult {
@@ -17,7 +19,29 @@ interface AIGenerationResult {
   error?: string;
   diagramId?: string;
   ibdData?: any[]; // IBD data from Redis for creating IBD diagrams
+  diagramType?: DiagramType;
+  name?: string;
+  description?: string;
 }
+
+const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGenerationResult> => {
+  const parsed = parseSmdTestModeInput(rawJson);
+  if (parsed.success === false) {
+    return {
+      nodes: [],
+      edges: [],
+      error: parsed.error,
+    };
+  }
+
+  return {
+    nodes: parsed.nodes,
+    edges: parsed.edges,
+    diagramType: 'smd',
+    name: parsed.name,
+    description: parsed.description,
+  };
+};
 
 // Helper function to poll for diagram result
 const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
@@ -184,7 +208,9 @@ export const useAIGeneration = () => {
       }, 300);
       
       // Call the backend API service
-      const result = await callGenerateDiagramAPI(options);
+      const result = options.testMode
+        ? await generateTestModeSmdDiagram(options.prompt)
+        : await callGenerateDiagramAPI(options);
       
       clearInterval(progressInterval);
       
@@ -195,18 +221,32 @@ export const useAIGeneration = () => {
         // Create a new diagram tab with the generated content
         setProgress(100);
         
-        // Generate a name for the new diagram based on the prompt
-        const diagramName = options.prompt.split(' ').slice(0, 3).join(' ') + ' Diagram';
+        const defaultDiagramName = options.testMode
+          ? 'SMD Test Diagram'
+          : `${options.prompt.split(' ').slice(0, 3).join(' ')} Diagram`;
+
+        const resolvedName =
+          result.name && result.name.trim().length > 0
+            ? result.name.trim()
+            : defaultDiagramName.trim().length > 0
+              ? defaultDiagramName
+              : 'Generated Diagram';
+
+        const resolvedType: DiagramType = result.diagramType ?? (options.isEnhanced ? 'bdd_enhanced' : 'bdd');
+        const resolvedDescription =
+          result.description && result.description.trim().length > 0
+            ? result.description.trim()
+            : shortDescription;
         
         // Open a new diagram with the generated content
         openDiagram({
-          name: diagramName,
-          type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
+          name: resolvedName,
+          type: resolvedType,
           nodes: result.nodes,
           edges: result.edges,
-          description: shortDescription,
+          description: resolvedDescription,
           needsCentering: true, // Center new AI-generated diagrams
-          generatedDiagramId: result.diagramId // Store Redis diagram ID for saving
+          generatedDiagramId: options.testMode ? undefined : result.diagramId // Store Redis diagram ID for saving
         });
         
         // Create IBD diagrams for enhanced diagrams if IBD data exists

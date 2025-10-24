@@ -179,7 +179,9 @@ const DiagramWorkspace: React.FC = () => {
     toggleValidationPanel,
     addNode,
     scheduleCompositeResize,
+    scheduleCompositeLayout,
     flushAllCompositeResizes,
+    flushAllCompositeLayouts,
     onViewportChange,
     clearCenteringFlag,
   } = useDiagramStore();
@@ -205,9 +207,10 @@ const DiagramWorkspace: React.FC = () => {
 
   useEffect(() => {
     if (activeDiagram?.type === 'smd') {
+      flushAllCompositeLayouts({ reason: 'hydrate' });
       flushAllCompositeResizes({ reason: 'hydrate' });
     }
-  }, [activeDiagram?.id, activeDiagram?.type, flushAllCompositeResizes]);
+  }, [activeDiagram?.id, activeDiagram?.type, flushAllCompositeLayouts, flushAllCompositeResizes]);
   
   // Define edge styles based on diagram type and node count
   const defaultEdgeOptions = (() => {
@@ -691,6 +694,7 @@ const DiagramWorkspace: React.FC = () => {
         // Add the node to the diagram
         addNode(newNode);
         if (activeDiagram?.type === 'smd' && newNode.parentNode) {
+          scheduleCompositeLayout(newNode.parentNode, { reason: 'child-add' });
           scheduleCompositeResize(newNode.parentNode, { reason: 'child-add', flush: true });
         }
         const displayName = typeDisplayNames[nodeType] || `${nodeType} node`;
@@ -701,7 +705,7 @@ const DiagramWorkspace: React.FC = () => {
         showNotification('Failed to add node', 'error');
       }
     },
-    [addNode, scheduleCompositeResize, showNotification, project, activeDiagram?.type, nodes]
+    [addNode, scheduleCompositeLayout, scheduleCompositeResize, showNotification, project, activeDiagram?.type, nodes]
   );
 
   const handleNodeDragStop = useCallback(
@@ -711,10 +715,11 @@ const DiagramWorkspace: React.FC = () => {
         node.parentNode &&
         isSmdChildNode(node)
       ) {
+        scheduleCompositeLayout(node.parentNode, { reason: 'drag-end' });
         scheduleCompositeResize(node.parentNode, { reason: 'drag-end', flush: true });
       }
     },
-    [activeDiagram?.type, scheduleCompositeResize]
+    [activeDiagram?.type, scheduleCompositeLayout, scheduleCompositeResize]
   );
 
   const handleSelectionDragStop = useCallback(
@@ -733,11 +738,12 @@ const DiagramWorkspace: React.FC = () => {
       });
       if (parents.size > 0) {
         parents.forEach(parentId => {
+          scheduleCompositeLayout(parentId, { reason: 'drag-end' });
           scheduleCompositeResize(parentId, { reason: 'drag-end', flush: true });
         });
       }
     },
-    [activeDiagram?.type, scheduleCompositeResize]
+    [activeDiagram?.type, scheduleCompositeLayout, scheduleCompositeResize]
   );
 
   const handleConnect = useCallback((connection: Connection) => {

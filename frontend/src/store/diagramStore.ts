@@ -30,6 +30,11 @@ import {
   isSmdCompositeNode,
   type CompositeResizeReason,
 } from '../features/smd/composite/resizeService';
+import {
+  createCompositeLayoutScheduler,
+  type CompositeLayoutRequest,
+  type CompositeLayoutReason,
+} from '../features/smd/composite/layoutScheduler';
 import { getNodeChangeId } from '../utils/reactflowChanges';
 
 // Define node types based on SysML diagram elements
@@ -448,6 +453,10 @@ interface DiagramStoreState {
   scheduleCompositeResizes: (parentIds: Iterable<string>, options?: CompositeResizeOptions) => void;
   flushCompositeResizes: (parentIds: Iterable<string>, options?: CompositeResizeOptions) => void;
   flushAllCompositeResizes: (options?: CompositeResizeOptions) => void;
+  scheduleCompositeLayout: (parentId: string, options?: CompositeLayoutOptions) => void;
+  scheduleCompositeLayouts: (parentIds: Iterable<string>, options?: CompositeLayoutOptions) => void;
+  flushCompositeLayouts: (parentIds: Iterable<string>, options?: CompositeLayoutOptions) => void;
+  flushAllCompositeLayouts: (options?: CompositeLayoutOptions) => void;
   
   addEdge: (edge: Edge) => void;
   updateEdge: (id: string, data: Partial<Edge>) => void;
@@ -481,6 +490,11 @@ interface DiagramStoreState {
 
 type CompositeResizeOptions = {
   reason?: CompositeResizeReason;
+  flush?: boolean;
+};
+
+type CompositeLayoutOptions = {
+  reason?: CompositeLayoutReason;
   flush?: boolean;
 };
 
@@ -548,6 +562,57 @@ const useDiagramStore = create<DiagramStoreState>()(
         compositeResizeScheduler.flushMany(composites, request);
       };
 
+      const compositeLayoutScheduler = createCompositeLayoutScheduler({
+        getNodes: () => get().nodes,
+        getEdges: () => get().edges,
+        applyLayout: nodes => {
+          set({ nodes });
+          get().updateActiveDiagram({ nodes });
+        },
+        afterLayout: ({ parentId, result }) => {
+          if (result.changed) {
+            requestResize(parentId, { reason: 'layout-done', flush: true });
+          }
+        },
+      });
+
+      const toLayoutRequest = (options?: CompositeLayoutOptions): CompositeLayoutRequest | undefined =>
+        options?.reason ? { reason: options.reason } : undefined;
+
+      const requestLayout = (parentId: string, options?: CompositeLayoutOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        if (!parentId) return;
+        const request = toLayoutRequest(options);
+        if (options?.flush) {
+          compositeLayoutScheduler.flush(parentId, request);
+        } else {
+          compositeLayoutScheduler.schedule(parentId, request);
+        }
+      };
+
+      const requestLayoutMany = (parentIds: Iterable<string>, options?: CompositeLayoutOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        const ids = Array.from(new Set(parentIds));
+        if (ids.length === 0) return;
+        const request = toLayoutRequest(options);
+        if (options?.flush) {
+          compositeLayoutScheduler.flushMany(ids, request);
+        } else {
+          compositeLayoutScheduler.scheduleMany(ids, request);
+        }
+      };
+
+      const flushAllLayouts = (options?: CompositeLayoutOptions) => {
+        if (!isActiveSmdDiagram()) return;
+        const composites = get()
+          .nodes
+          .filter(isSmdCompositeNode)
+          .map(node => node.id);
+        if (composites.length === 0) return;
+        const request = toLayoutRequest(options);
+        compositeLayoutScheduler.flushMany(composites, request);
+      };
+
       return {
       // Initial state
       openDiagrams: [],
@@ -607,6 +672,11 @@ const useDiagramStore = create<DiagramStoreState>()(
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
     }));
+
+    if (diagramData.type === 'smd') {
+      flushAllLayouts({ reason: 'hydrate', flush: true });
+      flushAll({ reason: 'hydrate', flush: true });
+    }
   },
 
   openNewDiagramTab: (diagramData) => {
@@ -636,6 +706,11 @@ const useDiagramStore = create<DiagramStoreState>()(
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
     }));
+
+    if (rest.type === 'smd') {
+      flushAllLayouts({ reason: 'hydrate', flush: true });
+      flushAll({ reason: 'hydrate', flush: true });
+    }
   },
   
   closeDiagram: (diagramId) => {
@@ -1126,15 +1201,20 @@ const useDiagramStore = create<DiagramStoreState>()(
     const parentIds = new Set<string>();
     nodes.forEach(node => addParentIfSmdChild(node, parentIds));
     if (parentIds.size > 0) {
+      requestLayoutMany(parentIds, { reason: 'hydrate', flush: true });
       requestResizeMany(parentIds, { reason: 'hydrate', flush: true });
     } else if (isActiveSmdDiagram()) {
       // If no specific parents detected but we are in SMD, ensure composites stay in sync.
+      flushAllLayouts({ reason: 'hydrate', flush: true });
       flushAll({ reason: 'hydrate', flush: true });
     }
   },
   setEdges: (edges) => {
     set({ edges });
     get().updateActiveDiagram({ edges });
+    if (isActiveSmdDiagram()) {
+      flushAllLayouts({ reason: 'edge-add', flush: true });
+    }
   },
   
   onNodesChange: (changes) => {
@@ -1195,6 +1275,7 @@ const useDiagramStore = create<DiagramStoreState>()(
     get().updateActiveDiagram({ nodes: adjustedNodes });
 
     if (immediateParents.size > 0) {
+      requestLayoutMany(immediateParents, { reason: 'child-delete', flush: true });
       requestResizeMany(immediateParents, { reason: 'child-delete', flush: true });
     }
     if (affectedParents.size > 0) {
@@ -1203,9 +1284,44 @@ const useDiagramStore = create<DiagramStoreState>()(
   },
   
   onEdgesChange: (changes) => {
-    const newEdges = applyEdgeChanges(changes, get().edges);
+    const state = get();
+    const previousEdges = state.edges;
+    const newEdges = applyEdgeChanges(changes, previousEdges);
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+    if (activeDiagram?.type !== 'smd') {
+      return;
+    }
+
+    const nodeMap = new Map(state.nodes.map(node => [node.id, node]));
+    const affectedParents = new Set<string>();
+
+    changes.forEach(change => {
+      if (change.type !== 'remove') {
+        return;
+      }
+      const removedEdge = previousEdges.find(edge => edge.id === change.id);
+      if (!removedEdge) {
+        return;
+      }
+      const sourceParent = nodeMap.get(removedEdge.source ?? '')?.parentNode ?? null;
+      const targetParent = nodeMap.get(removedEdge.target ?? '')?.parentNode ?? null;
+      if (
+        sourceParent &&
+        targetParent &&
+        sourceParent === targetParent &&
+        sourceParent !== null
+      ) {
+        affectedParents.add(sourceParent);
+      }
+    });
+
+    if (affectedParents.size > 0) {
+      requestLayoutMany(affectedParents, { reason: 'edge-remove', flush: true });
+      requestResizeMany(affectedParents, { reason: 'edge-remove', flush: true });
+    }
   },
   
   onConnect: (connection) => {
@@ -1218,10 +1334,12 @@ const useDiagramStore = create<DiagramStoreState>()(
     const isSMD = activeDiagram?.type === 'smd';
 
     let newEdge: Edge;
+    let sourceNode: Node<NodeData> | undefined;
+    let targetNode: Node<NodeData> | undefined;
     
     if (isSMD) {
-      const sourceNode = state.nodes.find(node => node.id === connection.source);
-      const targetNode = state.nodes.find(node => node.id === connection.target);
+      sourceNode = state.nodes.find(node => node.id === connection.source);
+      targetNode = state.nodes.find(node => node.id === connection.target);
       newEdge = applySmdEdgeMetadata(
         withSmdTransitionDefaults({
           id: `e-${connection.source}-${connection.target}-${Date.now()}`,
@@ -1259,6 +1377,10 @@ const useDiagramStore = create<DiagramStoreState>()(
     const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
     state.updateActiveDiagram({ edges: newEdges });
+
+    if (isSMD && sourceNode?.parentNode && sourceNode.parentNode === targetNode?.parentNode) {
+      requestLayout(sourceNode.parentNode, { reason: 'edge-add' });
+    }
   },
   
   // Node operations
@@ -1271,6 +1393,7 @@ const useDiagramStore = create<DiagramStoreState>()(
     get().updateActiveDiagram({ nodes: newNodes });
     
     if (node.parentNode) {
+      requestLayout(node.parentNode, { reason: 'child-add' });
       requestResize(node.parentNode, { reason: 'child-add', flush: true });
     }
   },
@@ -1334,6 +1457,7 @@ const useDiagramStore = create<DiagramStoreState>()(
     get().updateActiveDiagram({ nodes: newNodes, edges: newEdges });
 
     if (nodeToRemove?.parentNode) {
+      requestLayout(nodeToRemove.parentNode, { reason: 'child-delete', flush: true });
       requestResize(nodeToRemove.parentNode, { reason: 'child-delete', flush: true });
     }
   },
@@ -1341,6 +1465,10 @@ const useDiagramStore = create<DiagramStoreState>()(
   scheduleCompositeResizes: (parentIds, options) => requestResizeMany(parentIds, options),
   flushCompositeResizes: (parentIds, options) => requestResizeMany(parentIds, { ...options, flush: true }),
   flushAllCompositeResizes: (options) => flushAll({ ...options, flush: true }),
+  scheduleCompositeLayout: (parentId, options) => requestLayout(parentId, options),
+  scheduleCompositeLayouts: (parentIds, options) => requestLayoutMany(parentIds, options),
+  flushCompositeLayouts: (parentIds, options) => requestLayoutMany(parentIds, { ...options, flush: true }),
+  flushAllCompositeLayouts: (options) => flushAllLayouts({ ...options, flush: true }),
   
   // Edge operations
   addEdge: (edge) => {
@@ -1356,6 +1484,14 @@ const useDiagramStore = create<DiagramStoreState>()(
     const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    if (
+      newEdge.type === 'smdTransition' &&
+      sourceNode?.parentNode &&
+      sourceNode.parentNode === targetNode?.parentNode
+    ) {
+      requestLayout(sourceNode.parentNode, { reason: 'edge-add' });
+    }
   },
   
   updateEdge: (id, data) => {
@@ -1414,10 +1550,30 @@ const useDiagramStore = create<DiagramStoreState>()(
   removeEdge: (id) => {
     // Save current state before removing edge
     get().saveToHistory();
+
+    const state = get();
+    const edgeToRemove = state.edges.find(edge => edge.id === id);
     
-    const newEdges = get().edges.filter(edge => edge.id !== id);
+    const newEdges = state.edges.filter(edge => edge.id !== id);
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+    if (activeDiagram?.type !== 'smd' || !edgeToRemove) {
+      return;
+    }
+
+    const sourceNode = state.nodes.find(node => node.id === edgeToRemove.source);
+    const targetNode = state.nodes.find(node => node.id === edgeToRemove.target);
+    const sharedParent =
+      sourceNode?.parentNode && sourceNode.parentNode === targetNode?.parentNode
+        ? sourceNode.parentNode
+        : null;
+
+    if (sharedParent) {
+      requestLayout(sharedParent, { reason: 'edge-remove', flush: true });
+      requestResize(sharedParent, { reason: 'edge-remove', flush: true });
+    }
   },
   
   // Selection operations
@@ -1623,6 +1779,7 @@ const useDiagramStore = create<DiagramStoreState>()(
       }
     });
 
+    flushAllLayouts({ reason: 'undo-redo', flush: true });
     flushAll({ reason: 'hydrate', flush: true });
   },
   
@@ -1650,6 +1807,7 @@ const useDiagramStore = create<DiagramStoreState>()(
       }
     });
 
+    flushAllLayouts({ reason: 'undo-redo', flush: true });
     flushAll({ reason: 'hydrate', flush: true });
   },
   
