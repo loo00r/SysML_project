@@ -629,6 +629,14 @@ const DiagramWorkspace: React.FC = () => {
   const handleConnect = useCallback((connection: Connection) => {
     // SMD Policy: Reject connections targeting RIGHT or BOTTOM
     if (activeDiagram?.type === 'smd') {
+      const targetNode = nodes.find(n => n.id === connection.target);
+
+      // Initial node cannot receive any inbound transitions
+      if (targetNode?.type === 'smdInitial') {
+        showNotification('Initial state cannot receive inbound transitions. It is the entry point of the state machine.', 'warning');
+        return;
+      }
+
       const targetHandle = connection.targetHandle?.toLowerCase() || '';
 
       // Check if target handle is RIGHT or BOTTOM (disallowed)
@@ -639,7 +647,6 @@ const DiagramWorkspace: React.FC = () => {
 
       // Also check by position if no explicit handle
       if (!connection.targetHandle) {
-        const targetNode = nodes.find(n => n.id === connection.target);
         const sourceNode = nodes.find(n => n.id === connection.source);
 
         if (targetNode && sourceNode) {

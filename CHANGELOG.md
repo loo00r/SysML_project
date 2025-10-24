@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - SMD nodes now accept inbound transitions only on LEFT and TOP sides; RIGHT and BOTTOM are source-only.
 - Connection validation prevents creating transitions to RIGHT/BOTTOM sides with user-friendly warnings.
-- Initial nodes are now strictly source-only (no target handles).
+- Initial nodes have visual handles for symmetry but validation strictly prevents any inbound transitions.
 
 ### Fixed
 - Imported/Test-Mode diagrams automatically normalize invalid target sides (RIGHT/BOTTOM → LEFT/TOP).
