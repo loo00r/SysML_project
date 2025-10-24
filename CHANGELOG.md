@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.14] - 2025-10-24
+### Changed
+- SMD nodes now accept inbound transitions only on LEFT and TOP sides; RIGHT and BOTTOM are source-only.
+- Connection validation prevents creating transitions to RIGHT/BOTTOM sides with user-friendly warnings.
+- Initial nodes are now strictly source-only (no target handles).
+
+### Fixed
+- Imported/Test-Mode diagrams automatically normalize invalid target sides (RIGHT/BOTTOM → LEFT/TOP).
+- Arrow overlays no longer render on disallowed RIGHT/BOTTOM sides, eliminating duplicate arrow issues.
+- Edge normalization remaps invalid target positions based on geometric heuristics to maintain visual coherence.
+
 ## [1.2.13] - 2025-10-24
 ### Removed
 - SMD Composite State and all related behaviors (containment, workspace overlay, auto-resize, boundary policies).

@@ -30,10 +30,9 @@ const handleStyle = {
 
 const SmdInitialNode: React.FC<NodeProps> = ({ selected }) => (
   <Container>
-    <Handle type="target" position={Position.Top} style={handleStyle} />
-    <Handle type="source" position={Position.Right} style={handleStyle} />
-    <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
-    <Handle type="source" position={Position.Bottom} style={handleStyle} />
+    {/* Initial node is source-only, no target handles */}
+    <Handle id="out-right" type="source" position={Position.Right} style={handleStyle} />
+    <Handle id="out-bottom" type="source" position={Position.Bottom} style={handleStyle} />
     <InitialCore selected={selected} />
   </Container>
 );

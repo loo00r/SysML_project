@@ -179,138 +179,96 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task SMD-05R — Remove Composite State from SMD (and all dependencies)
+Task SMD-06 — Enforce inbound-only sides (Left/Top) for SMD targets
 
 Goal
-Fully remove the SMD Composite State feature. That includes the node type, palette item, containment/parenting, auto-resize, overlays, policies, and any code paths that assume children inside a composite. Existing diagrams that contain composites must load without crashing; their contents should be flattened into the SMD root.
+In SMD diagrams, nodes must accept incoming transitions only on LEFT and TOP. RIGHT and BOTTOM are source-only (no inbound arrows). Prevent creating such connections in the UI, normalize imported/Test-Mode JSON, and avoid rendering arrows on disallowed sides.
 
 Scope of Work
 
-1.  De-register and delete the Composite node type
+1.  Handle policy on SMD nodes
     
 
-*   Remove smdComposite from SMD nodeTypes registration and palette.
+*   State / Final / Choice: enable target handles only on LEFT and TOP; enable source handles only on RIGHT and BOTTOM.
     
-*   Delete/retire the component (e.g., CompositeNode.tsx) and styles/icons tied to it.
+*   Initial: source-only (no targets).
     
-*   Remove Composite from seeded SMD examples and creation handles.
-    
-*   Update SMD unions/types so SmdNodeType no longer includes "composite".
+*   Ensure React Flow handle props reflect this (isTarget false for RIGHT/BOTTOM).
     
 
-2.  Remove Composite-specific behaviors
+2.  Connection guard
     
 
-*   Delete/disable composite containment (no more parentNode usage for SMD children).
+*   In onConnect/validateConnection for SMD transitions, reject connections whose target handle is RIGHT or BOTTOM.
     
-*   Remove composite workspace overlay (“hollow frame”, header), internal drag clamps, soft boundary rules, and external-connection policies.
-    
-*   Delete the composite auto-resize service and its debounced triggers (e.g., resizeCompositeToChildren, RAF schedulers).
-    
-*   Remove any composite-aware edge routing/port logic.
+*   Optional UX: if the user drops near a disallowed side, auto-snap to the nearest allowed side (prefer LEFT, else TOP) and show a brief toast (“Right/Bottom are out-handles”).
     
 
-3.  Data model & migration (rehydrate-time)
+3.  Arrow overlay filter
     
 
-*   On load, detect any smdComposite in persisted SMD diagrams and **flatten** them:
+*   When computing inbound sides for node-drawn arrows, ignore RIGHT/BOTTOM even if legacy edges still point there. No arrow should render for disallowed sides.
     
-    *   Promote each child (nodes whose parentNode === composite.id) to the diagram root: clear parentNode.
+
+4.  Normalization & migration (rehydrate + Test Mode JSON import)
+    
+
+*   During edge normalization, if targetPosition ∈ {Right, Bottom} (or targetHandle indicates those sides), remap to an allowed side:
+    
+    *   If |dx| ≥ |dy| → set targetPosition = Left (and targetHandle='left').
         
-    *   Convert child positions from parent-local to absolute by adding the composite’s top-left workspace offset + padding (ensure they remain within canvas bounds).
+    *   Else → set targetPosition = Top (and targetHandle='top').
         
-    *   Internal transitions between children remain as normal transitions (source/target now refer to root-level nodes).
-        
-    *   Edges that referenced the composite directly as source or target:
-        
-        *   Try to reattach to the nearest former child (by center distance to the original attach side).
-            
-        *   If no valid child exists, drop the edge and record a non-blocking migration note (collect into a banner/toast with the list of removed edge IDs).
-            
-*   After migration, persist the new diagram JSON immediately to avoid re-running migration.
+*   Persist the corrected edge immediately (single one-time migration per diagram/import) to prevent regressions.
     
 
-4.  Store, selectors, and inspectors
+5.  Safety
     
 
-*   Remove composite-specific selectors and inspector panels.
+*   Do not change source side logic.
     
-*   Ensure SMD edge label editing, arrows, selection, and pointer-events continue to work without any composite checks.
+*   Self-loops: apply the same rule—loop targets may land only on LEFT/TOP.
     
-*   Keep any generic parentNode logic that is used by other diagram types (e.g., IBD) intact—scope deletions only to SMD.
-    
-
-5.  Event wiring & triggers
-    
-
-*   Remove any event subscriptions that referenced composite internals (child add/move/delete, internal connections) and their resize/layout side-effects.
-    
-*   Ensure that undo/redo and rehydrate paths no longer call composite services.
-    
-
-6.  Styling & assets
-    
-
-*   Delete composite CSS classes, header chrome, and overlay art.
-    
-*   Confirm that SMD nodes (initial/state/final/choice) and transitions render identically as before.
+*   Unit/utility: extract normalizeSmdTargetSide(edge, targetNodeBounds) so Test Mode and rehydrate share the same logic.
     
 
 Acceptance Criteria
 
-1.  No “Composite” item in the SMD palette; attempts to add a composite do nothing and produce no console errors.
+1.  It’s impossible to create an SMD edge that targets RIGHT or BOTTOM (UI validation blocks or auto-snaps).
     
-2.  Building/running the app produces no imports or type references to smdComposite.
+2.  Imported/Test-Mode JSON that targets RIGHT/BOTTOM gets normalized to LEFT/TOP; no duplicate arrows appear.
     
-3.  Opening a saved diagram that previously contained composites succeeds without errors and shows all former child nodes at the root with preserved relative positions (visually similar layout).
+3.  Node arrow overlays never render on RIGHT/BOTTOM.
     
-4.  Internal transitions formerly inside the composite still connect the same child nodes at root level.
+4.  Existing behavior for labels, selection, and arrows on allowed sides remains unchanged.
     
-5.  Edges that previously targeted the composite are either reattached to the nearest former child or removed with a visible one-time migration note; the diagram remains valid and interactive.
-    
-6.  No regressions to SMD transitions (labels, arrows), selection, undo/redo, or performance.
+5.  The screenshot case (double arrow at left and right) no longer reproduces.
     
 
 Manual Test Plan
 
-*   Confirm the SMD palette: Initial, State, Final, (Choice if present). No Composite.
+*   Drag to connect into LEFT/TOP → succeeds; into RIGHT/BOTTOM → blocked or snapped, no console errors.
     
-*   Load an older SMD with a composite containing several states and internal transitions:
+*   Import the provided JSON where a transition targets RIGHT/BOTTOM → arrow ends up on LEFT or TOP after normalization.
     
-    *   Children appear at root, positions look reasonable; transitions preserved.
-        
-    *   Any composite-boundary edges are reattached or listed in a migration banner.
-        
-*   Create new SMDs and verify basic flow (Initial → State → Final) works as before.
+*   Create self-loop targeting RIGHT/BOTTOM → blocked; LEFT/TOP → allowed.
     
-*   Run undo/redo after moving nodes—no composite code paths are invoked; no errors.
-    
-*   Validate that arrows and labels still render and remain synced with the inspector.
+*   Undo/redo and reload → constraints persist.
     
 
 Files Likely Touched
 
-*   frontend/src/components/nodes/smd/CompositeNode.tsx (delete or archive)
+*   frontend/src/components/nodes/smd/StateNode.tsx, FinalNode.tsx, ChoiceNode.tsx (handle props)
     
-*   frontend/src/components/palette/… (remove Composite from SMD section)
+*   frontend/src/edges/smdTransition/validateConnection.ts (or equivalent)
     
-*   frontend/src/store/diagramStore.ts (types/registrations; remove composite triggers; add migration on rehydrate)
+*   frontend/src/utils/smdTransition.ts (normalizeSmdTargetSide)
     
-*   frontend/src/services/smd/autoResizeComposite\*.ts (remove)
+*   frontend/src/components/shared/ArrowHeadOverlay.tsx (filter sides)
     
-*   frontend/src/utils/smdContainment.ts, smdConnectionPolicy.ts (remove/neutralize)
-    
-*   frontend/src/components/inspector/\* (remove composite inspector)
-    
-*   frontend/src/styles/\* (remove composite styles)
-    
-*   Any tests referencing composites; update snapshots/fixtures.
+*   frontend/src/services/imports/smdFromJson.ts (Test Mode normalization hook)
     
 
-Changelog (prepare after merge)Version: 1.2.13
-
-Removed
-
-*   SMD Composite State and all related behaviors (containment, workspace overlay, auto-resize, boundary policies).Changed
-    
-*   Legacy diagrams with composites are migrated on load by flattening children to the root; composite-bound edges are reattached when possible or removed with a migration note.
+Changelog (prepare)
+Version: 1.2.14 
+Changed — SMD nodes accept inbound transitions only on LEFT/TOP; RIGHT/BOTTOM are source-only.Fixed — Imported/Test-Mode diagrams normalize invalid target sides and no longer show duplicate arrows.

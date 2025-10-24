@@ -627,8 +627,41 @@ const DiagramWorkspace: React.FC = () => {
   );
 
   const handleConnect = useCallback((connection: Connection) => {
+    // SMD Policy: Reject connections targeting RIGHT or BOTTOM
+    if (activeDiagram?.type === 'smd') {
+      const targetHandle = connection.targetHandle?.toLowerCase() || '';
+
+      // Check if target handle is RIGHT or BOTTOM (disallowed)
+      if (targetHandle.includes('right') || targetHandle.includes('bottom')) {
+        showNotification('SMD nodes can only receive transitions on LEFT or TOP sides. RIGHT and BOTTOM are source-only.', 'warning');
+        return;
+      }
+
+      // Also check by position if no explicit handle
+      if (!connection.targetHandle) {
+        const targetNode = nodes.find(n => n.id === connection.target);
+        const sourceNode = nodes.find(n => n.id === connection.source);
+
+        if (targetNode && sourceNode) {
+          const dx = sourceNode.position.x - targetNode.position.x;
+          const dy = sourceNode.position.y - targetNode.position.y;
+
+          // Infer target side from geometry
+          const isHorizontalDominant = Math.abs(dx) >= Math.abs(dy);
+          const inferredSide = isHorizontalDominant
+            ? (dx > 0 ? 'right' : 'left')
+            : (dy > 0 ? 'bottom' : 'top');
+
+          if (inferredSide === 'right' || inferredSide === 'bottom') {
+            showNotification('SMD nodes can only receive transitions on LEFT or TOP sides.', 'warning');
+            return;
+          }
+        }
+      }
+    }
+
     storeOnConnect(connection);
-  }, [storeOnConnect]);
+  }, [storeOnConnect, activeDiagram?.type, nodes, showNotification]);
 
   // Render empty state when no diagram is active
   if (!activeDiagram) {

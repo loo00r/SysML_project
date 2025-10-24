@@ -23,6 +23,9 @@ const POSITION_TO_SIDE: Record<string, ArrowSide> = {
 
 const ORDER: ArrowSide[] = ['top', 'right', 'bottom', 'left'];
 
+// SMD policy: only LEFT and TOP can be inbound (target) sides
+const ALLOWED_INBOUND_SIDES: Set<ArrowSide> = new Set(['left', 'top']);
+
 const normalizeKey = (value?: string | null): string | null =>
   value ? value.toLowerCase() : null;
 
@@ -101,7 +104,8 @@ const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
       }
 
       const side = inferSide(edge, nodeMap.get(edge.source ?? ''), nodeMap.get(edge.target ?? ''));
-      if (side) {
+      // Filter out disallowed inbound sides (RIGHT/BOTTOM)
+      if (side && ALLOWED_INBOUND_SIDES.has(side)) {
         sideSet.add(side);
       }
     });
