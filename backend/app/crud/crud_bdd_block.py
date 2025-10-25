@@ -45,17 +45,20 @@ async def sync_bdd_blocks(
             continue
         block_name = element.get('name') or block_id
         block_description = element.get('description')
+        block_type = element.get('type')
 
 
         if block_id in existing_map:
             block = existing_map[block_id]
             block.block_name = block_name
             block.block_description = block_description
+            block.block_type = block_type
         else:
             block_data = BDDBlockCreate(
                 parent_bdd_diagram_id=parent_bdd_diagram_id,
                 block_id=block_id,
                 block_name=block_name,
+                block_type=block_type,
                 block_description=block_description
             )
             block = models.BDDBlock(**block_data.model_dump())

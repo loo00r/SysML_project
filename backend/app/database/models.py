@@ -90,6 +90,7 @@ class BDDBlock(Base):
     parent_bdd_diagram_id = Column(Integer, ForeignKey("diagram_embeddings.id"), nullable=False, index=True)
     block_id = Column(String, nullable=False, index=True)
     block_name = Column(String, nullable=False)
+    block_type = Column(String, nullable=True)
     block_description = Column(Text, nullable=True)
 
     __table_args__ = (
@@ -100,6 +101,7 @@ class BDDBlockCreate(BaseModel):
     parent_bdd_diagram_id: int
     block_id: str
     block_name: str
+    block_type: Optional[str] = None
     block_description: Optional[str] = None
 
 class BDDBlockResponse(BaseModel):
@@ -107,6 +109,7 @@ class BDDBlockResponse(BaseModel):
     parent_bdd_diagram_id: int
     block_id: str
     block_name: str
+    block_type: Optional[str] = None
     block_description: Optional[str] = None
     created_at: datetime
 

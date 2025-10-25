@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS bdd_blocks (
     parent_bdd_diagram_id INTEGER NOT NULL REFERENCES diagram_embeddings(id),
     block_id TEXT NOT NULL,
     block_name TEXT NOT NULL,
+    block_type TEXT,
     block_description TEXT,
     CONSTRAINT uq_bdd_block_parent UNIQUE (parent_bdd_diagram_id, block_id)
 );

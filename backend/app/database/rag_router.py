@@ -18,6 +18,7 @@ from app.database.models import (
 from app.database.embeddings import (
     store_diagram_with_embedding, 
     find_similar_diagrams,
+    find_similar_ibds,
     get_template_by_type,
     get_components_by_type
 )
@@ -132,45 +133,34 @@ async def generate_ibd_for_block_async(
 
         one_shot_examples: List[Dict[str, Any]] = []
         if use_rag:
-            query_parts = [block_name, block_type]
-            if block_description:
-                query_parts.append(block_description)
-            query_text = " - ".join(part for part in query_parts if part)
-            if not query_text:
-                query_text = block_id
-
             try:
-                similar_ibds = await find_similar_diagrams(
+                similar_ibds = await find_similar_ibds(
                     db=db,
-                    query_text=query_text,
-                    limit=1,
-                    diagram_type="ibd",
-                    include_scores=True
+                    block_name=block_name,
+                    block_type=block_type,
+                    limit=2
                 )
             except Exception as rag_error:
                 print(f"generate_ibd_for_block_async: RAG lookup failed for {block_name}: {rag_error}")
+                similar_ibds = []
+
+            if similar_ibds:
+                for existing_ibd in similar_ibds:
+                    nodes = existing_ibd.nodes or []
+                    edges = existing_ibd.edges or []
+                    if not nodes or not edges:
+                        continue
+                    one_shot_examples.append({
+                        "input": block_name,
+                        "output": {
+                            "nodes": nodes,
+                            "edges": edges
+                        }
+                    })
+                if one_shot_examples:
+                    print(f"Using {len(one_shot_examples)} IBD RAG example(s) for {block_name}")
             else:
-                if similar_ibds:
-                    best_match = similar_ibds[0]
-                    similarity_score = getattr(best_match, "similarity_score", None)
-                    if similarity_score is not None:
-                        print(f"Found similar IBD for {block_name} with score {similarity_score:.4f}")
-                    ibd_json = getattr(best_match, "diagram_json", {}) or {}
-                    nodes = ibd_json.get("nodes") or ibd_json.get("elements") or []
-                    edges = ibd_json.get("edges") or []
-                    if nodes and edges:
-                        one_shot_examples.append({
-                            "input": best_match.raw_text or block_name,
-                            "output": {
-                                "nodes": nodes,
-                                "edges": edges
-                            }
-                        })
-                        print(f"Using IBD RAG example for {block_name} with {len(nodes)} nodes")
-                    else:
-                        print(f"Similar IBD example for {block_name} missing nodes/edges, skipping RAG example")
-                else:
-                    print(f"No similar IBDs found for {block_name}, proceeding without RAG examples")
+                print(f"No similar IBDs found for {block_name}, proceeding without RAG examples")
 
         ibd_result = generate_ibd_diagram(
             block_id=block_id,
