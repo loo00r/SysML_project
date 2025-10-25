@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import json
 
 from app.db.dependencies import get_db
@@ -19,7 +19,7 @@ from app.database.embeddings import (
     get_template_by_type,
     get_components_by_type
 )
-from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, DiagramPositioning
+from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, generate_ibd_diagram, DiagramPositioning
 from app.crud import crud_ibd
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
@@ -33,6 +33,113 @@ def identify_diagram_candidates(
     ibd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     smd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     return ibd_candidates, smd_candidates
+
+async def generate_ibd_for_block_async(
+    block: Dict[str, Any],
+    system_context: str,
+    relationships: List[Dict[str, Any]],
+    db: AsyncSession,
+    use_rag: bool
+) -> Optional[Dict[str, Any]]:
+    """
+    Async helper to generate an Internal Block Diagram for a single block.
+    """
+    block_id = block.get("id")
+    if not block_id:
+        print("generate_ibd_for_block_async: Skipping block without 'id'")
+        return None
+
+    block_name = block.get("name", "Unnamed Block")
+    block_type = block.get("type", "block")
+    block_description = block.get("description", "")
+
+    try:
+        # Focus the parent relationships on the current block only.
+        block_relationships: List[Dict[str, Any]] = []
+        for rel in relationships or []:
+            source_id = rel.get("source_id") or rel.get("source")
+            target_id = rel.get("target_id") or rel.get("target")
+            if block_id in {source_id, target_id}:
+                block_relationships.append({
+                    "source": source_id,
+                    "target": target_id,
+                    "label": rel.get("name") or rel.get("label") or ""
+                })
+
+        one_shot_examples: List[Dict[str, Any]] = []
+        if use_rag:
+            query_parts = [block_name, block_type]
+            if block_description:
+                query_parts.append(block_description)
+            query_text = " - ".join(part for part in query_parts if part)
+            if not query_text:
+                query_text = block_id
+
+            try:
+                similar_ibds = await find_similar_diagrams(
+                    db=db,
+                    query_text=query_text,
+                    limit=1,
+                    diagram_type="ibd",
+                    include_scores=True
+                )
+            except Exception as rag_error:
+                print(f"generate_ibd_for_block_async: RAG lookup failed for {block_name}: {rag_error}")
+            else:
+                if similar_ibds:
+                    best_match = similar_ibds[0]
+                    similarity_score = getattr(best_match, "similarity_score", None)
+                    if similarity_score is not None:
+                        print(f"Found similar IBD for {block_name} with score {similarity_score:.4f}")
+                    ibd_json = getattr(best_match, "diagram_json", {}) or {}
+                    nodes = ibd_json.get("nodes") or ibd_json.get("elements") or []
+                    edges = ibd_json.get("edges") or []
+                    if nodes and edges:
+                        one_shot_examples.append({
+                            "input": best_match.raw_text or block_name,
+                            "output": {
+                                "nodes": nodes,
+                                "edges": edges
+                            }
+                        })
+                        print(f"Using IBD RAG example for {block_name} with {len(nodes)} nodes")
+                    else:
+                        print(f"Similar IBD example for {block_name} missing nodes/edges, skipping RAG example")
+                else:
+                    print(f"No similar IBDs found for {block_name}, proceeding without RAG examples")
+
+        ibd_result = generate_ibd_diagram(
+            block_id=block_id,
+            block_name=block_name,
+            block_description=block_description,
+            block_type=block_type,
+            system_context=system_context,
+            parent_relationships=block_relationships,
+            one_shot_examples=one_shot_examples or None
+        )
+
+        if ibd_result.get("error"):
+            print(f"generate_ibd_for_block_async: IBD generation failed for {block_name}: {ibd_result['error']}")
+            return None
+
+        ibd_raw = ibd_result.get("ibd_raw") or {}
+        nodes = ibd_raw.get("nodes") or []
+        edges = ibd_raw.get("edges") or []
+
+        if not nodes:
+            print(f"generate_ibd_for_block_async: No nodes returned for {block_name}, skipping result")
+            return None
+
+        return {
+            "parent_block_id": block_id,
+            "nodes": nodes,
+            "edges": edges
+        }
+
+    except Exception as exc:
+        print(f"generate_ibd_for_block_async: Unexpected error for {block_name}: {exc}")
+        return None
+
 
 @router.post("/diagrams/", response_model=DiagramEmbeddingResponse)
 async def create_diagram_embedding(

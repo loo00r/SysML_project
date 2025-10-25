@@ -210,28 +210,5 @@ The application now features a **tabbed interface** for managing multiple diagra
 - All original functionality preserved (save, export, validation, etc.)
 
 ### NEW TASK
-### TASK-4: Test IBD quality improvement
-**Type**: Testing
-**Priority**: High
-**Story Points**: 3
-
-**Description**:
-Test new IBD generation vs old nested approach. Measure quality, detail level, and correctness.
-
-**Test cases**:
-- Battery Pack IBD (automotive domain)
-- Flight Controller IBD (aerospace domain)
-- Server IBD (IT domain)
-
-**Acceptance Criteria**:
-- [ ] 3+ test cases documented
-- [ ] Quality comparison: nested vs chain (target: 70% → 90%+)
-- [ ] IBD has 3-7 components (vs 1-3 in nested)
-- [ ] Edges have meaningful labels
-- [ ] Components have descriptions and properties
-
-**Reference**: `docs/CHAIN_PROMPTING_COMPARISON.md` (Real-World Example)
-
-**Dependencies**: TASK-3
 
 ---
