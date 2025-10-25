@@ -28,7 +28,7 @@ from app.AI.diagram_generation import (
     generate_state_machine_diagram,
     DiagramPositioning
 )
-from app.crud import crud_ibd, crud_smd
+from app.crud import crud_ibd, crud_smd, crud_bdd_block
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -639,7 +639,15 @@ async def save_diagram_to_database(
             diagram_type="bdd",  # Always save as 'bdd' for RAG consistency
             diagram_json=cached_diagram["diagram"]
         )
-        
+
+        # Sync BDD blocks table for structured reuse
+        diagram_elements = (cached_diagram.get("diagram") or {}).get("elements", [])
+        bdd_block_map = await crud_bdd_block.sync_bdd_blocks(
+            db=db,
+            parent_bdd_diagram_id=db_diagram.id,
+            elements=diagram_elements
+        )
+
         # Normalize IBD payloads (supports both unified ibd_data list and legacy nested format)
         normalized_ibds: List[Dict[str, Any]] = []
         raw_diagram = cached_diagram.get("diagram") or {}
@@ -681,27 +689,40 @@ async def save_diagram_to_database(
         saved_ibd_count = 0
 
         for ibd_data in normalized_ibds:
+            parent_block_id = ibd_data["parent_block_id"]
+            block_ref = bdd_block_map.get(parent_block_id)
+            if block_ref is None:
+                block_ref = await crud_bdd_block.get_block_by_parent_and_id(
+                    db=db,
+                    parent_bdd_diagram_id=db_diagram.id,
+                    block_id=parent_block_id
+                )
+
             existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
                 db=db,
                 parent_bdd_id=db_diagram.id,
-                block_id=ibd_data["parent_block_id"]
+                block_id=parent_block_id
             )
+
+            parent_block_ref_id = getattr(block_ref, "id", None)
 
             if existing_ibd:
                 # IBD already exists -> UPDATE it
-                print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
+                print(f"DEBUG: Found existing IBD for block {parent_block_id}. Updating...")
                 await crud_ibd.update_ibd(
                     db=db,
                     db_ibd=existing_ibd,
                     nodes=ibd_data["nodes"],
-                    edges=ibd_data["edges"]
+                    edges=ibd_data["edges"],
+                    parent_block_ref_id=parent_block_ref_id
                 )
             else:
                 # IBD does not exist -> CREATE it
-                print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
+                print(f"DEBUG: No existing IBD for block {parent_block_id}. Creating new...")
                 new_ibd = InternalBlockDiagramCreate(
                     parent_bdd_diagram_id=db_diagram.id,
-                    parent_block_id=ibd_data["parent_block_id"],
+                    parent_block_id=parent_block_id,
+                    parent_block_ref_id=parent_block_ref_id,
                     nodes=ibd_data["nodes"],
                     edges=ibd_data["edges"],
                     source="ai"
@@ -722,6 +743,18 @@ async def save_diagram_to_database(
             edges = smd_data.get("edges", [])
             parent_block_name = smd_data.get("parent_block_name")
 
+            block_ref = bdd_block_map.get(parent_block_id)
+            if block_ref is None:
+                block_ref = await crud_bdd_block.get_block_by_parent_and_id(
+                    db=db,
+                    parent_bdd_diagram_id=db_diagram.id,
+                    block_id=parent_block_id
+                )
+            parent_block_ref_id = getattr(block_ref, "id", None)
+
+            if parent_block_name is None and block_ref is not None:
+                parent_block_name = block_ref.block_name
+
             existing_smd = await crud_smd.get_smd_by_parent_and_block(
                 db=db,
                 parent_bdd_id=db_diagram.id,
@@ -735,13 +768,15 @@ async def save_diagram_to_database(
                     db_smd=existing_smd,
                     states=nodes,
                     transitions=edges,
-                    parent_block_name=parent_block_name
+                    parent_block_name=parent_block_name,
+                    parent_block_ref_id=parent_block_ref_id
                 )
             else:
                 print(f"DEBUG: Creating new SMD for block {parent_block_id}")
                 new_smd = StateMachineDiagramCreate(
                     parent_bdd_diagram_id=db_diagram.id,
                     parent_block_id=parent_block_id,
+                    parent_block_ref_id=parent_block_ref_id,
                     parent_block_name=parent_block_name,
                     states=nodes,
                     transitions=edges,

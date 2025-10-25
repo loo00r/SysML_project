@@ -61,7 +61,8 @@ async def update_smd(
     states: List[Dict[str, Any]],
     transitions: List[Dict[str, Any]],
     parent_block_name: Optional[str] = None,
-    source: Optional[str] = None
+    source: Optional[str] = None,
+    parent_block_ref_id: Optional[int] = None
 ) -> StateMachineDiagram:
     """
     Update an existing state machine diagram's core data.
@@ -73,6 +74,8 @@ async def update_smd(
             db_smd.parent_block_name = parent_block_name
         if source is not None:
             db_smd.source = source
+        if parent_block_ref_id is not None:
+            db_smd.parent_block_ref_id = parent_block_ref_id
 
         await db.commit()
         await db.refresh(db_smd)

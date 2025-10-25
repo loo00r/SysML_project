@@ -21,10 +21,18 @@ async def create_ibd(db: AsyncSession, ibd: InternalBlockDiagramCreate) -> model
     await db.refresh(db_ibd)
     return db_ibd
 
-async def update_ibd(db: AsyncSession, db_ibd: models.InternalBlockDiagram, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]):
+async def update_ibd(
+    db: AsyncSession,
+    db_ibd: models.InternalBlockDiagram,
+    nodes: List[Dict[str, Any]],
+    edges: List[Dict[str, Any]],
+    parent_block_ref_id: int = None
+):
     """Updates an existing IBD's nodes and edges."""
     db_ibd.nodes = nodes
     db_ibd.edges = edges
+    if parent_block_ref_id is not None:
+        db_ibd.parent_block_ref_id = parent_block_ref_id
     await db.commit()
     await db.refresh(db_ibd)
     return db_ibd
