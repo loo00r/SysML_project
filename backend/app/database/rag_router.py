@@ -12,7 +12,8 @@ from app.database.models import (
     TemplateResponse,
     ComponentResponse, 
     SimilarDiagramRequest,
-    InternalBlockDiagramCreate
+    InternalBlockDiagramCreate,
+    StateMachineDiagramCreate
 )
 from app.database.embeddings import (
     store_diagram_with_embedding, 
@@ -27,7 +28,7 @@ from app.AI.diagram_generation import (
     generate_state_machine_diagram,
     DiagramPositioning
 )
-from app.crud import crud_ibd
+from app.crud import crud_ibd, crud_smd
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -707,12 +708,54 @@ async def save_diagram_to_database(
                 )
                 await crud_ibd.create_ibd(db=db, ibd=new_ibd)
             saved_ibd_count += 1
+
+        # Save SMDs if they exist
+        smd_data_list = cached_diagram.get("smd_data", [])
+        saved_smd_count = 0
+        for smd_data in smd_data_list or []:
+            parent_block_id = smd_data.get("parent_block_id")
+            if not parent_block_id:
+                print("DEBUG: Skipping SMD entry without parent_block_id")
+                continue
+
+            nodes = smd_data.get("nodes", [])
+            edges = smd_data.get("edges", [])
+            parent_block_name = smd_data.get("parent_block_name")
+
+            existing_smd = await crud_smd.get_smd_by_parent_and_block(
+                db=db,
+                parent_bdd_id=db_diagram.id,
+                block_id=parent_block_id
+            )
+
+            if existing_smd:
+                print(f"DEBUG: Updating existing SMD for block {parent_block_id}")
+                await crud_smd.update_smd(
+                    db=db,
+                    db_smd=existing_smd,
+                    states=nodes,
+                    transitions=edges,
+                    parent_block_name=parent_block_name
+                )
+            else:
+                print(f"DEBUG: Creating new SMD for block {parent_block_id}")
+                new_smd = StateMachineDiagramCreate(
+                    parent_bdd_diagram_id=db_diagram.id,
+                    parent_block_id=parent_block_id,
+                    parent_block_name=parent_block_name,
+                    states=nodes,
+                    transitions=edges,
+                    source="ai"
+                )
+                await crud_smd.create_smd(db=db, smd=new_smd)
+            saved_smd_count += 1
         
         return {
             "message": "Diagram saved successfully",
             "diagram_id": db_diagram.id,
             "saved_to_rag": True,
-            "ibd_count": saved_ibd_count
+            "ibd_count": saved_ibd_count,
+            "smd_count": saved_smd_count
         }
         
     except Exception as e:
