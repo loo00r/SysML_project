@@ -21,6 +21,7 @@ import {
   SMD_EDGE_MARKER_URL,
   USE_SMD_EDGE_MARKERS,
 } from '../../utils/smdTransition';
+import ValidationBadge from '../overlays/ValidationBadge';
 
 const LABEL_PLACEHOLDER = 'event [guard] / action';
 const SAVE_DEBOUNCE_MS = 150;
@@ -51,6 +52,14 @@ const SmdTransitionEdge: React.FC<EdgeProps> = (props) => {
   } = props;
 
   const updateTransition = useDiagramStore((state) => state.updateSmdTransitionEdge);
+
+  // Get validation results for this edge
+  const activeDiagramId = useDiagramStore(state => state.activeDiagramId);
+  const getSmdValidationResults = useDiagramStore(state => state.getSmdValidationResults);
+  const validationResults = useMemo(() => {
+    if (!activeDiagramId) return [];
+    return getSmdValidationResults(activeDiagramId).filter(r => r.kind === 'edge' && r.id === id);
+  }, [activeDiagramId, getSmdValidationResults, id]);
 
   const transitionData = useMemo(
     () => ensureSmdTransitionData(data as SmdTransitionDraft),
@@ -206,6 +215,13 @@ const SmdTransitionEdge: React.FC<EdgeProps> = (props) => {
 
       <EdgeLabelRenderer>
         <div style={labelContainerStyle}>
+          {/* Validation Badge for Edge */}
+          {validationResults.length > 0 && (
+            <div style={{ position: 'absolute', left: -30, top: -10 }}>
+              <ValidationBadge results={validationResults} position="top-right" size={18} />
+            </div>
+          )}
+
           {isEditing ? (
             <div
               className="smd-edge-label-editor"

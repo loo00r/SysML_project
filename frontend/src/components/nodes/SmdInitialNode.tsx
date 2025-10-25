@@ -1,6 +1,8 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Box, styled } from '@mui/material';
+import ValidationBadge from '../overlays/ValidationBadge';
+import useDiagramStore from '../../store/diagramStore';
 
 const Container = styled(Box)({
   position: 'relative',
@@ -28,15 +30,29 @@ const handleStyle = {
   height: 10,
 };
 
-const SmdInitialNode: React.FC<NodeProps> = ({ selected }) => (
-  <Container>
-    {/* Visual handles for symmetry - validation prevents inbound connections */}
-    <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} />
-    <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
-    <Handle id="out-right" type="source" position={Position.Right} style={handleStyle} />
-    <Handle id="out-bottom" type="source" position={Position.Bottom} style={handleStyle} />
-    <InitialCore selected={selected} />
-  </Container>
-);
+const SmdInitialNode: React.FC<NodeProps> = ({ selected, id }) => {
+  // Get validation results for this node
+  const activeDiagramId = useDiagramStore(state => state.activeDiagramId);
+  const getSmdValidationResults = useDiagramStore(state => state.getSmdValidationResults);
+  const validationResults = activeDiagramId
+    ? getSmdValidationResults(activeDiagramId).filter(r => r.kind === 'node' && r.id === id)
+    : [];
+
+  return (
+    <Container>
+      {/* Visual handles for symmetry - validation prevents inbound connections */}
+      <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} />
+      <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} />
+      <Handle id="out-right" type="source" position={Position.Right} style={handleStyle} />
+      <Handle id="out-bottom" type="source" position={Position.Bottom} style={handleStyle} />
+      <InitialCore selected={selected} />
+
+      {/* Validation Badge */}
+      {validationResults.length > 0 && (
+        <ValidationBadge results={validationResults} position="top-right" size={16} />
+      )}
+    </Container>
+  );
+};
 
 export default memo(SmdInitialNode);

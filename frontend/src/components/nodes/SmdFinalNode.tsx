@@ -3,6 +3,8 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Box, styled } from '@mui/material';
 import ArrowHeadOverlay from '../shared/ArrowHeadOverlay';
 import useSmdInboundSides from '../../hooks/useSmdInboundSides';
+import ValidationBadge from '../overlays/ValidationBadge';
+import useDiagramStore from '../../store/diagramStore';
 
 const Container = styled(Box)({
   position: 'relative',
@@ -44,6 +46,13 @@ const handleStyle = {
 const SmdFinalNode: React.FC<NodeProps> = ({ selected, id }) => {
   const inboundSides = useSmdInboundSides(id);
 
+  // Get validation results for this node
+  const activeDiagramId = useDiagramStore(state => state.activeDiagramId);
+  const getSmdValidationResults = useDiagramStore(state => state.getSmdValidationResults);
+  const validationResults = activeDiagramId
+    ? getSmdValidationResults(activeDiagramId).filter(r => r.kind === 'node' && r.id === id)
+    : [];
+
   return (
     <Container>
     <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} />
@@ -57,6 +66,11 @@ const SmdFinalNode: React.FC<NodeProps> = ({ selected, id }) => {
       {inboundSides.map((side) => (
         <ArrowHeadOverlay key={side} side={side} offset={16} color="#37474f" size={12} />
       ))}
+
+      {/* Validation Badge */}
+      {validationResults.length > 0 && (
+        <ValidationBadge results={validationResults} position="top-right" size={16} />
+      )}
     </Container>
   );
 };

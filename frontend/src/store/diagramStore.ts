@@ -21,6 +21,7 @@ import {
 } from '../utils/smdTransition';
 import { applyDagreLayout } from '../utils/dagreLayout';
 import { getNodeChangeId } from '../utils/reactflowChanges';
+import type { ValidationResult } from '../services/validation/smdValidator';
 
 // Define node types based on SysML diagram elements
 export type NodeType =
@@ -372,6 +373,9 @@ interface DiagramStoreState {
   isLoading: boolean;
   validationErrors: ValidationError[];
   showValidationPanel: boolean;
+
+  // SMD Validation state
+  smdValidationResults: Record<string, ValidationResult[]>; // keyed by diagramId
   
   // AI generation state
   generationPrompt: string;
@@ -431,6 +435,11 @@ interface DiagramStoreState {
   
   setValidationErrors: (errors: ValidationError[]) => void;
   toggleValidationPanel: () => void;
+
+  // SMD Validation operations
+  setSmdValidationResults: (diagramId: string, results: ValidationResult[]) => void;
+  clearSmdValidationResults: (diagramId: string) => void;
+  getSmdValidationResults: (diagramId: string) => ValidationResult[];
   
   setGenerationPrompt: (prompt: string) => void;
   setIsGenerating: (isGenerating: boolean) => void;
@@ -472,6 +481,8 @@ const useDiagramStore = create<DiagramStoreState>()(
   isLoading: false,
   validationErrors: [],
   showValidationPanel: false,
+
+  smdValidationResults: {},
   
   generationPrompt: '',
   isGenerating: false,
@@ -973,9 +984,9 @@ const useDiagramStore = create<DiagramStoreState>()(
         target: stateNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
-        targetHandle: 'in-top',
+        targetHandle: 'in-left',
         sourcePosition: Position.Right,
-        targetPosition: Position.Top,
+        targetPosition: Position.Left,
         markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       },
       {
@@ -984,9 +995,9 @@ const useDiagramStore = create<DiagramStoreState>()(
         target: finalNodeId,
         type: 'smdTransition',
         data: ensureSmdTransitionData(),
-        targetHandle: 'in-top',
+        targetHandle: 'in-left',
         sourcePosition: Position.Right,
-        targetPosition: Position.Top,
+        targetPosition: Position.Left,
         markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       }
     ];
@@ -1038,6 +1049,12 @@ const useDiagramStore = create<DiagramStoreState>()(
 
     set({ nodes: newNodes });
     get().updateActiveDiagram({ nodes: newNodes });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   onEdgesChange: (changes) => {
@@ -1046,6 +1063,12 @@ const useDiagramStore = create<DiagramStoreState>()(
     const newEdges = applyEdgeChanges(changes, previousEdges);
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   onConnect: (connection) => {
@@ -1101,6 +1124,12 @@ const useDiagramStore = create<DiagramStoreState>()(
     const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
     state.updateActiveDiagram({ edges: newEdges });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   // Node operations
@@ -1272,6 +1301,26 @@ const useDiagramStore = create<DiagramStoreState>()(
   // Validation operations
   setValidationErrors: (errors) => set({ validationErrors: errors }),
   toggleValidationPanel: () => set(state => ({ showValidationPanel: !state.showValidationPanel })),
+
+  // SMD Validation operations
+  setSmdValidationResults: (diagramId, results) => {
+    set(state => ({
+      smdValidationResults: {
+        ...state.smdValidationResults,
+        [diagramId]: results,
+      },
+    }));
+  },
+  clearSmdValidationResults: (diagramId) => {
+    set(state => {
+      const newResults = { ...state.smdValidationResults };
+      delete newResults[diagramId];
+      return { smdValidationResults: newResults };
+    });
+  },
+  getSmdValidationResults: (diagramId) => {
+    return get().smdValidationResults[diagramId] || [];
+  },
   
   // AI generation operations
   setGenerationPrompt: (prompt) => set({ generationPrompt: prompt }),

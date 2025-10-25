@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.19] - 2025-10-25
+### Fixed
+- SMD seed template now uses left handles instead of top handles for State and Final nodes, ensuring arrows render correctly when creating new state machine diagrams.
+- Initial → Idle → Final template transitions now properly display both arrows on canvas.
+
+### Changed
+- Updated tooltip text from "Add SMD" to "Create State Machine Diagram" for Sensor and Processor nodes for consistency with Block nodes.
+- Improved user experience with clearer, more descriptive tooltip messages across all BDD node types.
+
+## [1.2.18] - 2025-10-25
+### Added
+- SMD validation pass with badges and summary toast notifications.
+- VALIDATE button now runs SMD-specific checks for state machine diagrams.
+- Validation rules: exactly one Initial recommended (warning), no dangling transitions (error), Initial → Initial forbidden (error), Final → * forbidden (error).
+- Visual badges on canvas for problematic nodes and edges (red for errors, yellow for warnings).
+- Tooltip display on badges showing validation code and message.
+
+### Changed
+- VALIDATE button behavior now detects diagram type and runs appropriate validation.
+- Validation results automatically clear on any graph mutation (add/remove/connect nodes/edges).
+
+### Improved
+- Better SMD diagram quality checking with user-friendly visual feedback.
+- Clear distinction between errors and warnings with color-coded badges.
+
 ## [1.2.17] - 2025-10-25
 ### Changed
 - State and Choice nodes now expose only two handles (left inbound, right outbound); top/bottom handles removed for cleaner visual design.

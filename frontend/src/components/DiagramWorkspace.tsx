@@ -27,6 +27,7 @@ import TransitionPanel from './TransitionPanel';
 import ValidationPanel from './ValidationPanel';
 import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
 import { SMD_EDGE_MARKER_ID, SMD_EDGE_MARKER_URL, USE_SMD_EDGE_MARKERS } from '../utils/smdTransition';
+import { validateSmd, getValidationSummary } from '../services/validation/smdValidator';
 
 // Unified node types object - includes all node components to prevent rendering issues
 const unifiedNodeTypes = {
@@ -170,6 +171,8 @@ const DiagramWorkspace: React.FC = () => {
     addNode,
     onViewportChange,
     clearCenteringFlag,
+    setSmdValidationResults,
+    getSmdValidationResults,
   } = useDiagramStore();
 
   // Get ReactFlow instance methods
@@ -492,24 +495,39 @@ const DiagramWorkspace: React.FC = () => {
 
   // Handle validation
   const handleValidate = () => {
-    // Get diagram type from nodes (default to 'block' if not found)
-    const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
-    
-    // Validate the diagram
-    const result = validateSysMLDiagram(nodes, edges, diagramType);
-    setValidationResult(result);
-    
-    // Enable or disable export based on validation result
-    setIsExportEnabled(result.isValid);
-    
-    if (result.isValid) {
-      showNotification('Diagram validation successful. Export is now enabled.', 'success');
-    } else {
-      // Show validation panel with errors
-      if (!showValidationPanel) {
-        toggleValidationPanel();
+    // Check if this is an SMD diagram
+    if (activeDiagram?.type === 'smd') {
+      // Run SMD validation
+      const results = validateSmd(nodes, edges);
+      const summary = getValidationSummary(results);
+
+      // Store results in state
+      if (activeDiagramId) {
+        setSmdValidationResults(activeDiagramId, results);
       }
-      showNotification(`Validation failed with ${result.errors.length} issues. Please fix them before exporting.`, 'warning');
+
+      // Show appropriate notification
+      if (results.length === 0) {
+        showNotification('No issues found.', 'success');
+      } else {
+        const message = `Validation: ${summary.errors} error${summary.errors !== 1 ? 's' : ''}, ${summary.warnings} warning${summary.warnings !== 1 ? 's' : ''}`;
+        showNotification(message, summary.errors > 0 ? 'error' : 'warning');
+      }
+    } else {
+      // Original validation for non-SMD diagrams
+      const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
+      const result = validateSysMLDiagram(nodes, edges, diagramType);
+      setValidationResult(result);
+      setIsExportEnabled(result.isValid);
+
+      if (result.isValid) {
+        showNotification('Diagram validation successful. Export is now enabled.', 'success');
+      } else {
+        if (!showValidationPanel) {
+          toggleValidationPanel();
+        }
+        showNotification(`Validation failed with ${result.errors.length} issues. Please fix them before exporting.`, 'warning');
+      }
     }
   };
   

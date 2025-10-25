@@ -312,7 +312,7 @@ const SensorNode = ({ data, selected, id }: NodeProps) => {
           </SMDIndicatorIcon>
         </Tooltip>
       ) : (
-        <Tooltip title="Add SMD" placement="top">
+        <Tooltip title="Create State Machine Diagram" placement="top">
           <SMDIndicatorIcon
             className="add-smd"
             onClick={handleOpenSMD}

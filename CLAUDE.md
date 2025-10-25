@@ -179,96 +179,125 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task SMD-06a — Remove top/bottom handles on State and Choice (Initial/Final keep all four)
+Task SMD-06 — Prototype validation minimum
 
 Goal
-For SMD diagrams, State and Choice nodes should expose only two handles: LEFT (target/inbound) and RIGHT (source/outbound). Remove TOP and BOTTOM handles entirely for these two node types. Initial and Final keep all four visual handles as before (with existing validation rules still active: Initial remains source-only; right/bottom remain disallowed as targets globally).
+Implement a minimal validation pass for SMD diagrams, invoked by the VALIDATE button. Show badges on problematic nodes/edges. Rules:
+
+*   Exactly one Initial per diagram; if more than one exists → WARNING (not an error).
+    
+*   No dangling transitions (edges must have both a valid source and a valid target).
+    
+*   Forbid transition Initial → Initial (error).
+    
+*   Forbid any transition whose source is Final (Final → \*) (error).
+    
 
 Scope of Work
 
-1.  Node handle config
+1.  Validator service
     
 
-*   Update StateNode and ChoiceNode components to render exactly two handles:• left: isTarget = true, isSource = false• right: isTarget = false, isSource = true
+*   Create validateSmd(diagramId: string): ValidationResult\[\].
     
-*   Do not render top/bottom handles for these node types at all.
+*   ValidationResult fields:{ id: string; kind: "node" | "edge"; severity: "error" | "warning"; code: "SMD001" | "SMD002" | ...; message: string; }
     
-*   Keep InitialNode and FinalNode unchanged (all four handles visible).
+*   Rules:• SMD001 (warning): count nodes where type === "initial". If count > 1, return a warning for each extra Initial node with a message like “Only one Initial is recommended; found N.”• SMD002 (error): dangling transitions — for each edge of type "smdTransition", if source or target node is missing/unknown, return an error on the edge.• SMD003 (error): Initial → Initial — if edge.source.type === "initial" AND edge.target.type === "initial".• SMD004 (error): Final → \* — if edge.source.type === "final".
     
-
-2.  Connection validation (defense in depth)
+*   Return the array; store it under diagramStore.validation.results\[diagramId\].
     
-
-*   In validateConnection/onConnect guard for SMD edges, add a type-aware rule:• if target node type ∈ {state, choice} then reject targetPosition ∈ {Top, Bottom}.
-    
-*   Keep existing global policy (no inbound to RIGHT/BOTTOM for any node), so this is largely a safeguard for legacy/imported data.
+*   Clear results on any graph-mutating action (node/edge add/remove/move/connect) so stale badges disappear until the user revalidates.
     
 
-3.  Normalization/migration (rehydrate + Test Mode import)
+2.  VALIDATE button integration
     
 
-*   In normalizeSmdTargetSide(edge, targetNode):• if targetNode.type ∈ {state, choice} and targetPosition === Top, remap to Left.• if targetPosition ∈ {Right, Bottom}, keep the existing remap to Left/Top logic, but for state/choice always prefer Left.
+*   Wire the existing “VALIDATE” toolbar button to run validateSmd for the active diagram only when the diagram type === "smd".
     
-*   Persist normalized edges immediately after import/rehydrate to avoid flip-flop across reloads.
-    
-
-4.  Arrow overlay
+*   On completion:• If results.length === 0: show a brief success toast “No issues found”.• Else: show a compact summary toast “Validation: X errors, Y warnings”. Keep detailed results in state.
     
 
-*   Since top/bottom handles no longer exist on state/choice, ensure the inbound-sides hook cannot report Top/Bottom for these nodes.
-    
-*   Result: state/choice only ever display a left-side inbound arrow.
+3.  Badges on canvas
     
 
-5.  Test Mode (JSON → SMD) and Dagre
+*   For each node/edge with issues, render a small badge near it:• Red circle for error, yellow triangle for warning.• If multiple issues affect the same element, show a single badge with a tiny count overlay (e.g., “2”).
+    
+*   Tooltip on hover: show code + message (e.g., “SMD004: Final states cannot be sources.”).
+    
+*   Ensure badges are non-interactive (pointer-events: none) and have a high z-index above nodes/edges/labels.
     
 
-*   When flexiblePositions is enabled, bias connection anchoring for state/choice to left (targets) and right (sources).
+4.  Optional results panel (lightweight)
     
-*   If the auto-router chooses Top/Bottom for state/choice targets, override to Left before edge creation.
+
+*   If you already have a right-panel section, add a “Validation” list for the active diagram showing rows: icon, code, message, and a “Focus” link that selects the node/edge and pans to it.
+    
+*   Keep this purely optional; badges + toasts satisfy the requirement.
+    
+
+5.  Persistence and imports
+    
+
+*   Validation runs are ephemeral; do not persist results into diagram JSON.
+    
+*   No special handling needed for Test Mode imports beyond the same rules.
+    
+
+6.  Safety and performance
+    
+
+*   Use memoized index maps: nodeById, typeById, outgoingById to avoid O(N×M) scans.
+    
+*   Run entirely on the client; avoid blocking the UI—if results > 2k elements, chunk with requestIdleCallback (not required now, but structure for it).
     
 
 Acceptance Criteria
 
-1.  State and Choice nodes render only two handles (left target, right source). No top/bottom dots on these nodes. Initial and Final remain with four handles.
+*   Pressing VALIDATE on an SMD diagram shows warnings if there are multiple Initial nodes. Extra Initials display yellow badges; the toast summarizes counts.
     
-2.  It is impossible to connect an inbound transition to the top or bottom of State/Choice in the UI.
+*   Dangling edges are flagged as errors with red badges; selecting them shows the tooltip with SMD002 message.
     
-3.  Imported/Test-Mode diagrams that tried to target Top/Bottom on State/Choice are automatically normalized to Left; no warnings or duplicate arrows appear.
+*   Any Initial → Initial edge is flagged as an error (red badge on that edge).
     
-4.  Arrow overlays on State/Choice only render on the left side.
+*   Any edge with a Final as the source is flagged as an error (red badge on that edge).
     
-5.  No regressions for labels, arrows, or validation on Initial/Final nodes.
+*   Clicking VALIDATE on a clean diagram shows a success toast and no badges.
+    
+*   After any edit (e.g., deleting an extra Initial), badges disappear until VALIDATE is clicked again.
     
 
 Manual Test Plan
 
-*   Try to create edges into the top or bottom of a State and a Choice: no handle appears, and validation blocks any forced attempts.
+1.  Create two Initial nodes and connect one to Idle; click VALIDATE → 1+ yellow badge(s), summary toast shows warnings > 0.
     
-*   Import a JSON that targets Top on a State: after import, the edge targets Left and the arrow shows on the left.
+2.  Create an edge Initial → Initial; VALIDATE → red badge on that edge (SMD003).
     
-*   Create typical flows: Initial → State → Choice → Final. Verify handles behave as specified and arrows look correct.
+3.  Create an edge Final → State; VALIDATE → red badge on that edge (SMD004).
     
-*   Reload (rehydrate) and undo/redo to ensure normalization persists and nothing flips back to Top/Bottom.
+4.  Create an edge with a missing target (e.g., delete the target node); VALIDATE → red badge (SMD002).
+    
+5.  Fix issues and re-validate → badges clear; success toast appears.
     
 
 Files Likely Touched
 
-*   frontend/src/components/nodes/smd/StateNode.tsx
+*   frontend/src/services/validation/smdValidator.ts (new)
     
-*   frontend/src/components/nodes/smd/ChoiceNode.tsx
+*   frontend/src/store/diagramStore.ts (results state; clear-on-change)
     
-*   frontend/src/edges/smdTransition/validateConnection.ts (or equivalent)
+*   frontend/src/components/toolbar/ValidateButton.tsx (wire-up)
     
-*   frontend/src/utils/smdTransition.ts (normalizeSmdTargetSide updates)
+*   frontend/src/components/overlays/ValidationBadge.tsx (new, canvas badges)
     
-*   frontend/src/components/shared/useSmdInboundSides.ts (or wherever inbound-side detection lives)
+*   frontend/src/components/panels/ValidationPanel.tsx (optional)
     
-*   frontend/src/services/imports/smdFromJson.ts (Test Mode import hook)
+*   frontend/src/styles/validation.css (icons, z-index, tooltip)
     
 
-Changelog (prepare after merge)Version: 1.2.17Changed
+Changelog (prepare after merge)
+Version: 1.2.17
+Added
 
-*   State and Choice nodes now expose only two handles (left inbound, right outbound); top/bottom handles removed.Fixed
+*   SMD validation pass with badges and summary (one Initial recommended, no dangling edges, block Initial→Initial and Final→\*).Improved
     
-*   Normalization ensures imported SMD edges targeting Top/Bottom on State/Choice are remapped to Left to match new handle policy.
+*   VALIDATE button now runs SMD checks and highlights problematic nodes/edges.
