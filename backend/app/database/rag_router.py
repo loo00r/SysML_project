@@ -7,16 +7,17 @@ import json
 from app.db.dependencies import get_db
 from app.core.redis_client import redis_client
 from app.database.models import (
-    DiagramEmbeddingCreate, 
-    DiagramEmbeddingResponse, 
+    DiagramEmbeddingCreate,
+    DiagramEmbeddingResponse,
     TemplateResponse,
-    ComponentResponse, 
+    ComponentResponse,
     SimilarDiagramRequest,
+    InternalBlockDiagram,
     InternalBlockDiagramCreate,
     StateMachineDiagramCreate
 )
 from app.database.embeddings import (
-    store_diagram_with_embedding, 
+    store_diagram_with_embedding,
     find_similar_diagrams,
     find_similar_ibds,
     get_template_by_type,
@@ -32,6 +33,31 @@ from app.AI.diagram_generation import (
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
+
+
+def build_ibd_one_shot_example(
+    block_name: str,
+    ibd: InternalBlockDiagram
+) -> Optional[Dict[str, Any]]:
+    """
+    Normalize persisted IBD data into the one-shot format expected by generate_ibd_diagram.
+    Returns None when stored diagrams lack usable node/edge data.
+    """
+    if ibd is None:
+        return None
+
+    nodes = ibd.nodes or []
+    edges = ibd.edges or []
+    if not nodes or not edges:
+        return None
+
+    return {
+        "input": block_name,
+        "output": {
+            "nodes": nodes,
+            "edges": edges
+        }
+    }
 
 def identify_diagram_candidates(
     elements: List[Dict[str, Any]]
@@ -146,17 +172,9 @@ async def generate_ibd_for_block_async(
 
             if similar_ibds:
                 for existing_ibd in similar_ibds:
-                    nodes = existing_ibd.nodes or []
-                    edges = existing_ibd.edges or []
-                    if not nodes or not edges:
-                        continue
-                    one_shot_examples.append({
-                        "input": block_name,
-                        "output": {
-                            "nodes": nodes,
-                            "edges": edges
-                        }
-                    })
+                    example = build_ibd_one_shot_example(block_name, existing_ibd)
+                    if example:
+                        one_shot_examples.append(example)
                 if one_shot_examples:
                     print(f"Using {len(one_shot_examples)} IBD RAG example(s) for {block_name}")
             else:
