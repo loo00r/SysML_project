@@ -33,9 +33,24 @@ CREATE TABLE IF NOT EXISTS uav_components (
     properties JSONB
 );
 
+-- Create table for storing State Machine Diagrams
+CREATE TABLE IF NOT EXISTS state_machine_diagrams (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    parent_bdd_diagram_id INTEGER NOT NULL REFERENCES diagram_embeddings(id),
+    parent_block_id TEXT NOT NULL,
+    parent_block_name TEXT,
+    states JSONB NOT NULL,
+    transitions JSONB NOT NULL,
+    source TEXT NOT NULL DEFAULT 'ai',
+    CONSTRAINT uq_state_machine_parent UNIQUE (parent_bdd_diagram_id, parent_block_id)
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS diagram_type_idx ON diagram_embeddings (diagram_type);
 CREATE INDEX IF NOT EXISTS template_type_idx ON sysml_templates (template_type);
+CREATE INDEX IF NOT EXISTS smd_parent_bdd_idx ON state_machine_diagrams (parent_bdd_diagram_id);
+CREATE INDEX IF NOT EXISTS smd_parent_block_idx ON state_machine_diagrams (parent_block_id);
 
 -- Create vector index for similarity search
 CREATE INDEX IF NOT EXISTS embedding_idx ON diagram_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);

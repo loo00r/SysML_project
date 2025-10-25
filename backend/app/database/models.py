@@ -119,3 +119,36 @@ class InternalBlockDiagramResponse(BaseModel):
     
     class Config:
         orm_mode = True
+
+class StateMachineDiagram(Base):
+    __tablename__ = "state_machine_diagrams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    parent_bdd_diagram_id = Column(Integer, ForeignKey("diagram_embeddings.id"), nullable=False, index=True)
+    parent_block_id = Column(String, nullable=False, index=True)
+    parent_block_name = Column(String, nullable=True)
+    states = Column(JSON, nullable=False)
+    transitions = Column(JSON, nullable=False)
+    source = Column(String, default='ai', nullable=False)
+
+class StateMachineDiagramCreate(BaseModel):
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    parent_block_name: Optional[str] = None
+    states: List[Dict[str, Any]]
+    transitions: List[Dict[str, Any]]
+    source: str = 'ai'
+
+class StateMachineDiagramResponse(BaseModel):
+    id: int
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    parent_block_name: Optional[str] = None
+    states: List[Dict[str, Any]]
+    transitions: List[Dict[str, Any]]
+    source: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
