@@ -14,6 +14,7 @@ from app.database.models import (
     SysMLTemplate,
     UAVComponent,
     InternalBlockDiagram,
+    StateMachineDiagram,
 )
 
 # Initialize OpenAI client
@@ -74,6 +75,63 @@ async def find_similar_ibds(
         fallback_stmt = fallback_stmt.where(models.BDDBlock.block_type.ilike(f"%{block_type}%"))
 
     fallback_stmt = fallback_stmt.order_by(models.InternalBlockDiagram.created_at.desc()).limit(limit)
+    result = await db.execute(fallback_stmt)
+    return result.scalars().all()
+
+
+async def find_similar_smds(
+    db: AsyncSession,
+    block_name: str,
+    block_type: str = None,
+    limit: int = 3
+) -> List[StateMachineDiagram]:
+    """
+    Keyword-based retrieval of SMD diagrams for one-shot examples using the
+    persisted block catalog. Prefers exact matches and falls back to LIKE searches.
+    """
+    block_name = (block_name or "").strip()
+    _query_text = f"State machine for {block_name}" if block_name else "State machine"
+    # _query_text reserved for future embedding-based retrieval
+
+    if not block_name:
+        return []
+
+    base_stmt = (
+        select(models.StateMachineDiagram)
+        .outerjoin(
+            models.BDDBlock,
+            models.BDDBlock.id == models.StateMachineDiagram.parent_block_ref_id
+        )
+    )
+
+    exact_stmt = base_stmt.where(
+        or_(
+            func.lower(models.StateMachineDiagram.parent_block_id) == func.lower(block_name),
+            func.lower(models.StateMachineDiagram.parent_block_name) == func.lower(block_name),
+            func.lower(models.BDDBlock.block_name) == func.lower(block_name),
+        )
+    )
+    if block_type:
+        exact_stmt = exact_stmt.where(func.lower(models.BDDBlock.block_type) == func.lower(block_type))
+
+    exact_stmt = exact_stmt.order_by(models.StateMachineDiagram.created_at.desc()).limit(limit)
+    result = await db.execute(exact_stmt)
+    matches = result.scalars().all()
+    if matches:
+        return matches
+
+    like_pattern = f"%{block_name}%"
+    fallback_stmt = base_stmt.where(
+        or_(
+            models.StateMachineDiagram.parent_block_id.ilike(like_pattern),
+            models.StateMachineDiagram.parent_block_name.ilike(like_pattern),
+            models.BDDBlock.block_name.ilike(like_pattern),
+        )
+    )
+    if block_type:
+        fallback_stmt = fallback_stmt.where(models.BDDBlock.block_type.ilike(f"%{block_type}%"))
+
+    fallback_stmt = fallback_stmt.order_by(models.StateMachineDiagram.created_at.desc()).limit(limit)
     result = await db.execute(fallback_stmt)
     return result.scalars().all()
 
