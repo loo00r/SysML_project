@@ -20,7 +20,13 @@ from app.database.embeddings import (
     get_template_by_type,
     get_components_by_type
 )
-from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, generate_ibd_diagram, DiagramPositioning
+from app.AI.diagram_generation import (
+    generate_diagram,
+    generate_sysml_diagram,
+    generate_ibd_diagram,
+    generate_state_machine_diagram,
+    DiagramPositioning
+)
 from app.crud import crud_ibd
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
@@ -34,6 +40,62 @@ def identify_diagram_candidates(
     ibd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     smd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     return ibd_candidates, smd_candidates
+
+
+async def generate_smd_for_block_async(
+    block: Dict[str, Any],
+    system_context: str,
+    db: AsyncSession,
+    use_rag: bool
+) -> Optional[Dict[str, Any]]:
+    """Async helper to generate a State Machine Diagram for a single block."""
+    block_id = block.get("id")
+    if not block_id:
+        print("generate_smd_for_block_async: Skipping block without 'id'")
+        return None
+
+    block_name = block.get("name", "Unnamed Block")
+    block_type = block.get("type", "block")
+    block_description = block.get("description", "")
+
+    try:
+        one_shot_examples: List[Dict[str, Any]] = []
+        if use_rag:
+            # Placeholder for future RAG lookup (e.g., find_similar_smds)
+            pass
+
+        smd_result = generate_state_machine_diagram(
+            block_id=block_id,
+            block_name=block_name,
+            block_description=block_description,
+            block_type=block_type,
+            system_context=system_context,
+            one_shot_examples=one_shot_examples or None
+        )
+
+        if smd_result.get("error"):
+            print(f"generate_smd_for_block_async: SMD generation failed for {block_name}: {smd_result['error']}")
+            return None
+
+        smd_raw = smd_result.get("smd_raw") or {}
+        nodes = smd_raw.get("nodes") or []
+        edges = smd_raw.get("edges") or []
+
+        if not nodes:
+            print(f"generate_smd_for_block_async: No nodes returned for {block_name}, skipping")
+            return None
+
+        return {
+            "parent_block_id": block_id,
+            "parent_block_name": block_name,
+            "nodes": nodes,
+            "edges": edges
+        }
+
+    except Exception as exc:
+        print(f"generate_smd_for_block_async: Unexpected error for {block_name}: {exc}")
+        return None
+
 
 async def generate_ibd_for_block_async(
     block: Dict[str, Any],
@@ -283,7 +345,7 @@ async def generate_diagram_unified(
     if not generate_smd:
         smd_candidates = []
 
-    # Step 3: Parallel generation (currently IBD async helper, SMD pending future tasks).
+    # Step 3: Parallel generation for IBD and SMD
     ibd_tasks = [
         generate_ibd_for_block_async(
             block=block,
@@ -295,9 +357,15 @@ async def generate_diagram_unified(
         for block in ibd_candidates
     ]
 
-    smd_tasks: List[Any] = []
-    if smd_candidates:
-        print("Unified chain: SMD generation requested but not yet implemented; skipping.")
+    smd_tasks = [
+        generate_smd_for_block_async(
+            block=block,
+            system_context=text,
+            db=db,
+            use_rag=use_rag
+        )
+        for block in smd_candidates
+    ]
 
     all_tasks = ibd_tasks + smd_tasks
     ibd_to_create: List[Dict[str, Any]] = []

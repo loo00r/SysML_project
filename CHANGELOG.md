@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bootstrapped `state_machine_diagrams` table creation in `backend/app/database/init.sql` for fresh deployments.
 - CRUD utilities and async unit tests for state machine diagrams in backend SMD implementation.
 - State machine prompt template in `backend/app/AI/diagram_generation.py` using node/edge structure for SMD behavior modeling.
+- Unified generation endpoint now runs SMD tasks alongside IBD, caching `smd_data` and reporting counts.
 - SQLAlchemy model and Pydantic schemas for state machine diagrams in `backend/app/database/models.py`, exported via `backend/app/database/__init__.py`.
 
 ### Changed
