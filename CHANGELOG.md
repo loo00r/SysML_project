@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.22] - 2025-10-25
+### Fixed
+- SMD Final nodes now consistently appear at the end of diagrams through Dagre rank assignment.
+- Initial nodes now consistently appear at the beginning of diagrams.
+
+### Changed
+- Dagre layout algorithm now uses 'longest-path' ranker for better hierarchical SMD layouts.
+- Automatic rank assignment (Initial=0, Final=999) ensures proper state machine flow visualization.
+
+### Improved
+- More predictable and intuitive SMD diagram layouts in Test Mode.
+- Better visual hierarchy for state machine diagrams.
+
 ## [1.2.21] - 2025-10-25
 ### Changed
 - AI Diagram Generator now creates detailed diagrams by default (with Internal Blocks and State Machines).

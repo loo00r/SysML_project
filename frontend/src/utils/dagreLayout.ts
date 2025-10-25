@@ -20,14 +20,31 @@ const getLayoutedElements = (
     rankdir: direction,
     nodesep: nodeSep,
     ranksep: rankSep,
+    ranker: 'longest-path', // Better for hierarchical layouts
   });
 
   g.setDefaultEdgeLabel(() => ({}));
 
-  // Add nodes and edges to the graph
+  // Add nodes and edges to the graph with rank assignment for SMD nodes
   nodes.forEach((node) => {
-    g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    const nodeConfig: { width: number; height: number; rank?: number } = {
+      width: nodeWidth,
+      height: nodeHeight,
+    };
+
+    // Assign ranks for SMD state machine nodes to ensure proper ordering
+    if (node.type === 'smdInitial') {
+      // Initial nodes should be at the beginning (rank 0)
+      nodeConfig.rank = 0;
+    } else if (node.type === 'smdFinal') {
+      // Final nodes should be at the end (highest rank)
+      // We use a large number to ensure they're placed last
+      nodeConfig.rank = 999;
+    }
+
+    g.setNode(node.id, nodeConfig);
   });
+
   edges.forEach((edge) => {
     g.setEdge(edge.source, edge.target);
   });
