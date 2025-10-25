@@ -84,10 +84,10 @@ interface DiagramGeneratorProps {
 }
 
 const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onClear }) => {
-  const [isExpanded, setIsExpanded] = useState(false); 
+  const [isExpanded, setIsExpanded] = useState(false);
   const [text, setText] = useState('');
   const [includeRelationships, setIncludeRelationships] = useState(true);
-  const [generateEnhanced, setGenerateEnhanced] = useState(false);
+  const [generateEnhanced, setGenerateEnhanced] = useState(true);
   const [testMode, setTestMode] = useState(false);
   
   // Use our custom AI generation hook
@@ -213,7 +213,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                     name="generateEnhanced"
                   />
                 }
-                label="Generate with Internal Diagrams"
+                label="Generate Detailed Diagram"
               />
             </Stack>
             {testMode && (

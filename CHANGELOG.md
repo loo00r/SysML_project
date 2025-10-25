@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.21] - 2025-10-25
+### Changed
+- AI Diagram Generator now creates detailed diagrams by default (with Internal Blocks and State Machines).
+- Renamed "Generate with Internal Diagrams" toggle to "Generate Detailed Diagram" for better clarity.
+
+### Improved
+- Enhanced default user experience - detailed diagrams provide more comprehensive system models out of the box.
+- More intuitive toggle naming aligned with user expectations.
+
 ## [1.2.20] - 2025-10-25
 ### Added
 - BDD validation and export now includes all related SMD and IBD diagrams automatically.
