@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any, Tuple, Optional
@@ -196,6 +197,164 @@ async def get_components(
     """
     components = await get_components_by_type(db, component_type)
     return components
+
+@router.post("/generate-diagram-unified/", status_code=202)
+async def generate_diagram_unified(
+    text: str = Body(..., embed=True),
+    use_rag: bool = Body(True, embed=True),
+    generate_ibd: bool = Body(True, embed=True),
+    generate_smd: bool = Body(False, embed=True),
+    name: str = Body("Generated Diagram", embed=True),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Unified chain prompting workflow:
+    1. Generate BDD (single AI call)
+    2. Analyze blocks
+    3. Generate IBD/SMD in parallel (asyncio gather)
+    4. Store in Redis and return diagram ID with preview metadata
+    """
+    print("\n==== UNIFIED CHAIN PROMPTING START ====")
+    print(f"Input excerpt: {text[:120]}")
+    print(f"Options -> RAG: {use_rag}, IBD: {generate_ibd}, SMD: {generate_smd}")
+
+    # Step 1: Generate BDD with optional RAG support.
+    bdd_examples: List[Dict[str, Any]] = []
+    if use_rag:
+        try:
+            similar_bdds = await find_similar_diagrams(
+                db=db,
+                query_text=text,
+                limit=1,
+                diagram_type="bdd",
+                include_scores=True
+            )
+        except Exception as rag_error:
+            print(f"Unified chain: BDD RAG lookup failed: {rag_error}")
+        else:
+            if similar_bdds:
+                best_match = similar_bdds[0]
+                print(f"Unified chain: Using BDD example '{best_match.name}'")
+                bdd_examples.append({
+                    "input": best_match.raw_text,
+                    "output": best_match.diagram_json
+                })
+            else:
+                print("Unified chain: No similar BDD examples found")
+
+    bdd_result = generate_sysml_diagram(
+        prompt=text,
+        diagram_type="bdd",
+        one_shot_examples=bdd_examples or None
+    )
+
+    if bdd_result.get("error"):
+        error_payload = {
+            "status": "error",
+            "error": bdd_result["error"]
+        }
+        diagram_id = redis_client.store_diagram(error_payload)
+        return {
+            "status": "error",
+            "diagramId": diagram_id,
+            "preview": {
+                "name": name,
+                "bdd_blocks": 0,
+                "ibd_count": 0,
+                "smd_count": 0
+            }
+        }
+
+    raw_bdd = bdd_result.get("diagram_raw", {})
+    positioned_bdd = DiagramPositioning.apply_positioning(raw_bdd)
+    elements = raw_bdd.get("elements", [])
+    relationships = raw_bdd.get("relationships", [])
+
+    # Step 2: Identify candidate blocks.
+    ibd_candidates: List[Dict[str, Any]] = []
+    smd_candidates: List[Dict[str, Any]] = []
+    if elements:
+        ibd_candidates, smd_candidates = identify_diagram_candidates(elements)
+    print(f"Unified chain: Identified {len(ibd_candidates)} IBD candidates and {len(smd_candidates)} SMD candidates")
+
+    # Respect caller toggles.
+    if not generate_ibd:
+        ibd_candidates = []
+    if not generate_smd:
+        smd_candidates = []
+
+    # Step 3: Parallel generation (currently IBD async helper, SMD pending future tasks).
+    ibd_tasks = [
+        generate_ibd_for_block_async(
+            block=block,
+            system_context=text,
+            relationships=relationships,
+            db=db,
+            use_rag=use_rag
+        )
+        for block in ibd_candidates
+    ]
+
+    smd_tasks: List[Any] = []
+    if smd_candidates:
+        print("Unified chain: SMD generation requested but not yet implemented; skipping.")
+
+    all_tasks = ibd_tasks + smd_tasks
+    ibd_to_create: List[Dict[str, Any]] = []
+    smd_to_create: List[Dict[str, Any]] = []
+
+    if all_tasks:
+        print(f"Unified chain: Launching {len(all_tasks)} async generation tasks")
+        try:
+            results = await asyncio.gather(*all_tasks, return_exceptions=True)
+        except Exception as gather_error:
+            print(f"Unified chain: Parallel generation failed: {gather_error}")
+            results = []
+
+        ibd_task_count = len(ibd_tasks)
+        for index, result in enumerate(results):
+            if isinstance(result, Exception):
+                print(f"Unified chain: Task {index} raised exception: {result}")
+                continue
+            if result is None:
+                continue
+            if index < ibd_task_count:
+                ibd_to_create.append(result)
+            else:
+                smd_to_create.append(result)
+    else:
+        print("Unified chain: No async generation tasks to execute")
+
+    print(f"Unified chain: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
+
+    # Step 4: Store final payload in Redis.
+    redis_payload = {
+        "diagram": positioned_bdd,
+        "raw_text": text,
+        "model_used": bdd_result.get("model_used"),
+        "saved_to_rag": False,
+        "used_rag": use_rag and bool(bdd_examples),
+        "examples_count": len(bdd_examples),
+        "ibd_data": ibd_to_create,
+        "smd_data": smd_to_create,
+        "status": "completed"
+    }
+    diagram_id = redis_client.store_diagram(redis_payload)
+
+    preview = {
+        "name": name,
+        "bdd_blocks": len(elements),
+        "ibd_count": len(ibd_to_create),
+        "smd_count": len(smd_to_create)
+    }
+
+    print(f"Unified chain: Stored result under ID {diagram_id}")
+
+    return {
+        "status": "processing",
+        "diagramId": diagram_id,
+        "preview": preview
+    }
 
 @router.post("/generate-diagram-with-context/", status_code=202)
 async def generate_diagram_with_context(
@@ -412,9 +571,47 @@ async def save_diagram_to_database(
             diagram_json=cached_diagram["diagram"]
         )
         
-        # Save IBDs if they exist
-        ibd_data_list = cached_diagram.get("ibd_data", [])
-        for ibd_data in ibd_data_list:
+        # Normalize IBD payloads (supports both unified ibd_data list and legacy nested format)
+        normalized_ibds: List[Dict[str, Any]] = []
+        raw_diagram = cached_diagram.get("diagram") or {}
+        cached_ibd_data = cached_diagram.get("ibd_data")
+
+        if isinstance(cached_ibd_data, list) and cached_ibd_data:
+            for item in cached_ibd_data:
+                if not isinstance(item, dict):
+                    continue
+                parent_block_id = item.get("parent_block_id")
+                if not parent_block_id:
+                    continue
+                nodes = item.get("nodes", [])
+                edges = item.get("edges", [])
+                normalized_ibds.append({
+                    "parent_block_id": parent_block_id,
+                    "nodes": nodes,
+                    "edges": edges
+                })
+
+        if not normalized_ibds and isinstance(raw_diagram, dict):
+            # Legacy fallback: extract IBDs nested inside the BDD diagram
+            for element in raw_diagram.get("elements", []):
+                if not isinstance(element, dict):
+                    continue
+                internal_diagram = element.get("internal_diagram")
+                if not isinstance(internal_diagram, dict):
+                    continue
+                parent_block_id = element.get("id")
+                nodes = internal_diagram.get("nodes", [])
+                edges = internal_diagram.get("edges", [])
+                if parent_block_id:
+                    normalized_ibds.append({
+                        "parent_block_id": parent_block_id,
+                        "nodes": nodes,
+                        "edges": edges
+                    })
+
+        saved_ibd_count = 0
+
+        for ibd_data in normalized_ibds:
             existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
                 db=db,
                 parent_bdd_id=db_diagram.id,
@@ -441,11 +638,13 @@ async def save_diagram_to_database(
                     source="ai"
                 )
                 await crud_ibd.create_ibd(db=db, ibd=new_ibd)
+            saved_ibd_count += 1
         
         return {
             "message": "Diagram saved successfully",
             "diagram_id": db_diagram.id,
-            "saved_to_rag": True
+            "saved_to_rag": True,
+            "ibd_count": saved_ibd_count
         }
         
     except Exception as e:

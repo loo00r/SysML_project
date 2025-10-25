@@ -60,12 +60,13 @@ const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): P
 const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
   try {
     // Step 1: Start generation and get diagram ID
-    const endpoint = '/api/v1/rag/generate-diagram-with-context/';
+    const endpoint = '/api/v1/rag/generate-diagram-unified/';
     
     const requestBody = {
       text: options.prompt,
-      diagram_type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
       use_rag: true,
+      generate_ibd: Boolean(options.isEnhanced),
+      generate_smd: false,
       name: 'AI Generated Diagram'
     };
     
@@ -82,8 +83,13 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
 
     const initResult = await response.json();
-    if (initResult.error) {
-      return { nodes: [], edges: [], error: initResult.error };
+    if (initResult.error || initResult.status === 'error') {
+      const message = initResult.error || 'Diagram generation failed to start';
+      return { nodes: [], edges: [], error: message };
+    }
+
+    if (!initResult.diagramId) {
+      return { nodes: [], edges: [], error: 'Missing diagram ID from unified generation endpoint' };
     }
     
     // Step 2: Poll for the actual result
@@ -94,7 +100,13 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
     
     // Convert the backend diagram format to ReactFlow format
-    const nodes = data.diagram.elements.map((element: any) => ({
+    const ibdData = data.ibd_data || [];
+    const ibdBlockIds = new Set(
+      ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
+    );
+
+    const diagramElements = data.diagram?.elements || [];
+    const nodes = diagramElements.map((element: any) => ({
       id: element.id,
       type: element.type,
       data: { 
@@ -106,13 +118,14 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
           ...element.properties
         },
         type: element.type,
-        has_ibd: element.data?.has_ibd || false
+        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
     
     // Convert relationships to edges
-    const edges = data.diagram.relationships.map((rel: any) => ({
+    const diagramRelationships = data.diagram?.relationships || [];
+    const edges = diagramRelationships.map((rel: any) => ({
       id: `edge-${rel.source_id}-${rel.target_id}`,
       source: rel.source_id,
       target: rel.target_id,
@@ -129,7 +142,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       nodes, 
       edges, 
       diagramId: initResult.diagramId,
-      ibdData: data.ibd_data || [] // Include IBD data from Redis
+      ibdData // Include IBD data from Redis
     };
   } catch (error) {
     console.error('Error generating diagram:', error);

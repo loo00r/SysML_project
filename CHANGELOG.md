@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Unified chain prompting endpoint wiring asynchronous IBD generation with Redis preview metadata in `backend/app/database/rag_router.py`.
+- Alembic migration creating `state_machine_diagrams` table linked to `diagram_embeddings` for upcoming SMD support.
+
+### Changed
+- Frontend AI generation now targets the unified chain prompting endpoint to retrieve Redis-backed diagram results and IBD context.
+- `/api/v1/rag/save-diagram/` now upserts IBD payloads from redis (including legacy nested formats) and reports saved counts.
+
+## [1.1.103] - 2025-10-25
+### Added
+- Alembic migration creating `state_machine_diagrams` table linked to `diagram_embeddings` for upcoming SMD support.
+
+## [1.1.102] - 2025-10-25
+### Changed
+- `/api/v1/rag/save-diagram/` now upserts IBD payloads from redis (including legacy nested formats) and reports saved counts.
+
+## [1.1.101] - 2025-10-25
+### Changed
+- Frontend AI generation now targets the unified chain prompting endpoint to retrieve Redis-backed diagram results and IBD context.
+
+## [1.1.100] - 2025-10-23
+### Added
+- Unified chain prompting endpoint wiring asynchronous IBD generation with Redis preview metadata in `backend/app/database/rag_router.py`.
+
 ## [1.1.99] - 2025-10-23
 ### Added
 - Async wrapper to generate internal block diagrams with optional RAG context in `backend/app/database/rag_router.py`.
