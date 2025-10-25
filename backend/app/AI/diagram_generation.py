@@ -593,6 +593,91 @@ TASK: Generate an Internal Block Diagram for the block "{block_name}" showing it
         return {"error": str(e), "ibd_raw": {}}
 
 
+
+
+def generate_state_machine_diagram(
+    block_id: str,
+    block_name: str,
+    block_description: str,
+    block_type: str,
+    system_context: str,
+    one_shot_examples: List[Dict] = None
+) -> Dict[str, Any]:
+    """
+    Generate an SMD for a specific block using chain prompting with behavioral context.
+
+    This is part of the chain prompting workflow:
+    BDD Generation → SMD Generation (this function)
+    """
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    system_prompt = SMD_PROMPT_TEMPLATE.format(
+        system_context=system_context,
+        block_name=block_name,
+        block_description=block_description,
+        block_type=block_type,
+        block_id=block_id
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if one_shot_examples:
+        print(f"
+==== Using {len(one_shot_examples)} RAG examples for SMD ====")
+        for example in one_shot_examples:
+            example_input = example.get("input", block_name)
+            messages.append({"role": "user", "content": f"Generate SMD for block: {example_input}"})
+            messages.append({"role": "assistant", "content": json.dumps(example.get("output", {}), indent=2)})
+
+    user_prompt = f"Generate state machine diagram for '{block_name}'."
+    messages.append({"role": "user", "content": user_prompt})
+
+    print(f"
+==== Generating SMD for block: {block_name} (ID: {block_id}) ====")
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_GENERATIVE_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1
+        )
+
+        response_text = response.choices[0].message.content
+        smd_data = json.loads(response_text)
+
+        if "nodes" not in smd_data or "edges" not in smd_data:
+            raise ValueError("SMD must contain 'nodes' and 'edges' fields")
+        if not isinstance(smd_data["nodes"], list) or not isinstance(smd_data["edges"], list):
+            raise ValueError("SMD 'nodes' and 'edges' must be arrays")
+        if len(smd_data["nodes"]) == 0:
+            raise ValueError("SMD must contain at least one node")
+
+        print(f"
+==== SMD Generation Successful for {block_name} ====")
+        print(f"Generated {len(smd_data['nodes'])} nodes and {len(smd_data['edges'])} edges")
+
+        return {
+            "smd_raw": smd_data,
+            "block_id": block_id,
+            "block_name": block_name,
+            "model_used": settings.OPENAI_GENERATIVE_MODEL,
+            "rag_used": bool(one_shot_examples),
+        }
+
+    except json.JSONDecodeError as e:
+        print(f"
+==== ERROR: Invalid JSON in SMD generation for {block_name}: {str(e)} ====")
+        return {"error": f"Invalid JSON response: {str(e)}", "smd_raw": {}}
+    except ValueError as e:
+        print(f"
+==== ERROR: Validation failed for {block_name}: {str(e)} ====")
+        return {"error": str(e), "smd_raw": {}}
+    except Exception as e:
+        print(f"
+==== ERROR generating SMD for {block_name}: {str(e)} ====")
+        return {"error": str(e), "smd_raw": {}}
+
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
     """
     Legacy function for backward compatibility.
