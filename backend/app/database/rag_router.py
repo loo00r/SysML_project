@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import json
 
 from app.db.dependencies import get_db
@@ -23,6 +23,16 @@ from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, 
 from app.crud import crud_ibd
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
+
+def identify_diagram_candidates(
+    elements: List[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Identify blocks that should feed IBD and SMD generation steps (see docs/UNIFIED_CHAIN_PROMPTING_PLAN.md).
+    """
+    ibd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
+    smd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
+    return ibd_candidates, smd_candidates
 
 @router.post("/diagrams/", response_model=DiagramEmbeddingResponse)
 async def create_diagram_embedding(

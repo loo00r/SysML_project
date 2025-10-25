@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Helper and unit test to identify BDD block candidates for IBD and SMD generation in `backend/app/database/rag_router.py`.
+
+## [1.1.98] - 2025-10-23
+### Added
+- Helper and unit test to identify BDD block candidates for IBD and SMD generation in `backend/app/database/rag_router.py`.
 
 ## [1.1.97] - 2025-10-23
 
