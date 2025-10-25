@@ -1,17 +1,53 @@
 import { Node, Edge } from 'reactflow';
 
+// Import DiagramInstance type for nested diagram support
+export interface DiagramInstance {
+  id: string;
+  name: string;
+  type: string;
+  nodes: Node[];
+  edges: Edge[];
+  parentDiagramId?: string;
+  parentBlockId?: string;
+}
+
+/**
+ * Collects all related diagrams (IBD and SMD) for a given BDD diagram
+ *
+ * @param mainDiagramId The ID of the main BDD diagram
+ * @param allDiagrams All available diagrams
+ * @returns Array of related diagrams
+ */
+export const collectRelatedDiagrams = (
+  mainDiagramId: string,
+  allDiagrams: DiagramInstance[]
+): DiagramInstance[] => {
+  const relatedDiagrams: DiagramInstance[] = [];
+
+  // Find all diagrams that have this diagram as parent
+  allDiagrams.forEach(diagram => {
+    if (diagram.parentDiagramId === mainDiagramId) {
+      relatedDiagrams.push(diagram);
+    }
+  });
+
+  return relatedDiagrams;
+};
+
 /**
  * Converts a SysML diagram to XMI format
- * 
+ *
  * @param nodes The diagram nodes
  * @param edges The diagram edges
  * @param diagramType The type of diagram (block, activity, etc.)
+ * @param relatedDiagrams Optional array of related diagrams (IBD, SMD)
  * @returns XMI formatted string
  */
 export const generateXMI = (
-  nodes: Node[], 
-  edges: Edge[], 
-  diagramType: string
+  nodes: Node[],
+  edges: Edge[],
+  diagramType: string,
+  relatedDiagrams?: DiagramInstance[]
 ): string => {
   // Get current date for XMI metadata
   const currentDate = new Date().toISOString();
@@ -60,13 +96,60 @@ export const generateXMI = (
   // Add edges to XMI
   edges.forEach(edge => {
     const relationshipType = mapEdgeTypeToXMI(edge.data?.type || 'association');
-    xmi += `      <packagedElement xmi:type="${relationshipType}" xmi:id="${edge.id}" 
+    xmi += `      <packagedElement xmi:type="${relationshipType}" xmi:id="${edge.id}"
         name="${edge.label || edge.data?.name || ''}"
-        source="${edge.source}" 
+        source="${edge.source}"
         target="${edge.target}"/>
 `;
   });
-  
+
+  // Add related diagrams (IBD and SMD) if present
+  if (relatedDiagrams && relatedDiagrams.length > 0) {
+    relatedDiagrams.forEach(relatedDiagram => {
+      const diagramTypeName = relatedDiagram.type.toUpperCase();
+      xmi += `      <!-- ${diagramTypeName}: ${relatedDiagram.name} -->
+`;
+
+      // Add nodes from related diagram
+      relatedDiagram.nodes.forEach(node => {
+        const nodeType = mapNodeTypeToXMI(node.type || 'block', relatedDiagram.type);
+        xmi += `      <packagedElement xmi:type="${nodeType}" xmi:id="${node.id}" name="${node.data.label || 'Unnamed'}">
+`;
+
+        // Add node properties if any
+        if (node.data.properties) {
+          Object.entries(node.data.properties).forEach(([key, value]) => {
+            if (key !== 'id' && key !== 'name' && value) {
+              xmi += `        <ownedAttribute xmi:type="uml:Property" name="${key}" value="${value}"/>
+`;
+            }
+          });
+        }
+
+        // Add description if available
+        if (node.data.description) {
+          xmi += `        <ownedComment xmi:type="uml:Comment">
+          <body>${node.data.description}</body>
+        </ownedComment>
+`;
+        }
+
+        xmi += `      </packagedElement>
+`;
+      });
+
+      // Add edges from related diagram
+      relatedDiagram.edges.forEach(edge => {
+        const relationshipType = mapEdgeTypeToXMI(edge.data?.type || 'association');
+        xmi += `      <packagedElement xmi:type="${relationshipType}" xmi:id="${edge.id}"
+        name="${edge.label || edge.data?.name || ''}"
+        source="${edge.source}"
+        target="${edge.target}"/>
+`;
+      });
+    });
+  }
+
   // Close XMI
   xmi += `    </packagedElement>
   </uml:Model>
@@ -113,39 +196,41 @@ const mapEdgeTypeToXMI = (edgeType: string): string => {
 
 /**
  * Validates a diagram against SysML rules
- * 
+ *
  * @param nodes The diagram nodes
  * @param edges The diagram edges
  * @param diagramType The type of diagram
+ * @param relatedDiagrams Optional array of related diagrams (IBD, SMD)
  * @returns Object with validation result and any errors
  */
 export const validateSysMLDiagram = (
-  nodes: Node[], 
-  edges: Edge[], 
-  diagramType: string
+  nodes: Node[],
+  edges: Edge[],
+  diagramType: string,
+  relatedDiagrams?: DiagramInstance[]
 ): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  
+
   // Basic validation - check if diagram has nodes
   if (nodes.length === 0) {
     errors.push('Diagram must contain at least one node');
   }
-  
+
   // Check for disconnected nodes (except for certain diagram types)
   if (diagramType !== 'requirement') {
     const connectedNodeIds = new Set<string>();
-    
+
     edges.forEach(edge => {
       connectedNodeIds.add(edge.source);
       connectedNodeIds.add(edge.target);
     });
-    
+
     const disconnectedNodes = nodes.filter(node => !connectedNodeIds.has(node.id));
     if (disconnectedNodes.length > 0) {
       errors.push(`Found ${disconnectedNodes.length} disconnected node(s). All nodes should be connected in a ${diagramType} diagram.`);
     }
   }
-  
+
   // Diagram-specific validations
   switch (diagramType) {
     case 'block':
@@ -165,7 +250,51 @@ export const validateSysMLDiagram = (
       validateRequirementDiagram(nodes, edges, errors);
       break;
   }
-  
+
+  // Validate related diagrams (IBD and SMD)
+  if (relatedDiagrams && relatedDiagrams.length > 0) {
+    relatedDiagrams.forEach(relatedDiagram => {
+      const diagramTypeName = relatedDiagram.type.toUpperCase();
+      const relatedErrors: string[] = [];
+
+      // Basic validation for related diagram
+      if (relatedDiagram.nodes.length === 0) {
+        relatedErrors.push(`${diagramTypeName} "${relatedDiagram.name}" must contain at least one node`);
+      }
+
+      // Check for disconnected nodes in related diagram
+      if (relatedDiagram.type !== 'requirement') {
+        const connectedNodeIds = new Set<string>();
+
+        relatedDiagram.edges.forEach(edge => {
+          connectedNodeIds.add(edge.source);
+          connectedNodeIds.add(edge.target);
+        });
+
+        const disconnectedNodes = relatedDiagram.nodes.filter(node => !connectedNodeIds.has(node.id));
+        if (disconnectedNodes.length > 0) {
+          relatedErrors.push(`${diagramTypeName} "${relatedDiagram.name}": Found ${disconnectedNodes.length} disconnected node(s)`);
+        }
+      }
+
+      // Type-specific validation for related diagrams
+      switch (relatedDiagram.type) {
+        case 'ibd':
+          validateBlockDiagram(relatedDiagram.nodes, relatedDiagram.edges, relatedErrors);
+          break;
+        case 'smd':
+          // SMD has its own validation, but we can add basic checks here
+          // Future: integrate with validateSmd from smdValidator
+          break;
+      }
+
+      // Add related diagram errors with prefix
+      relatedErrors.forEach(error => {
+        errors.push(`[${diagramTypeName}] ${error}`);
+      });
+    });
+  }
+
   return {
     isValid: errors.length === 0,
     errors

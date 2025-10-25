@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.20] - 2025-10-25
+### Added
+- BDD validation and export now includes all related SMD and IBD diagrams automatically.
+- XMI export now contains nodes and edges from nested state machine and internal block diagrams.
+- Success messages display count of included related diagrams.
+
+### Changed
+- `validateSysMLDiagram` function enhanced to validate nested diagrams with type-specific error prefixes.
+- `generateXMI` function extended to include related diagrams in export output.
+- Validation errors now clearly indicate which nested diagram has issues (e.g., "[SMD] error message").
+
+### Improved
+- Comprehensive BDD validation covering entire system hierarchy including behavioral and structural sub-diagrams.
+- Better export completeness - single XMI file now contains full system model.
+
 ## [1.2.19] - 2025-10-25
 ### Fixed
 - SMD seed template now uses left handles instead of top handles for State and Final nodes, ensuring arrows render correctly when creating new state machine diagrams.

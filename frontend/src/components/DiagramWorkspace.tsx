@@ -25,7 +25,7 @@ import useDiagramStore, { DiagramType, type NodeData } from '../store/diagramSto
 import PropertiesPanel from './PropertiesPanel';
 import TransitionPanel from './TransitionPanel';
 import ValidationPanel from './ValidationPanel';
-import { validateSysMLDiagram, generateXMI, downloadXMI } from '../utils/xmiExport';
+import { validateSysMLDiagram, generateXMI, downloadXMI, collectRelatedDiagrams } from '../utils/xmiExport';
 import { SMD_EDGE_MARKER_ID, SMD_EDGE_MARKER_URL, USE_SMD_EDGE_MARKERS } from '../utils/smdTransition';
 import { validateSmd, getValidationSummary } from '../services/validation/smdValidator';
 
@@ -514,14 +514,25 @@ const DiagramWorkspace: React.FC = () => {
         showNotification(message, summary.errors > 0 ? 'error' : 'warning');
       }
     } else {
-      // Original validation for non-SMD diagrams
+      // Original validation for non-SMD diagrams (BDD, IBD, etc.)
       const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
-      const result = validateSysMLDiagram(nodes, edges, diagramType);
+
+      // Collect related diagrams (SMD and IBD) if this is a BDD diagram
+      let relatedDiagrams: any[] = [];
+      if (activeDiagram?.type === 'bdd' && activeDiagramId) {
+        relatedDiagrams = collectRelatedDiagrams(activeDiagramId, openDiagrams);
+      }
+
+      const result = validateSysMLDiagram(nodes, edges, diagramType, relatedDiagrams);
       setValidationResult(result);
       setIsExportEnabled(result.isValid);
 
       if (result.isValid) {
-        showNotification('Diagram validation successful. Export is now enabled.', 'success');
+        const relatedCount = relatedDiagrams.length;
+        const message = relatedCount > 0
+          ? `Diagram validation successful (including ${relatedCount} related diagram${relatedCount > 1 ? 's' : ''}). Export is now enabled.`
+          : 'Diagram validation successful. Export is now enabled.';
+        showNotification(message, 'success');
       } else {
         if (!showValidationPanel) {
           toggleValidationPanel();
@@ -538,23 +549,33 @@ const DiagramWorkspace: React.FC = () => {
     try {
       // Get diagram type from nodes (default to 'block' if not found)
       const diagramType = nodes.length > 0 && nodes[0].type ? nodes[0].type.split('-')[0] : 'block';
-      
+
+      // Collect related diagrams (SMD and IBD) if this is a BDD diagram
+      let relatedDiagrams: any[] = [];
+      if (activeDiagram?.type === 'bdd' && activeDiagramId) {
+        relatedDiagrams = collectRelatedDiagrams(activeDiagramId, openDiagrams);
+      }
+
       // First validate the diagram
-      const validationResults = validateSysMLDiagram(nodes, edges, diagramType);
+      const validationResults = validateSysMLDiagram(nodes, edges, diagramType, relatedDiagrams);
       setValidationResult(validationResults);
-      
+
       if (!validationResults.isValid) {
         showNotification(`Cannot export: ${validationResults.errors.join(', ')}`, 'error');
         return;
       }
-      
-      // Generate XMI
-      const xmiContent = generateXMI(nodes, edges, diagramType);
+
+      // Generate XMI (including related diagrams)
+      const xmiContent = generateXMI(nodes, edges, diagramType, relatedDiagrams);
       
       // Download the XMI file
       downloadXMI(xmiContent, `${activeDiagram.name.replace(/\s+/g, '_')}.xmi`);
-      
-      showNotification('XMI exported successfully', 'success');
+
+      const relatedCount = relatedDiagrams.length;
+      const message = relatedCount > 0
+        ? `XMI exported successfully (including ${relatedCount} related diagram${relatedCount > 1 ? 's' : ''})`
+        : 'XMI exported successfully';
+      showNotification(message, 'success');
     } catch (error) {
       console.error('Error exporting XMI:', error);
       showNotification(`Failed to export: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
