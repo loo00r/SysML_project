@@ -639,29 +639,58 @@ const DiagramWorkspace: React.FC = () => {
 
       const targetHandle = connection.targetHandle?.toLowerCase() || '';
 
-      // Check if target handle is RIGHT or BOTTOM (disallowed)
+      // Check if target handle is RIGHT or BOTTOM (disallowed globally)
       if (targetHandle.includes('right') || targetHandle.includes('bottom')) {
         showNotification('SMD nodes can only receive transitions on LEFT or TOP sides. RIGHT and BOTTOM are source-only.', 'warning');
         return;
       }
 
-      // Also check by position if no explicit handle
-      if (!connection.targetHandle) {
-        const sourceNode = nodes.find(n => n.id === connection.source);
+      // Additional check for State/Choice: they can ONLY accept LEFT (not even TOP)
+      if (targetNode?.type === 'smdState' || targetNode?.type === 'smdChoice') {
+        if (targetHandle.includes('top')) {
+          showNotification('State and Choice nodes can only receive transitions on the LEFT side.', 'warning');
+          return;
+        }
 
-        if (targetNode && sourceNode) {
-          const dx = sourceNode.position.x - targetNode.position.x;
-          const dy = sourceNode.position.y - targetNode.position.y;
+        // Also check by position if no explicit handle
+        if (!connection.targetHandle) {
+          const sourceNode = nodes.find(n => n.id === connection.source);
 
-          // Infer target side from geometry
-          const isHorizontalDominant = Math.abs(dx) >= Math.abs(dy);
-          const inferredSide = isHorizontalDominant
-            ? (dx > 0 ? 'right' : 'left')
-            : (dy > 0 ? 'bottom' : 'top');
+          if (targetNode && sourceNode) {
+            const dx = sourceNode.position.x - targetNode.position.x;
+            const dy = sourceNode.position.y - targetNode.position.y;
 
-          if (inferredSide === 'right' || inferredSide === 'bottom') {
-            showNotification('SMD nodes can only receive transitions on LEFT or TOP sides.', 'warning');
-            return;
+            // Infer target side from geometry
+            const isHorizontalDominant = Math.abs(dx) >= Math.abs(dy);
+            const inferredSide = isHorizontalDominant
+              ? (dx > 0 ? 'right' : 'left')
+              : (dy > 0 ? 'bottom' : 'top');
+
+            if (inferredSide !== 'left') {
+              showNotification('State and Choice nodes can only receive transitions on the LEFT side.', 'warning');
+              return;
+            }
+          }
+        }
+      } else {
+        // For Initial/Final nodes, check by position if no explicit handle
+        if (!connection.targetHandle) {
+          const sourceNode = nodes.find(n => n.id === connection.source);
+
+          if (targetNode && sourceNode) {
+            const dx = sourceNode.position.x - targetNode.position.x;
+            const dy = sourceNode.position.y - targetNode.position.y;
+
+            // Infer target side from geometry
+            const isHorizontalDominant = Math.abs(dx) >= Math.abs(dy);
+            const inferredSide = isHorizontalDominant
+              ? (dx > 0 ? 'right' : 'left')
+              : (dy > 0 ? 'bottom' : 'top');
+
+            if (inferredSide === 'right' || inferredSide === 'bottom') {
+              showNotification('SMD nodes can only receive transitions on LEFT or TOP sides.', 'warning');
+              return;
+            }
           }
         }
       }

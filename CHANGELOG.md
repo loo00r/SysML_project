@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.17] - 2025-10-25
+### Changed
+- State and Choice nodes now expose only two handles (left inbound, right outbound); top/bottom handles removed for cleaner visual design.
+- Connection validation enhanced to prevent targeting top/bottom sides on State/Choice nodes.
+- Dagre layout algorithm now forces LEFT/RIGHT positioning for State/Choice nodes in SMD diagrams.
+
+### Fixed
+- Normalization ensures imported SMD edges targeting Top/Bottom on State/Choice are remapped to Left to match new handle policy.
+- Test Mode JSON imports automatically normalize invalid target handles for State/Choice nodes.
+- Arrow overlays on State/Choice now only render on allowed left side, eliminating visual confusion.
+- Initial and Final nodes maintain all four handles with existing validation rules unchanged.
+
 ## [1.2.16] - 2025-10-24
 ### Improved
 - SMD Test Mode layout now supports flexible 4-directional connections (top, left, right, bottom).

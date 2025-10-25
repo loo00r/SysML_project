@@ -179,96 +179,96 @@ The application now features a **tabbed interface** for managing multiple diagra
 
 ### new task
 
-Task SMD-06 — Enforce inbound-only sides (Left/Top) for SMD targets
+Task SMD-06a — Remove top/bottom handles on State and Choice (Initial/Final keep all four)
 
 Goal
-In SMD diagrams, nodes must accept incoming transitions only on LEFT and TOP. RIGHT and BOTTOM are source-only (no inbound arrows). Prevent creating such connections in the UI, normalize imported/Test-Mode JSON, and avoid rendering arrows on disallowed sides.
+For SMD diagrams, State and Choice nodes should expose only two handles: LEFT (target/inbound) and RIGHT (source/outbound). Remove TOP and BOTTOM handles entirely for these two node types. Initial and Final keep all four visual handles as before (with existing validation rules still active: Initial remains source-only; right/bottom remain disallowed as targets globally).
 
 Scope of Work
 
-1.  Handle policy on SMD nodes
+1.  Node handle config
     
 
-*   State / Final / Choice: enable target handles only on LEFT and TOP; enable source handles only on RIGHT and BOTTOM.
+*   Update StateNode and ChoiceNode components to render exactly two handles:• left: isTarget = true, isSource = false• right: isTarget = false, isSource = true
     
-*   Initial: source-only (no targets).
+*   Do not render top/bottom handles for these node types at all.
     
-*   Ensure React Flow handle props reflect this (isTarget false for RIGHT/BOTTOM).
-    
-
-2.  Connection guard
+*   Keep InitialNode and FinalNode unchanged (all four handles visible).
     
 
-*   In onConnect/validateConnection for SMD transitions, reject connections whose target handle is RIGHT or BOTTOM.
-    
-*   Optional UX: if the user drops near a disallowed side, auto-snap to the nearest allowed side (prefer LEFT, else TOP) and show a brief toast (“Right/Bottom are out-handles”).
+2.  Connection validation (defense in depth)
     
 
-3.  Arrow overlay filter
+*   In validateConnection/onConnect guard for SMD edges, add a type-aware rule:• if target node type ∈ {state, choice} then reject targetPosition ∈ {Top, Bottom}.
+    
+*   Keep existing global policy (no inbound to RIGHT/BOTTOM for any node), so this is largely a safeguard for legacy/imported data.
     
 
-*   When computing inbound sides for node-drawn arrows, ignore RIGHT/BOTTOM even if legacy edges still point there. No arrow should render for disallowed sides.
+3.  Normalization/migration (rehydrate + Test Mode import)
     
 
-4.  Normalization & migration (rehydrate + Test Mode JSON import)
+*   In normalizeSmdTargetSide(edge, targetNode):• if targetNode.type ∈ {state, choice} and targetPosition === Top, remap to Left.• if targetPosition ∈ {Right, Bottom}, keep the existing remap to Left/Top logic, but for state/choice always prefer Left.
+    
+*   Persist normalized edges immediately after import/rehydrate to avoid flip-flop across reloads.
     
 
-*   During edge normalization, if targetPosition ∈ {Right, Bottom} (or targetHandle indicates those sides), remap to an allowed side:
-    
-    *   If |dx| ≥ |dy| → set targetPosition = Left (and targetHandle='left').
-        
-    *   Else → set targetPosition = Top (and targetHandle='top').
-        
-*   Persist the corrected edge immediately (single one-time migration per diagram/import) to prevent regressions.
+4.  Arrow overlay
     
 
-5.  Safety
+*   Since top/bottom handles no longer exist on state/choice, ensure the inbound-sides hook cannot report Top/Bottom for these nodes.
+    
+*   Result: state/choice only ever display a left-side inbound arrow.
     
 
-*   Do not change source side logic.
+5.  Test Mode (JSON → SMD) and Dagre
     
-*   Self-loops: apply the same rule—loop targets may land only on LEFT/TOP.
+
+*   When flexiblePositions is enabled, bias connection anchoring for state/choice to left (targets) and right (sources).
     
-*   Unit/utility: extract normalizeSmdTargetSide(edge, targetNodeBounds) so Test Mode and rehydrate share the same logic.
+*   If the auto-router chooses Top/Bottom for state/choice targets, override to Left before edge creation.
     
 
 Acceptance Criteria
 
-1.  It’s impossible to create an SMD edge that targets RIGHT or BOTTOM (UI validation blocks or auto-snaps).
+1.  State and Choice nodes render only two handles (left target, right source). No top/bottom dots on these nodes. Initial and Final remain with four handles.
     
-2.  Imported/Test-Mode JSON that targets RIGHT/BOTTOM gets normalized to LEFT/TOP; no duplicate arrows appear.
+2.  It is impossible to connect an inbound transition to the top or bottom of State/Choice in the UI.
     
-3.  Node arrow overlays never render on RIGHT/BOTTOM.
+3.  Imported/Test-Mode diagrams that tried to target Top/Bottom on State/Choice are automatically normalized to Left; no warnings or duplicate arrows appear.
     
-4.  Existing behavior for labels, selection, and arrows on allowed sides remains unchanged.
+4.  Arrow overlays on State/Choice only render on the left side.
     
-5.  The screenshot case (double arrow at left and right) no longer reproduces.
+5.  No regressions for labels, arrows, or validation on Initial/Final nodes.
     
 
 Manual Test Plan
 
-*   Drag to connect into LEFT/TOP → succeeds; into RIGHT/BOTTOM → blocked or snapped, no console errors.
+*   Try to create edges into the top or bottom of a State and a Choice: no handle appears, and validation blocks any forced attempts.
     
-*   Import the provided JSON where a transition targets RIGHT/BOTTOM → arrow ends up on LEFT or TOP after normalization.
+*   Import a JSON that targets Top on a State: after import, the edge targets Left and the arrow shows on the left.
     
-*   Create self-loop targeting RIGHT/BOTTOM → blocked; LEFT/TOP → allowed.
+*   Create typical flows: Initial → State → Choice → Final. Verify handles behave as specified and arrows look correct.
     
-*   Undo/redo and reload → constraints persist.
+*   Reload (rehydrate) and undo/redo to ensure normalization persists and nothing flips back to Top/Bottom.
     
 
 Files Likely Touched
 
-*   frontend/src/components/nodes/smd/StateNode.tsx, FinalNode.tsx, ChoiceNode.tsx (handle props)
+*   frontend/src/components/nodes/smd/StateNode.tsx
+    
+*   frontend/src/components/nodes/smd/ChoiceNode.tsx
     
 *   frontend/src/edges/smdTransition/validateConnection.ts (or equivalent)
     
-*   frontend/src/utils/smdTransition.ts (normalizeSmdTargetSide)
+*   frontend/src/utils/smdTransition.ts (normalizeSmdTargetSide updates)
     
-*   frontend/src/components/shared/ArrowHeadOverlay.tsx (filter sides)
+*   frontend/src/components/shared/useSmdInboundSides.ts (or wherever inbound-side detection lives)
     
-*   frontend/src/services/imports/smdFromJson.ts (Test Mode normalization hook)
+*   frontend/src/services/imports/smdFromJson.ts (Test Mode import hook)
     
 
-Changelog (prepare)
-Version: 1.2.14 
-Changed — SMD nodes accept inbound transitions only on LEFT/TOP; RIGHT/BOTTOM are source-only.Fixed — Imported/Test-Mode diagrams normalize invalid target sides and no longer show duplicate arrows.
+Changelog (prepare after merge)Version: 1.2.17Changed
+
+*   State and Choice nodes now expose only two handles (left inbound, right outbound); top/bottom handles removed.Fixed
+    
+*   Normalization ensures imported SMD edges targeting Top/Bottom on State/Choice are remapped to Left to match new handle policy.

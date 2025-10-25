@@ -5,6 +5,7 @@ import {
   composeSmdTransitionLabel,
   SMD_EDGE_MARKER_URL,
   USE_SMD_EDGE_MARKERS,
+  normalizeSmdTargetSide,
 } from './smdTransition';
 
 const NODE_TYPE_MAP: Record<string, NodeData['type']> = {
@@ -389,6 +390,15 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
     const label =
       toTrimmedString(edgeRecord['label']) ?? composeSmdTransitionLabel(transitionData) ?? undefined;
 
+    const targetNode = nodeMap.get(target);
+    const rawTargetHandle = normalizeEdgeHandle(edgeRecord['targetHandle']);
+
+    // Normalize target handle for State/Choice nodes (only LEFT allowed)
+    const normalizedTargetHandle = normalizeSmdTargetSide({
+      targetHandle: rawTargetHandle,
+      targetNodeType: targetNode?.type,
+    });
+
     const edge: Edge = {
       id,
       source,
@@ -397,7 +407,7 @@ export const parseSmdTestModeInput = (rawInput: string): SmdTestModeParseResult 
       data: transitionData,
       label,
       sourceHandle: normalizeEdgeHandle(edgeRecord['sourceHandle']),
-      targetHandle: normalizeEdgeHandle(edgeRecord['targetHandle']),
+      targetHandle: normalizedTargetHandle,
       animated: false,
       markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
       style: {

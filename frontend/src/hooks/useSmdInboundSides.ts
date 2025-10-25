@@ -96,6 +96,7 @@ const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
 
   return useMemo(() => {
     const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const currentNode = nodeMap.get(nodeId);
     const sideSet = new Set<ArrowSide>();
 
     edges.forEach((edge) => {
@@ -104,8 +105,20 @@ const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
       }
 
       const side = inferSide(edge, nodeMap.get(edge.source ?? ''), nodeMap.get(edge.target ?? ''));
-      // Filter out disallowed inbound sides (RIGHT/BOTTOM)
-      if (side && ALLOWED_INBOUND_SIDES.has(side)) {
+
+      // Filter out disallowed inbound sides (RIGHT/BOTTOM globally)
+      if (!side || !ALLOWED_INBOUND_SIDES.has(side)) {
+        return;
+      }
+
+      // Additional filter for State/Choice: only LEFT is allowed (no TOP)
+      if (currentNode?.type === 'smdState' || currentNode?.type === 'smdChoice') {
+        if (side === 'left') {
+          sideSet.add(side);
+        }
+        // Ignore 'top' for State/Choice even if edge says so
+      } else {
+        // For Initial/Final, both left and top are allowed
         sideSet.add(side);
       }
     });

@@ -84,3 +84,36 @@ export const parseSmdTransitionLabel = (label: string | undefined): Required<Smd
 
   return ensureSmdTransitionData({ event, guard, action });
 };
+
+/**
+ * Normalizes SMD edge target side for State and Choice nodes.
+ * State/Choice nodes can only accept inbound transitions on LEFT side.
+ * This function remaps any Top/Right/Bottom target to Left.
+ */
+export interface NormalizeSmdTargetSideParams {
+  targetHandle?: string | null;
+  targetNodeType?: string;
+}
+
+export const normalizeSmdTargetSide = (
+  edge: NormalizeSmdTargetSideParams & { targetHandle?: string | null }
+): string => {
+  const targetNodeType = edge.targetNodeType;
+  const targetHandle = edge.targetHandle?.toLowerCase();
+
+  // Only normalize for State and Choice nodes
+  if (targetNodeType !== 'smdState' && targetNodeType !== 'smdChoice') {
+    return edge.targetHandle || 'in-left';
+  }
+
+  // For State/Choice, any target that's not LEFT gets remapped to LEFT
+  if (
+    targetHandle &&
+    (targetHandle.includes('left') || targetHandle === 'in-left')
+  ) {
+    return edge.targetHandle || 'in-left';
+  }
+
+  // Remap everything else to LEFT for State/Choice
+  return 'in-left';
+};

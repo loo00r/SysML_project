@@ -46,9 +46,17 @@ const getLayoutedElements = (
       },
     };
 
-    // For SMD diagrams with flexible positions, don't set fixed target/source positions
-    // This allows connections to use all 4 sides (top, left, right, bottom)
+    // For SMD diagrams with flexible positions
     if (flexiblePositions) {
+      // State/Choice nodes: force LEFT for targets, RIGHT for sources
+      if (node.type === 'smdState' || node.type === 'smdChoice') {
+        return {
+          ...baseNode,
+          targetPosition: Position.Left,
+          sourcePosition: Position.Right,
+        };
+      }
+      // For Initial/Final, allow flexible positioning (all 4 sides)
       return baseNode;
     }
 
