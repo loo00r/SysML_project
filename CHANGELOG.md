@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alembic migration creating `state_machine_diagrams` table linked to `diagram_embeddings` for upcoming SMD support.
 - Bootstrapped `state_machine_diagrams` table creation in `backend/app/database/init.sql` for fresh deployments.
 - CRUD utilities and async unit tests for state machine diagrams in backend SMD implementation.
+- State machine prompt template in `backend/app/AI/diagram_generation.py` using node/edge structure for SMD behavior modeling.
 - SQLAlchemy model and Pydantic schemas for state machine diagrams in `backend/app/database/models.py`, exported via `backend/app/database/__init__.py`.
 
 ### Changed

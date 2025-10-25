@@ -277,6 +277,58 @@ Rules:
 6. Return exactly one valid JSON object following the required format.
 """
 
+SMD_PROMPT_TEMPLATE = """
+You are a SysML behavioral modeling specialist.
+
+TASK: Generate a State Machine Diagram (SMD) in JSON format for a specific block.
+
+CONTEXT:
+- Parent System: {system_context}
+- Block Name: {block_name}
+- Block Description: {block_description}
+- Block Type: {block_type}
+- Block ID: {block_id}
+
+GOAL:
+Capture the block's lifecycle using states (nodes) and transitions (edges) that describe how it behaves over time.
+
+Required output format:
+{{
+  "diagram_type": "smd",
+  "parent_block_id": "{block_id}",
+  "parent_block_name": "{block_name}",
+  "nodes": [
+    {{"id": "init", "type": "initial"}},
+    {{"id": "state-operational", "type": "state", "name": "Operational"}},
+    {{"id": "state-fault", "type": "state", "name": "Fault"}},
+    {{"id": "final", "type": "final"}}
+  ],
+  "edges": [
+    {{"id": "edge-start", "source": "init", "target": "state-operational", "label": "initialize"}},
+    {{"id": "edge-fault", "source": "state-operational", "target": "state-fault", "label": "error_detected"}},
+    {{"id": "edge-reset", "source": "state-fault", "target": "state-operational", "label": "reset"}},
+    {{"id": "edge-shutdown", "source": "state-operational", "target": "final", "label": "shutdown"}}
+  ]
+}}
+
+RULES:
+1. Nodes must use types "initial", "state", or "final". Include exactly one "initial" node. Add a "final" node when shutdown/end behavior is relevant.
+2. Provide 4–8 nodes total (including initial/final). Use descriptive IDs such as "state-charging" and readable names for operational states.
+3. Edges represent transitions. Every edge requires source, target, and a concise label describing the trigger or condition (e.g., "enable_autopilot").
+4. Ensure no operational state is isolated: each must have at least one incoming and one outgoing edge.
+5. Labels should be short verbs/phrases. Use an empty string only when the transition occurs automatically.
+6. Do NOT include coordinates, layout data, or extra fields. Return exactly one JSON object matching the format above.
+7. Tailor the lifecycle to the provided block and domain context (automotive, aerospace, robotics, energy, etc.).
+
+DOMAIN EXAMPLES (for inspiration only):
+- Vehicle control: init → Off → Driving → Manual → Autopilot → Parking → Charging → Final
+- Flight computer: init → Boot → Standby → Active → Safe Mode → Final
+- Industrial robot: init → Homing → Ready → Executing → Paused → Recovery → Final
+- Battery management: init → Idle → Charging → Balancing → Fault → Final
+
+Use these patterns as inspiration, but align the final nodes and edges with the specific block description.
+"""
+
 BDD_ENHANCED_PROMPT_TEMPLATE = """
 You are an expert SysML architect. Your task is to generate a comprehensive system diagram
 in JSON format based on a user's description. The output must be a Block Definition
