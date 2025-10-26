@@ -622,8 +622,7 @@ def generate_state_machine_diagram(
     messages = [{"role": "system", "content": system_prompt}]
 
     if one_shot_examples:
-        print(f"
-==== Using {len(one_shot_examples)} RAG examples for SMD ====")
+        print(f"\n==== Using {len(one_shot_examples)} RAG examples for SMD ====")
         for example in one_shot_examples:
             example_input = example.get("input", block_name)
             messages.append({"role": "user", "content": f"Generate SMD for block: {example_input}"})
@@ -632,8 +631,7 @@ def generate_state_machine_diagram(
     user_prompt = f"Generate state machine diagram for '{block_name}'."
     messages.append({"role": "user", "content": user_prompt})
 
-    print(f"
-==== Generating SMD for block: {block_name} (ID: {block_id}) ====")
+    print(f"\n==== Generating SMD for block: {block_name} (ID: {block_id}) ====")
 
     try:
         response = client.chat.completions.create(
@@ -653,8 +651,7 @@ def generate_state_machine_diagram(
         if len(smd_data["nodes"]) == 0:
             raise ValueError("SMD must contain at least one node")
 
-        print(f"
-==== SMD Generation Successful for {block_name} ====")
+        print(f"\n==== SMD Generation Successful for {block_name} ====")
         print(f"Generated {len(smd_data['nodes'])} nodes and {len(smd_data['edges'])} edges")
 
         return {
@@ -666,16 +663,13 @@ def generate_state_machine_diagram(
         }
 
     except json.JSONDecodeError as e:
-        print(f"
-==== ERROR: Invalid JSON in SMD generation for {block_name}: {str(e)} ====")
+        print(f"\n==== ERROR: Invalid JSON in SMD generation for {block_name}: {str(e)} ====")
         return {"error": f"Invalid JSON response: {str(e)}", "smd_raw": {}}
     except ValueError as e:
-        print(f"
-==== ERROR: Validation failed for {block_name}: {str(e)} ====")
+        print(f"\n==== ERROR: Validation failed for {block_name}: {str(e)} ====")
         return {"error": str(e), "smd_raw": {}}
     except Exception as e:
-        print(f"
-==== ERROR generating SMD for {block_name}: {str(e)} ====")
+        print(f"\n==== ERROR generating SMD for {block_name}: {str(e)} ====")
         return {"error": str(e), "smd_raw": {}}
 
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:

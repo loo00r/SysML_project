@@ -1373,10 +1373,8 @@ const useDiagramStore = create<DiagramStoreState>()(
   generateDiagramFromText: async (text) => {
     try {
       set({ isGenerating: true });
-      
-      // Save current state to history before generating
       get().saveToHistory();
-      
+
       if (get().useRAG) {
         const generateIBD = get().diagramType === 'bdd_enhanced';
         const response = await fetch('/api/v1/rag/generate-diagram-unified/', {
@@ -1389,50 +1387,72 @@ const useDiagramStore = create<DiagramStoreState>()(
             use_rag: true,
             generate_ibd: generateIBD,
             generate_smd: false,
-            name: 'Generated Diagram'
+            name: 'Generated Diagram',
           }),
         });
 
         if (!response.ok) {
           throw new Error(`API error: ${response.statusText}`);
         }
-      }));
-      const rfEdges = data.edges.map((edge: any) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: 'smoothstep',
-        label: edge.label || '',
-        animated: edge.animated || false,
-        style: { stroke: '#555' }
-      }));
-      
-      // Застосовуємо автоматичне позиціонування за допомогою Dagre
-      // IBD діаграми використовують LR (горизонтальний), BDD діаграми TB (вертикальний)
-      const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
-      console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
-      const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(rfNodes, rfEdges, direction, 
-        get().diagramType === 'ibd' ? {
-          nodeSep: 150,  // Vertical distance can be smaller
-          rankSep: 350   // Radically increased horizontal distance
-        } : undefined
-      );
-      
-      set({
-        nodes: layoutedNodes,
-        edges: layoutedEdges
-      });
-      get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
 
-        // Validate the generated diagram
+        const initResult = await response.json();
+        if (initResult.error || initResult.status === 'error' || !initResult.diagramId) {
+          throw new Error(initResult.error || 'Failed to start unified diagram generation');
+        }
+
+        const result = await pollUnifiedDiagramResult(initResult.diagramId);
+        if (result.error || result.status === 'error') {
+          throw new Error(result.error || 'Diagram generation failed');
+        }
+
+        const ibdData = result.ibd_data || [];
+        const ibdBlockIds = new Set(
+          ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
+        );
+
+        const diagram = result.diagram || {};
+        const rfNodes = (diagram.elements || []).map((node: any) => ({
+          id: node.id,
+          type: node.type || node.data?.type || 'block',
+          data: {
+            label: node.name || node.data?.label || node.label,
+            description: node.description || node.data?.description || '',
+            type: node.data?.type || node.type || 'block',
+            properties: node.properties || node.data?.properties || {},
+            inputs: node.inputs || node.data?.inputs || [],
+            outputs: node.outputs || node.data?.outputs || [],
+            has_ibd: node.data?.has_ibd || ibdBlockIds.has(node.id) || false,
+          },
+        }));
+
+        const rfEdges = (diagram.relationships || []).map((edge: any) => ({
+          id: edge.id || `edge-${edge.source_id}-${edge.target_id}`,
+          source: edge.source_id || edge.source,
+          target: edge.target_id || edge.target,
+          type: 'smoothstep',
+          label: edge.name || edge.label || '',
+          animated: edge.animated || false,
+          style: { stroke: '#555' },
+        }));
+
+        const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+          rfNodes,
+          rfEdges,
+          'TB'
+        );
+
+        set({
+          nodes: layoutedNodes,
+          edges: layoutedEdges,
+        });
+        get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
+
         const errors = get().validateDiagram();
         set({ validationErrors: errors });
-
         if (errors.length > 0) {
           set({ showValidationPanel: true });
         }
       } else {
-        // Legacy direct generation without RAG/unified flow
         const response = await fetch('/api/v1/create-diagram/', {
           method: 'POST',
           headers: {
@@ -1440,7 +1460,7 @@ const useDiagramStore = create<DiagramStoreState>()(
           },
           body: JSON.stringify({
             text,
-            diagram_type: get().diagramType
+            diagram_type: get().diagramType,
           }),
         });
 
@@ -1449,70 +1469,71 @@ const useDiagramStore = create<DiagramStoreState>()(
         }
 
         const data = await response.json();
+        if (!data.nodes || !data.edges) {
+          throw new Error('Diagram generation returned empty result');
+        }
 
-        if (data.nodes && data.edges) {
-          const rfNodes = data.nodes.map((node: any) => ({
-            id: node.id,
-            type: node.type || node.data?.type || 'block',
-            position: node.position || { x: 0, y: 0 },
-            data: {
-              label: node.name || node.data?.label || node.label,
-              description: node.description || node.data?.description || '',
-              type: node.data?.type || node.type || 'block',
-              properties: node.properties || node.data?.properties || {},
-              inputs: node.inputs || node.data?.inputs || [],
-              outputs: node.outputs || node.data?.outputs || []
-            }
-          }));
-          const rfEdges = data.edges.map((edge: any) => ({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: 'smoothstep',
-            label: edge.label || '',
-            animated: edge.animated || false,
-            style: { stroke: '#555' }
-          }));
+        const rfNodes = data.nodes.map((node: any) => ({
+          id: node.id,
+          type: node.type || node.data?.type || 'block',
+          data: {
+            label: node.name || node.data?.label || node.label,
+            description: node.description || node.data?.description || '',
+            type: node.data?.type || node.type || 'block',
+            properties: node.properties || node.data?.properties || {},
+            inputs: node.inputs || node.data?.inputs || [],
+            outputs: node.outputs || node.data?.outputs || [],
+          },
+        }));
 
-          const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
-          console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
-          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
-            rfNodes,
-            rfEdges,
-            direction,
-            get().diagramType === 'ibd'
-              ? {
-                  nodeSep: 150,
-                  rankSep: 350
-                }
-              : undefined
-          );
+        const rfEdges = data.edges.map((edge: any) => ({
+          id: edge.id || `edge-${edge.source}-${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          type: 'smoothstep',
+          label: edge.label || '',
+          animated: edge.animated || false,
+          style: { stroke: '#555' },
+        }));
 
-          set({
-            nodes: layoutedNodes,
-            edges: layoutedEdges
-          });
-          get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
+        const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
+        const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+          rfNodes,
+          rfEdges,
+          direction,
+          get().diagramType === 'ibd'
+            ? {
+                nodeSep: 150,
+                rankSep: 350,
+              }
+            : undefined
+        );
 
-          const errors = get().validateDiagram();
-          set({ validationErrors: errors });
+        set({
+          nodes: layoutedNodes,
+          edges: layoutedEdges,
+        });
+        get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
 
-          if (errors.length > 0) {
-            set({ showValidationPanel: true });
-          }
+        const errors = get().validateDiagram();
+        set({ validationErrors: errors });
+        if (errors.length > 0) {
+          set({ showValidationPanel: true });
         }
       }
     } catch (error) {
       console.error('Error generating diagram:', error);
-      set({ 
+      set({
         validationErrors: [
           ...get().validationErrors,
-          { 
-            type: 'error', 
-            message: `Failed to generate diagram: ${error instanceof Error ? error.message : String(error)}` 
-          }
+          {
+            type: 'error',
+            message: `Failed to generate diagram: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
         ],
-        showValidationPanel: true
+        showValidationPanel: true,
       });
     } finally {
       set({ isGenerating: false });
