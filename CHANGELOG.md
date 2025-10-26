@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Generate Detailed Diagram now links AI-created State Machine Diagrams with the main BDD and IBD outputs.
+
+## [1.2.23] - 2025-10-26
+### Changed
+- AI-generated detailed diagrams automatically open State Machine Diagram tabs for eligible blocks alongside their BDD and IBD counterparts.
 
 ## [1.2.22] - 2025-10-25
 ### Fixed
@@ -2830,4 +2836,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
-

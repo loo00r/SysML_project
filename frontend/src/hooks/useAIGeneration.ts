@@ -1,7 +1,13 @@
 import { useState, useCallback } from 'react';
-import useDiagramStore, { type DiagramType } from '../store/diagramStore';
+import type { Edge, Node } from 'reactflow';
+import useDiagramStore, { type DiagramType, type NodeData } from '../store/diagramStore';
 import { applyDagreLayout } from '../utils/dagreLayout';
 import { parseSmdTestModeInput } from '../utils/smdTestMode';
+import {
+  composeSmdTransitionLabel,
+  ensureSmdTransitionData,
+  parseSmdTransitionLabel,
+} from '../utils/smdTransition';
 
 // Types for AI generation
 interface AIGenerationOptions {
@@ -19,6 +25,7 @@ interface AIGenerationResult {
   error?: string;
   diagramId?: string;
   ibdData?: any[]; // IBD data from Redis for creating IBD diagrams
+  smdData?: any[]; // SMD data from Redis for creating SMD diagrams
   diagramType?: DiagramType;
   name?: string;
   description?: string;
@@ -57,6 +64,163 @@ const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGeneration
     name: parsed.name,
     description: parsed.description,
   };
+};
+
+const SMD_NODE_TYPE_MAP: Record<string, NodeData['type']> = {
+  initial: 'smdInitial',
+  final: 'smdFinal',
+  state: 'smdState',
+  choice: 'smdChoice',
+};
+
+const toTrimmedString = (value: unknown): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}`;
+  }
+  return undefined;
+};
+
+const normalizeSmdNodeType = (value: unknown): NodeData['type'] | null => {
+  const raw = toTrimmedString(value);
+  if (!raw) {
+    return null;
+  }
+  const key = raw.toLowerCase();
+  return SMD_NODE_TYPE_MAP[key] ?? null;
+};
+
+const stateTypeForNodeType = (nodeType: NodeData['type']): NodeData['stateType'] | undefined => {
+  switch (nodeType) {
+    case 'smdInitial':
+      return 'initial';
+    case 'smdFinal':
+      return 'final';
+    case 'smdChoice':
+      return 'choice';
+    case 'smdState':
+      return 'state';
+    default:
+      return undefined;
+  }
+};
+
+const transformSmdNodesFromApi = (rawNodes: unknown[]): { nodes: Node<NodeData>[]; nodeIdSet: Set<string> } => {
+  const nodes: Node<NodeData>[] = [];
+  const nodeIdSet = new Set<string>();
+
+  rawNodes.forEach((rawNode, index) => {
+    if (!rawNode || typeof rawNode !== 'object') {
+      return;
+    }
+
+    const nodeRecord = rawNode as Record<string, unknown>;
+    const nodeId = toTrimmedString(nodeRecord.id) ?? `smd-node-${index}`;
+    const nodeType = normalizeSmdNodeType(nodeRecord.type);
+
+    if (!nodeType) {
+      return;
+    }
+
+    const preferredLabel =
+      toTrimmedString(nodeRecord.name) ??
+      toTrimmedString(nodeRecord.label) ??
+      (nodeType === 'smdInitial'
+        ? 'Initial'
+        : nodeType === 'smdFinal'
+        ? 'Final'
+        : nodeType === 'smdChoice'
+        ? 'Choice'
+        : 'State');
+
+    const description = toTrimmedString(nodeRecord.description) ?? '';
+    const entry = toTrimmedString(nodeRecord.entry) ?? '';
+    const exit = toTrimmedString(nodeRecord.exit) ?? '';
+    const doActivity = toTrimmedString((nodeRecord as Record<string, unknown>)['do']) ?? '';
+
+    nodes.push({
+      id: nodeId,
+      type: nodeType,
+      position: { x: 0, y: index * 120 },
+      data: {
+        label: preferredLabel,
+        description,
+        type: nodeType,
+        name: preferredLabel,
+        entry,
+        exit,
+        do: doActivity,
+        stateType: stateTypeForNodeType(nodeType),
+      },
+    });
+    nodeIdSet.add(nodeId);
+  });
+
+  return { nodes, nodeIdSet };
+};
+
+const transformSmdEdgesFromApi = (rawEdges: unknown[], validNodeIds: Set<string>): Edge[] => {
+  const edges: Edge[] = [];
+
+  rawEdges.forEach((rawEdge, index) => {
+    if (!rawEdge || typeof rawEdge !== 'object') {
+      return;
+    }
+
+    const edgeRecord = rawEdge as Record<string, unknown>;
+    const source =
+      toTrimmedString(edgeRecord.source) ??
+      toTrimmedString(edgeRecord.source_id) ??
+      toTrimmedString(edgeRecord.from);
+    const target =
+      toTrimmedString(edgeRecord.target) ??
+      toTrimmedString(edgeRecord.target_id) ??
+      toTrimmedString(edgeRecord.to);
+
+    if (!source || !target) {
+      return;
+    }
+
+    if (validNodeIds.size > 0 && (!validNodeIds.has(source) || !validNodeIds.has(target))) {
+      return;
+    }
+
+    const edgeId = toTrimmedString(edgeRecord.id) ?? `smd-edge-${source}-${target}-${index}`;
+
+    const baseData = ensureSmdTransitionData({
+      event: toTrimmedString(edgeRecord.event) ?? toTrimmedString(edgeRecord.trigger),
+      guard: toTrimmedString(edgeRecord.guard),
+      action: toTrimmedString(edgeRecord.action) ?? toTrimmedString(edgeRecord.effect),
+    });
+
+    let derivedData = baseData;
+    let label = toTrimmedString(edgeRecord.label);
+
+    if (label) {
+      const parsed = parseSmdTransitionLabel(label);
+      derivedData = ensureSmdTransitionData({
+        event: derivedData.event || parsed.event,
+        guard: derivedData.guard || parsed.guard,
+        action: derivedData.action || parsed.action,
+      });
+    } else {
+      label = composeSmdTransitionLabel(baseData);
+    }
+
+    edges.push({
+      id: edgeId,
+      source,
+      target,
+      type: 'smdTransition',
+      label: label ?? '',
+      data: derivedData,
+    });
+  });
+
+  return edges;
 };
 
 // Helper function to poll for diagram result
@@ -106,7 +270,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       text: options.prompt,
       use_rag: true,
       generate_ibd: Boolean(options.isEnhanced),
-      generate_smd: false,
+      generate_smd: Boolean(options.isEnhanced),
       name: 'AI Generated Diagram'
     };
     
@@ -144,6 +308,10 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     const ibdBlockIds = new Set(
       ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
     );
+    const smdData = data.smd_data || [];
+    const smdBlockIds = new Set(
+      smdData.map((item: any) => item.parent_block_id).filter(Boolean)
+    );
 
     const diagramElements = data.diagram?.elements || [];
     const nodes = diagramElements.map((element: any) => ({
@@ -158,7 +326,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
           ...element.properties
         },
         type: element.type,
-        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false
+        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false,
+        has_smd: element.data?.has_smd || smdBlockIds.has(element.id) || false
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
@@ -182,7 +351,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       nodes, 
       edges, 
       diagramId: initResult.diagramId,
-      ibdData // Include IBD data from Redis
+      ibdData, // Include IBD data from Redis
+      smdData // Include SMD data from Redis
     };
   } catch (error) {
     console.error('Error generating diagram:', error);
@@ -346,6 +516,69 @@ export const useAIGeneration = () => {
           // After creating all IBD diagrams, switch back to the main BDD diagram
           if (currentDiagramId) {
             console.log(`🔄 Switching back to main BDD diagram: ${currentDiagramId}`);
+            setActiveDiagram(currentDiagramId);
+          }
+        }
+
+        if (options.isEnhanced && result.smdData && result.smdData.length > 0) {
+          console.log(`🚀 Creating ${result.smdData.length} SMD diagrams from AI generation`);
+
+          const currentDiagramId = useDiagramStore.getState().activeDiagramId;
+
+          result.smdData.forEach((smdEntry: any, index: number) => {
+            const rawNodes = Array.isArray(smdEntry?.nodes) ? smdEntry.nodes : [];
+            if (!rawNodes.length) {
+              const identifier = smdEntry?.parent_block_id ?? `index-${index}`;
+              console.warn(`⚠️ Skipping SMD creation for block ${identifier}: no nodes provided`);
+              return;
+            }
+
+            const rawEdges = Array.isArray(smdEntry?.edges) ? smdEntry.edges : [];
+            const { nodes: smdNodes, nodeIdSet } = transformSmdNodesFromApi(rawNodes);
+            const smdEdges = transformSmdEdgesFromApi(rawEdges, nodeIdSet);
+
+            const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+              smdNodes,
+              smdEdges,
+              'LR',
+              {
+                nodeWidth: 180,
+                nodeHeight: 80,
+                nodeSep: 100,
+                rankSep: 150,
+                flexiblePositions: true,
+              }
+            );
+
+            const blockLabel =
+              toTrimmedString(smdEntry?.parent_block_name) ??
+              toTrimmedString(smdEntry?.parent_block_id) ??
+              `Block ${index + 1}`;
+
+            const smdCustomId =
+              currentDiagramId && smdEntry?.parent_block_id
+                ? `smd-for-${currentDiagramId}-${smdEntry.parent_block_id}`
+                : undefined;
+
+            console.log(
+              `🔧 Creating SMD: ${blockLabel} with ${layoutedNodes.length} nodes and ${layoutedEdges.length} edges`
+            );
+
+            openNewDiagramTab({
+              name: `SMD for ${blockLabel}`,
+              type: 'smd',
+              nodes: layoutedNodes,
+              edges: layoutedEdges,
+              description: `State Machine Diagram for ${blockLabel}`,
+              customId: smdCustomId,
+              needsCentering: true,
+              parentBlockId: toTrimmedString(smdEntry?.parent_block_id),
+              parentDiagramId: currentDiagramId || undefined,
+            });
+          });
+
+          if (currentDiagramId) {
+            console.log(`🔄 Switching back to main BDD diagram after SMD creation: ${currentDiagramId}`);
             setActiveDiagram(currentDiagramId);
           }
         }

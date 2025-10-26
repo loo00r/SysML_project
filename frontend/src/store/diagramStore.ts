@@ -74,6 +74,7 @@ export interface NodeData {
   inputs?: string[];
   outputs?: string[];
   has_ibd?: boolean; // Flag for AI-generated IBDs
+  has_smd?: boolean; // Flag for AI-generated SMDs
   name?: string;
   entry?: string;
   exit?: string;
@@ -1386,7 +1387,7 @@ const useDiagramStore = create<DiagramStoreState>()(
             text,
             use_rag: true,
             generate_ibd: generateIBD,
-            generate_smd: false,
+            generate_smd: generateIBD,
             name: 'Generated Diagram',
           }),
         });
@@ -1409,6 +1410,10 @@ const useDiagramStore = create<DiagramStoreState>()(
         const ibdBlockIds = new Set(
           ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
         );
+        const smdData = result.smd_data || [];
+        const smdBlockIds = new Set(
+          smdData.map((item: any) => item.parent_block_id).filter(Boolean)
+        );
 
         const diagram = result.diagram || {};
         const rfNodes = (diagram.elements || []).map((node: any) => ({
@@ -1422,6 +1427,7 @@ const useDiagramStore = create<DiagramStoreState>()(
             inputs: node.inputs || node.data?.inputs || [],
             outputs: node.outputs || node.data?.outputs || [],
             has_ibd: node.data?.has_ibd || ibdBlockIds.has(node.id) || false,
+            has_smd: node.data?.has_smd || smdBlockIds.has(node.id) || false,
           },
         }));
 
