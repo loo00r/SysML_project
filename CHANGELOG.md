@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.26] - 2025-10-26
+### Changed
+- State Machine Diagram auto-layout increases horizontal and vertical spacing for clearer AI-generated results.
+
 ## [1.2.25] - 2025-10-26
 ### Changed
 - BDD auto-layout keeps system roots at the top while preserving the expanded vertical spacing introduced previously.

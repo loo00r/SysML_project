@@ -50,9 +50,9 @@ const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGeneration
     'LR', // Left to Right for natural state machine flow
     {
       nodeWidth: 180,           // Wider for state names
-      nodeHeight: 80,           // Taller for state content
-      nodeSep: 100,             // Vertical spacing between nodes (increased for top/bottom connections)
-      rankSep: 150,             // Horizontal spacing between ranks (increased for clarity)
+      nodeHeight: 90,           // Slightly taller for multi-line labels
+      nodeSep: 160,             // Increased vertical spacing between rows
+      rankSep: 220,             // Increased horizontal spacing between ranks
       flexiblePositions: true,  // Allow SMD to use all 4 sides for connections
     }
   );
@@ -562,9 +562,9 @@ export const useAIGeneration = () => {
               'LR',
               {
                 nodeWidth: 180,
-                nodeHeight: 80,
-                nodeSep: 100,
-                rankSep: 150,
+                nodeHeight: 90,
+                nodeSep: 160,
+                rankSep: 220,
                 flexiblePositions: true,
               }
             );
