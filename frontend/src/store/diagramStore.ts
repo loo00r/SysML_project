@@ -1,10 +1,69 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Node, Edge, Connection, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Viewport } from 'reactflow';
+import {
+  Node,
+  Edge,
+  Connection,
+  NodeChange,
+  EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+  Viewport,
+  Position,
+} from 'reactflow';
+import type { SmdTransitionDraft } from '../utils/smdTransition';
+import {
+  ensureSmdTransitionData,
+  composeSmdTransitionLabel,
+  parseSmdTransitionLabel,
+  SMD_EDGE_MARKER_URL,
+  USE_SMD_EDGE_MARKERS,
+} from '../utils/smdTransition';
 import { applyDagreLayout } from '../utils/dagreLayout';
+import { getNodeChangeId } from '../utils/reactflowChanges';
+import type { ValidationResult } from '../services/validation/smdValidator';
+
+// Helper: poll unified generation result from Redis cache
+const pollUnifiedDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
+
+    if (response.status === 404) {
+      throw new Error('Diagram generation expired or failed');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to retrieve diagram result: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.status === 'completed') {
+      return result;
+    }
+
+    if (result.status === 'error') {
+      throw new Error(result.error || 'Diagram generation failed');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  throw new Error('Diagram generation timed out');
+};
 
 // Define node types based on SysML diagram elements
-export type NodeType = 'block' | 'sensor' | 'processor' | 'port' | 'connection';
+export type NodeType =
+  | 'block'
+  | 'sensor'
+  | 'processor'
+  | 'port'
+  | 'connection'
+  | 'ibd'
+  | 'ibd_block'
+  | 'smdInitial'
+  | 'smdFinal'
+  | 'smdState'
+  | 'smdChoice';
 
 // Define node data structure
 export interface NodeData {
@@ -15,10 +74,18 @@ export interface NodeData {
   inputs?: string[];
   outputs?: string[];
   has_ibd?: boolean; // Flag for AI-generated IBDs
+  name?: string;
+  entry?: string;
+  exit?: string;
+  do?: string;
+  event?: string;
+  guard?: string;
+  action?: string;
+  stateType?: 'initial' | 'final' | 'choice' | 'state';
 }
 
 // Define diagram types
-export type DiagramType = 'bdd' | 'bdd_enhanced' | 'ibd';
+export type DiagramType = 'bdd' | 'bdd_enhanced' | 'ibd' | 'smd';
 
 // Define diagram instance interface
 export interface DiagramInstance {
@@ -33,6 +100,8 @@ export interface DiagramInstance {
   viewport?: Viewport; // Add viewport state for each diagram
   needsCentering?: boolean; // Flag to trigger fitView for new diagrams
   generatedDiagramId?: string; // Redis diagram ID for AI-generated diagrams
+  parentBlockId?: string;
+  parentDiagramId?: string;
 }
 
 // Define validation error structure
@@ -48,7 +117,265 @@ export interface DiagramState {
   edges: Edge[];
   viewport?: { x: number; y: number; zoom: number };
   source?: 'ai' | 'manual'; // Track how this diagram was created
+  type?: DiagramType;
+  name?: string;
+  parentBlockId?: string;
+  parentDiagramId?: string;
 }
+
+type SmdSide = 'left' | 'right' | 'top' | 'bottom';
+
+const HANDLE_SIDE_LOOKUP: Record<string, SmdSide> = {
+  left: 'left',
+  right: 'right',
+  top: 'top',
+  bottom: 'bottom',
+  'in-left': 'left',
+  'in-right': 'right',
+  'in-top': 'top',
+  'in-bottom': 'bottom',
+  'out-left': 'left',
+  'out-right': 'right',
+  'out-top': 'top',
+  'out-bottom': 'bottom',
+};
+
+const HANDLE_NORMALIZATION_MAP: Record<string, string> = {
+  left: 'in-left',
+  right: 'in-right',
+  top: 'in-top',
+  bottom: 'in-bottom',
+  'in-left': 'in-left',
+  'in-right': 'in-right',
+  'in-top': 'in-top',
+  'in-bottom': 'in-bottom',
+};
+
+const SIDE_TO_POSITION: Record<SmdSide, Position> = {
+  left: Position.Left,
+  right: Position.Right,
+  top: Position.Top,
+  bottom: Position.Bottom,
+};
+
+const POSITION_SIDE_LOOKUP: Record<string, SmdSide> = {
+  left: 'left',
+  right: 'right',
+  top: 'top',
+  bottom: 'bottom',
+};
+
+const normalizeHandleKey = (value?: string | null): string | null =>
+  value ? value.toLowerCase() : null;
+
+const normalizePositionKey = (value?: Position | string | null): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value.toLowerCase();
+  }
+
+  return `${value}`.toLowerCase();
+};
+
+const getSideFromHandle = (handle?: string | null): SmdSide | null => {
+  const key = normalizeHandleKey(handle);
+  return key ? HANDLE_SIDE_LOOKUP[key] ?? null : null;
+};
+
+const getSideFromPosition = (position?: Position | string | null): SmdSide | null => {
+  const key = normalizePositionKey(position);
+  return key ? POSITION_SIDE_LOOKUP[key] ?? null : null;
+};
+
+type EdgeWithPositions = Edge & {
+  targetPosition?: Position | string;
+  sourcePosition?: Position | string;
+};
+
+const deriveSideFromGeometry = (
+  edge: Edge,
+  sourceNode: Node<NodeData> | undefined,
+  targetNode: Node<NodeData> | undefined,
+): SmdSide | null => {
+  if (!sourceNode || !targetNode) {
+    return null;
+  }
+
+  if (edge.source === edge.target) {
+    const handleSide = getSideFromHandle(edge.targetHandle);
+    if (handleSide) {
+      return handleSide;
+    }
+    return 'right';
+  }
+
+  const dx = (sourceNode.position?.x ?? 0) - (targetNode.position?.x ?? 0);
+  const dy = (sourceNode.position?.y ?? 0) - (targetNode.position?.y ?? 0);
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+
+  return dy > 0 ? 'bottom' : 'top';
+};
+
+const normalizeSmdTargetSide = (side: SmdSide | null, sourceNode: Node<NodeData> | undefined, targetNode: Node<NodeData> | undefined): SmdSide => {
+  // SMD Policy: Only LEFT and TOP are allowed as target sides
+  if (side === 'left' || side === 'top') {
+    return side;
+  }
+
+  // If RIGHT or BOTTOM (or null), remap to allowed side based on geometry
+  if (!sourceNode || !targetNode) {
+    return 'left'; // Default fallback
+  }
+
+  const dx = sourceNode.position.x - targetNode.position.x;
+  const dy = sourceNode.position.y - targetNode.position.y;
+
+  // If horizontal distance dominates, use LEFT; otherwise use TOP
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return 'left';
+  }
+  return 'top';
+};
+
+const applySmdEdgeMetadata = (
+  edge: Edge,
+  sourceNode: Node<NodeData> | undefined,
+  targetNode: Node<NodeData> | undefined,
+): Edge => {
+  const edgeWithPositions = edge as EdgeWithPositions;
+  const rawTargetSide =
+    getSideFromHandle(edge.targetHandle) ??
+    getSideFromPosition(edgeWithPositions.targetPosition ?? null) ??
+    getSideFromPosition(
+      typeof edge.data === 'object' && edge.data
+        ? ((edge.data as Record<string, unknown>).targetPosition as Position | string | null)
+        : null,
+    ) ??
+    deriveSideFromGeometry(edge, sourceNode, targetNode);
+
+  // Normalize target side to only allow LEFT/TOP
+  const targetSide = normalizeSmdTargetSide(rawTargetSide, sourceNode, targetNode);
+
+  if (!targetSide) {
+    return edge;
+  }
+
+  const normalizedTargetHandleKey = normalizeHandleKey(edge.targetHandle);
+  const canonicalTargetHandle = normalizedTargetHandleKey
+    ? HANDLE_NORMALIZATION_MAP[normalizedTargetHandleKey] ?? edge.targetHandle
+    : HANDLE_NORMALIZATION_MAP[targetSide] ?? edge.targetHandle;
+
+  const sourceSideHint =
+    getSideFromHandle(edge.sourceHandle) ??
+    getSideFromPosition(edgeWithPositions.sourcePosition ?? null) ??
+    getSideFromPosition(
+      typeof edge.data === 'object' && edge.data
+        ? ((edge.data as Record<string, unknown>).sourcePosition as Position | string | null)
+        : null,
+    );
+
+  const baseData =
+    typeof edge.data === 'object' && edge.data ? (edge.data as Record<string, unknown>) : {};
+  const nextData: Record<string, unknown> = {
+    ...baseData,
+    targetPosition: targetSide,
+  };
+
+  if (sourceSideHint) {
+    nextData.sourcePosition = sourceSideHint;
+  }
+
+  const existingTargetSide = getSideFromPosition(edgeWithPositions.targetPosition ?? null);
+  const existingSourceSide = getSideFromPosition(edgeWithPositions.sourcePosition ?? null);
+
+  const nextTargetPosition = existingTargetSide
+    ? SIDE_TO_POSITION[existingTargetSide]
+    : SIDE_TO_POSITION[targetSide];
+
+  const fallbackSourcePosition =
+    typeof edgeWithPositions.sourcePosition === 'number'
+      ? (edgeWithPositions.sourcePosition as Position)
+      : existingSourceSide
+        ? SIDE_TO_POSITION[existingSourceSide]
+        : undefined;
+
+  const nextSourcePosition = sourceSideHint
+    ? SIDE_TO_POSITION[sourceSideHint]
+    : fallbackSourcePosition;
+
+  const result: EdgeWithPositions = {
+    ...edge,
+    targetHandle: canonicalTargetHandle ?? edge.targetHandle,
+    data: nextData,
+    targetPosition: nextTargetPosition,
+    sourcePosition: nextSourcePosition ?? edgeWithPositions.sourcePosition,
+  };
+
+  return result;
+};
+
+const withSmdTransitionDefaults = (edge: Edge, patchData?: SmdTransitionDraft): Edge => {
+  const initialData = edge.data
+    ? ensureSmdTransitionData(edge.data as SmdTransitionDraft)
+    : parseSmdTransitionLabel(typeof edge.label === 'string' ? edge.label : undefined);
+  const mergedData = ensureSmdTransitionData({ ...initialData, ...(patchData ?? {}) });
+  const computedLabel = composeSmdTransitionLabel(mergedData);
+
+  return {
+    ...edge,
+    type: 'smdTransition',
+    data: mergedData,
+    label: computedLabel || undefined,
+    markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : edge.markerEnd,
+    style: {
+      ...(edge.style ?? {}),
+      stroke: '#37474f',
+      strokeWidth: 2,
+    },
+  };
+};
+
+const normalizeSmdEdges = (nodes: Node<NodeData>[], edges: Edge[]): Edge[] => {
+  if (!edges?.length) {
+    return edges || [];
+  }
+
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+  const normalized: Edge[] = [];
+
+  edges.forEach(edge => {
+    const sourceNode = nodeMap.get(edge.source);
+    const targetNode = nodeMap.get(edge.target);
+
+    const isSmdEdge = (sourceNode?.type ?? '').startsWith('smd') || (targetNode?.type ?? '').startsWith('smd');
+
+    if (isSmdEdge) {
+      const normalizedLabel = typeof edge.label === 'string' && edge.label.trim().length > 0 ? edge.label : undefined;
+      normalized.push(
+        applySmdEdgeMetadata(
+          withSmdTransitionDefaults({
+            ...edge,
+            type: 'smdTransition',
+            label: normalizedLabel,
+          }),
+          sourceNode,
+          targetNode,
+        ),
+      );
+      return;
+    }
+
+    normalized.push(edge);
+  });
+
+  return normalized;
+};
 
 // Define the store state
 interface DiagramStoreState {
@@ -74,6 +401,9 @@ interface DiagramStoreState {
   isLoading: boolean;
   validationErrors: ValidationError[];
   showValidationPanel: boolean;
+
+  // SMD Validation state
+  smdValidationResults: Record<string, ValidationResult[]>; // keyed by diagramId
   
   // AI generation state
   generationPrompt: string;
@@ -101,6 +431,12 @@ interface DiagramStoreState {
   // Persistent state actions
   saveDiagramState: (diagramId: string, state: DiagramState) => void;
   openIbdForBlock: (bddBlockId: string) => Promise<void>;
+  openSmdForBlock: (params: {
+    blockId: string;
+    parentDiagramId?: string;
+    blockName?: string;
+    parentName?: string;
+  }) => void;
   
   // Legacy actions
   setNodes: (nodes: Node<NodeData>[]) => void;
@@ -112,9 +448,10 @@ interface DiagramStoreState {
   addNode: (node: Node<NodeData>) => void;
   updateNode: (id: string, data: Partial<NodeData>) => void;
   removeNode: (id: string) => void;
-  
+
   addEdge: (edge: Edge) => void;
   updateEdge: (id: string, data: Partial<Edge>) => void;
+  updateSmdTransitionEdge: (id: string, data: SmdTransitionDraft) => void;
   removeEdge: (id: string) => void;
   
   setSelectedNodes: (nodeIds: string[]) => void;
@@ -126,6 +463,11 @@ interface DiagramStoreState {
   
   setValidationErrors: (errors: ValidationError[]) => void;
   toggleValidationPanel: () => void;
+
+  // SMD Validation operations
+  setSmdValidationResults: (diagramId: string, results: ValidationResult[]) => void;
+  clearSmdValidationResults: (diagramId: string) => void;
+  getSmdValidationResults: (diagramId: string) => ValidationResult[];
   
   setGenerationPrompt: (prompt: string) => void;
   setIsGenerating: (isGenerating: boolean) => void;
@@ -143,10 +485,12 @@ interface DiagramStoreState {
 }
 
 // Create the store
-const useDiagramStore = create<DiagramStoreState>()(persist(
-  (set, get) => ({
-  // Initial state
-  openDiagrams: [],
+const useDiagramStore = create<DiagramStoreState>()(
+  persist(
+    (set, get) => {
+      return {
+      // Initial state
+      openDiagrams: [],
   activeDiagramId: null,
   
   // Persistent state for IBD diagrams
@@ -165,6 +509,8 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   isLoading: false,
   validationErrors: [],
   showValidationPanel: false,
+
+  smdValidationResults: {},
   
   generationPrompt: '',
   isGenerating: false,
@@ -178,11 +524,19 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   
   // Multi-diagram actions
   openDiagram: (diagramData) => {
+    const baseNodes = diagramData.nodes ?? [];
+    const baseEdges = diagramData.edges ?? [];
+    const resolvedEdges = diagramData.type === 'smd'
+      ? normalizeSmdEdges(baseNodes, baseEdges)
+      : baseEdges;
+
     const newDiagram: DiagramInstance = {
       id: `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
       modifiedAt: new Date(),
-      ...diagramData
+      ...diagramData,
+      nodes: baseNodes,
+      edges: resolvedEdges,
     };
     
     set(state => ({
@@ -190,7 +544,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       activeDiagramId: newDiagram.id,
       // Update computed state
       nodes: newDiagram.nodes,
-      edges: newDiagram.edges,
+      edges: resolvedEdges,
       diagramType: newDiagram.type,
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
@@ -199,11 +553,19 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
 
   openNewDiagramTab: (diagramData) => {
     const { customId, ...rest } = diagramData;
+    const baseNodes = rest.nodes ?? [];
+    const baseEdges = rest.edges ?? [];
+    const resolvedEdges = rest.type === 'smd'
+      ? normalizeSmdEdges(baseNodes, baseEdges)
+      : baseEdges;
+
     const newDiagram: DiagramInstance = {
       id: customId || `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date(),
       modifiedAt: new Date(),
-      ...rest
+      ...rest,
+      nodes: baseNodes,
+      edges: resolvedEdges,
     };
     
     set(state => ({
@@ -211,7 +573,7 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       activeDiagramId: newDiagram.id,
       // Update computed state
       nodes: newDiagram.nodes,
-      edges: newDiagram.edges,
+      edges: resolvedEdges,
       diagramType: newDiagram.type,
       diagramName: newDiagram.name,
       diagramDescription: newDiagram.description || ''
@@ -224,11 +586,15 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     // Find the diagram being closed
     const diagramToClose = state.openDiagrams.find(d => d.id === diagramId);
     
-    // If it's an IBD diagram, save its state before closing
-    if (diagramToClose && diagramToClose.type === 'ibd') {
+    // If it's an IBD or SMD diagram, save its state before closing
+    if (diagramToClose && (diagramToClose.type === 'ibd' || diagramToClose.type === 'smd')) {
       get().saveDiagramState(diagramId, {
         nodes: diagramToClose.nodes,
-        edges: diagramToClose.edges
+        edges: diagramToClose.edges,
+        type: diagramToClose.type,
+        name: diagramToClose.name,
+        parentBlockId: diagramToClose.parentBlockId,
+        parentDiagramId: diagramToClose.parentDiagramId
       });
     }
     
@@ -259,13 +625,17 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   setActiveDiagram: (diagramId) => {
     const state = get();
     
-    // Save current active diagram state if it's an IBD
+    // Save current active diagram state if it's an IBD or SMD
     if (state.activeDiagramId && state.activeDiagramId !== diagramId) {
       const currentDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
-      if (currentDiagram && currentDiagram.type === 'ibd') {
+      if (currentDiagram && (currentDiagram.type === 'ibd' || currentDiagram.type === 'smd')) {
         get().saveDiagramState(state.activeDiagramId, {
           nodes: state.nodes,
-          edges: state.edges
+          edges: state.edges,
+          type: currentDiagram.type,
+          name: currentDiagram.name,
+          parentBlockId: currentDiagram.parentBlockId,
+          parentDiagramId: currentDiagram.parentDiagramId
         });
       }
     }
@@ -293,30 +663,47 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     
     const updatedDiagrams = state.openDiagrams.map(diagram => {
       if (diagram.id === state.activeDiagramId) {
+        const nodesForDiagram = payload.nodes || diagram.nodes;
+        const edgesForDiagramRaw = payload.edges || diagram.edges;
+        const edgesForDiagram = diagram.type === 'smd'
+          ? normalizeSmdEdges(nodesForDiagram, edgesForDiagramRaw)
+          : edgesForDiagramRaw;
+
         return {
           ...diagram,
-          nodes: payload.nodes || diagram.nodes,
-          edges: payload.edges || diagram.edges,
+          nodes: nodesForDiagram,
+          edges: edgesForDiagram,
           modifiedAt: new Date()
         };
       }
       return diagram;
     });
     
+    const activeDiagramAfterUpdate = updatedDiagrams.find(d => d.id === state.activeDiagramId);
+    const nodesToStore = payload.nodes || state.nodes;
+    const edgesToStoreRaw = payload.edges || state.edges;
+    const edgesToStore = activeDiagramAfterUpdate?.type === 'smd'
+      ? normalizeSmdEdges(nodesToStore, edgesToStoreRaw)
+      : edgesToStoreRaw;
+
     set(state => ({
       openDiagrams: updatedDiagrams,
       // Update computed state
-      nodes: payload.nodes || state.nodes,
-      edges: payload.edges || state.edges
+      nodes: nodesToStore,
+      edges: edgesToStore
     }));
-    
-    // Auto-save to diagramsData if this is an IBD
+
+    // Auto-save to diagramsData if this is an IBD or SMD
     if (state.activeDiagramId) {
-      const activeDiagram = updatedDiagrams.find(d => d.id === state.activeDiagramId);
-      if (activeDiagram && activeDiagram.type === 'ibd') {
+      const activeDiagram = activeDiagramAfterUpdate;
+      if (activeDiagram && (activeDiagram.type === 'ibd' || activeDiagram.type === 'smd')) {
         get().saveDiagramState(state.activeDiagramId, {
-          nodes: payload.nodes || state.nodes,
-          edges: payload.edges || state.edges
+          nodes: nodesToStore,
+          edges: edgesToStore,
+          type: activeDiagram.type,
+          name: activeDiagram.name,
+          parentBlockId: activeDiagram.parentBlockId,
+          parentDiagramId: activeDiagram.parentDiagramId
         });
       }
     }
@@ -352,7 +739,10 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
     set(currentState => ({
       diagramsData: {
         ...currentState.diagramsData,
-        [diagramId]: state
+        [diagramId]: {
+          ...(currentState.diagramsData[diagramId] || {}),
+          ...state
+        }
       }
     }));
   },
@@ -513,6 +903,163 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       throw error;
     }
   },
+
+  openSmdForBlock: ({ blockId, parentDiagramId, blockName, parentName }) => {
+    const { openDiagrams, diagramsData, activeDiagramId, openNewDiagramTab, setActiveDiagram } = get();
+
+    const effectiveParentId = parentDiagramId || activeDiagramId;
+
+    if (!effectiveParentId) {
+      console.error('❌ [SMD] Cannot create SMD: no active diagram');
+      return;
+    }
+
+    const parentDiagram = openDiagrams.find(d => d.id === effectiveParentId);
+    if (!parentDiagram) {
+      console.error('❌ [SMD] Parent diagram not found for id:', effectiveParentId);
+      return;
+    }
+
+    if (parentDiagram.type !== 'bdd' && parentDiagram.type !== 'bdd_enhanced') {
+      console.warn('ℹ️ [SMD] SMD creation is only available from BDD diagrams');
+      return;
+    }
+
+    const smdId = `smd-for-${effectiveParentId}-${blockId}`;
+
+    // If already open, focus it
+    const existingTab = openDiagrams.find(d => d.id === smdId);
+    if (existingTab) {
+      setActiveDiagram(smdId);
+      return;
+    }
+
+    const parentNode = parentDiagram.nodes.find(node => node.id === blockId);
+    const resolvedBlockName = blockName || parentNode?.data?.label || parentNode?.data?.name || 'Block';
+    const resolvedParentName = parentName || parentDiagram.name;
+    const smdName = resolvedParentName && resolvedParentName !== resolvedBlockName
+      ? `SMD for ${resolvedParentName} - ${resolvedBlockName}`
+      : `SMD for ${resolvedBlockName}`;
+
+    // Try to restore from cache
+    const cachedState = diagramsData[smdId];
+    if (cachedState) {
+      const cachedNodes = cachedState.nodes || [];
+      const normalizedEdges = normalizeSmdEdges(cachedNodes, cachedState.edges || []);
+      openNewDiagramTab({
+        name: cachedState.name || smdName,
+        type: 'smd',
+        nodes: cachedNodes,
+        edges: normalizedEdges,
+        description: `State Machine Diagram for ${resolvedBlockName}`,
+        customId: smdId,
+        needsCentering: true,
+        parentBlockId: cachedState.parentBlockId || blockId,
+        parentDiagramId: cachedState.parentDiagramId || effectiveParentId
+      });
+      setActiveDiagram(smdId);
+      return;
+    }
+
+    // Seed default SMD nodes and edges
+    const initialNodeId = `${smdId}-initial`;
+    const stateNodeId = `${smdId}-state`;
+    const finalNodeId = `${smdId}-final`;
+
+    const seedNodes: Node<NodeData>[] = [
+      {
+        id: initialNodeId,
+        type: 'smdInitial',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'Initial',
+          name: 'Initial',
+          type: 'smdInitial',
+          stateType: 'initial'
+        } as NodeData
+      },
+      {
+        id: stateNodeId,
+        type: 'smdState',
+        position: { x: 200, y: 0 },
+        data: {
+          label: 'Idle',
+          name: 'Idle',
+          entry: '',
+          exit: '',
+          do: '',
+          type: 'smdState',
+          stateType: 'state'
+        } as NodeData
+      },
+      {
+        id: finalNodeId,
+        type: 'smdFinal',
+        position: { x: 400, y: 0 },
+        data: {
+          label: 'Final',
+          name: 'Final',
+          type: 'smdFinal',
+          stateType: 'final'
+        } as NodeData
+      }
+    ];
+
+    const seedEdges: EdgeWithPositions[] = [
+      {
+        id: `${initialNodeId}-${stateNodeId}`,
+        source: initialNodeId,
+        target: stateNodeId,
+        type: 'smdTransition',
+        data: ensureSmdTransitionData(),
+        targetHandle: 'in-left',
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
+      },
+      {
+        id: `${stateNodeId}-${finalNodeId}`,
+        source: stateNodeId,
+        target: finalNodeId,
+        type: 'smdTransition',
+        data: ensureSmdTransitionData(),
+        targetHandle: 'in-left',
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        markerEnd: USE_SMD_EDGE_MARKERS ? SMD_EDGE_MARKER_URL : undefined,
+      }
+    ];
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+      seedNodes,
+      seedEdges,
+      'LR',
+      { nodeSep: 160, rankSep: 160 }
+    );
+
+    const normalizedEdges = normalizeSmdEdges(layoutedNodes, layoutedEdges);
+
+    openNewDiagramTab({
+      name: smdName,
+      type: 'smd',
+      nodes: layoutedNodes,
+      edges: normalizedEdges,
+      description: `State Machine Diagram for ${resolvedBlockName}`,
+      customId: smdId,
+      needsCentering: true,
+      parentBlockId: blockId,
+      parentDiagramId: effectiveParentId
+    });
+
+    get().saveDiagramState(smdId, {
+      nodes: layoutedNodes,
+      edges: normalizedEdges,
+      type: 'smd',
+      name: smdName,
+      parentBlockId: blockId,
+      parentDiagramId: effectiveParentId
+    });
+  },
   
   // Legacy actions
   setNodes: (nodes) => {
@@ -525,45 +1072,92 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   },
   
   onNodesChange: (changes) => {
-    const newNodes = applyNodeChanges(changes, get().nodes);
+    const currentNodes = get().nodes;
+    const newNodes = applyNodeChanges(changes, currentNodes);
+
     set({ nodes: newNodes });
     get().updateActiveDiagram({ nodes: newNodes });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   onEdgesChange: (changes) => {
-    const newEdges = applyEdgeChanges(changes, get().edges);
+    const state = get();
+    const previousEdges = state.edges;
+    const newEdges = applyEdgeChanges(changes, previousEdges);
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   onConnect: (connection) => {
     // Save current state before connecting nodes
     get().saveToHistory();
     
-    // Get current diagram type and node count to determine edge style
-    const activeDiagram = get().openDiagrams.find(d => d.id === get().activeDiagramId);
+    const state = get();
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
     const isIBD = activeDiagram?.type === 'ibd';
-    const currentNodes = get().nodes;
+    const isSMD = activeDiagram?.type === 'smd';
+
+    let newEdge: Edge;
+    let sourceNode: Node<NodeData> | undefined;
+    let targetNode: Node<NodeData> | undefined;
     
-    const newEdge: Edge = {
-      id: `e-${connection.source}-${connection.target}`,
-      source: connection.source || '',
-      target: connection.target || '',
-      // For IBD: always use smoothstep (orthogonal lines). For BDD: always smoothstep
-      type: 'smoothstep',
-      animated: isIBD,
-      style: isIBD ? { 
-        stroke: '#555', 
-        strokeWidth: 2,
-        strokeDasharray: '8 4'
-      } : { stroke: '#555', strokeWidth: 1 },
-      className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
-      label: isIBD ? 'IBD Blocks' : undefined
-    };
+    if (isSMD) {
+      sourceNode = state.nodes.find(node => node.id === connection.source);
+      targetNode = state.nodes.find(node => node.id === connection.target);
+      newEdge = applySmdEdgeMetadata(
+        withSmdTransitionDefaults({
+          id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+          source: connection.source || '',
+          target: connection.target || '',
+          sourceHandle: connection.sourceHandle,
+          targetHandle: connection.targetHandle,
+          type: 'smdTransition',
+          data: ensureSmdTransitionData(),
+        }),
+        sourceNode,
+        targetNode,
+      );
+    } else {
+      newEdge = {
+        id: `e-${connection.source}-${connection.target}-${Date.now()}`,
+        source: connection.source || '',
+        target: connection.target || '',
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        type: 'smoothstep',
+        animated: isIBD ? true : false,
+        style: isIBD
+          ? {
+              stroke: '#555',
+              strokeWidth: 2,
+              strokeDasharray: '8 4'
+            }
+          : { stroke: '#555', strokeWidth: 1 },
+        className: isIBD ? 'ibd-animated-edge ibd-edge' : undefined,
+        label: isIBD ? 'IBD Blocks' : undefined,
+      };
+    }
     
-    const newEdges = [...get().edges, newEdge];
+    const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
-    get().updateActiveDiagram({ edges: newEdges });
+    state.updateActiveDiagram({ edges: newEdges });
+
+    // Clear SMD validation results on graph mutation
+    const activeDiagramId = get().activeDiagramId;
+    if (activeDiagramId) {
+      get().clearSmdValidationResults(activeDiagramId);
+    }
   },
   
   // Node operations
@@ -579,32 +1173,73 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   updateNode: (id, data) => {
     // Save current state before updating node
     get().saveToHistory();
+    const prevState = get();
+    const targetNode = prevState.nodes.find(node => node.id === id);
+    const mergedData = targetNode ? { ...targetNode.data, ...data } : data;
+    const previousLabel = targetNode?.data?.label;
+    const nextLabel = mergedData?.label ?? previousLabel;
     
     const newNodes = get().nodes.map(node => 
       node.id === id ? { ...node, data: { ...node.data, ...data } } : node
     );
     set({ nodes: newNodes });
     get().updateActiveDiagram({ nodes: newNodes });
+
+    if (
+      targetNode &&
+      (targetNode.type === 'block' || targetNode.data?.type === 'block') &&
+      prevState.activeDiagramId &&
+      previousLabel !== nextLabel &&
+      nextLabel
+    ) {
+      const smdId = `smd-for-${prevState.activeDiagramId}-${id}`;
+      const newDiagramName = `SMD for ${nextLabel}`;
+
+      set(current => ({
+        openDiagrams: current.openDiagrams.map(diagram =>
+          diagram.id === smdId
+            ? { ...diagram, name: newDiagramName, modifiedAt: new Date() }
+            : diagram
+        ),
+        diagramsData: current.diagramsData[smdId]
+          ? {
+              ...current.diagramsData,
+              [smdId]: {
+                ...current.diagramsData[smdId],
+                name: newDiagramName
+              }
+            }
+          : current.diagramsData
+      }));
+    }
   },
   
   removeNode: (id) => {
     // Save current state before removing node
     get().saveToHistory();
     
+    const previousNodes = get().nodes;
+    const nodeToRemove = previousNodes.find(node => node.id === id);
+
     // Remove the node and connected edges
-    const newNodes = get().nodes.filter(node => node.id !== id);
+    const newNodes = previousNodes.filter(node => node.id !== id);
     const newEdges = get().edges.filter(edge => edge.source !== id && edge.target !== id);
     
     set({ nodes: newNodes, edges: newEdges });
     get().updateActiveDiagram({ nodes: newNodes, edges: newEdges });
   },
-  
   // Edge operations
   addEdge: (edge) => {
     // Save current state before adding edge
     get().saveToHistory();
-    
-    const newEdges = [...get().edges, edge];
+
+    const state = get();
+    const sourceNode = state.nodes.find(node => node.id === edge.source);
+    const targetNode = state.nodes.find(node => node.id === edge.target);
+    const newEdge = edge.type === 'smdTransition'
+      ? applySmdEdgeMetadata(withSmdTransitionDefaults(edge), sourceNode, targetNode)
+      : edge;
+    const newEdges = [...state.edges, newEdge];
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
   },
@@ -612,10 +1247,52 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   updateEdge: (id, data) => {
     // Save current state before updating edge
     get().saveToHistory();
-    
-    const newEdges = get().edges.map(edge => 
-      edge.id === id ? { ...edge, ...data } : edge
-    );
+
+    const state = get();
+    const nodeMap = new Map(state.nodes.map(node => [node.id, node]));
+
+    const newEdges = state.edges.map(edge => {
+      if (edge.id !== id) {
+        return edge;
+      }
+
+      const patch = data as Partial<Edge>;
+      const mergedEdge = { ...edge, ...patch };
+      const nextType = patch?.type ?? edge.type;
+
+      if (nextType === 'smdTransition') {
+        const patchData = patch?.data as SmdTransitionDraft | undefined;
+        return applySmdEdgeMetadata(
+          withSmdTransitionDefaults(mergedEdge, patchData),
+          nodeMap.get(mergedEdge.source),
+          nodeMap.get(mergedEdge.target),
+        );
+      }
+
+      return mergedEdge;
+    });
+    set({ edges: newEdges });
+    get().updateActiveDiagram({ edges: newEdges });
+  },
+
+  updateSmdTransitionEdge: (id, data) => {
+    get().saveToHistory();
+
+    const state = get();
+    const nodeMap = new Map(state.nodes.map(node => [node.id, node]));
+
+    const newEdges = state.edges.map(edge => {
+      if (edge.id !== id) {
+        return edge;
+      }
+
+      return applySmdEdgeMetadata(
+        withSmdTransitionDefaults(edge, data),
+        nodeMap.get(edge.source),
+        nodeMap.get(edge.target),
+      );
+    });
+
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
   },
@@ -623,10 +1300,21 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   removeEdge: (id) => {
     // Save current state before removing edge
     get().saveToHistory();
+
+    const state = get();
+    const edgeToRemove = state.edges.find(edge => edge.id === id);
     
-    const newEdges = get().edges.filter(edge => edge.id !== id);
+    const newEdges = state.edges.filter(edge => edge.id !== id);
     set({ edges: newEdges });
     get().updateActiveDiagram({ edges: newEdges });
+
+    const activeDiagram = state.openDiagrams.find(d => d.id === state.activeDiagramId);
+    if (activeDiagram?.type !== 'smd' || !edgeToRemove) {
+      return;
+    }
+
+    const sourceNode = state.nodes.find(node => node.id === edgeToRemove.source);
+    const targetNode = state.nodes.find(node => node.id === edgeToRemove.target);
   },
   
   // Selection operations
@@ -641,6 +1329,26 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
   // Validation operations
   setValidationErrors: (errors) => set({ validationErrors: errors }),
   toggleValidationPanel: () => set(state => ({ showValidationPanel: !state.showValidationPanel })),
+
+  // SMD Validation operations
+  setSmdValidationResults: (diagramId, results) => {
+    set(state => ({
+      smdValidationResults: {
+        ...state.smdValidationResults,
+        [diagramId]: results,
+      },
+    }));
+  },
+  clearSmdValidationResults: (diagramId) => {
+    set(state => {
+      const newResults = { ...state.smdValidationResults };
+      delete newResults[diagramId];
+      return { smdValidationResults: newResults };
+    });
+  },
+  getSmdValidationResults: (diagramId) => {
+    return get().smdValidationResults[diagramId] || [];
+  },
   
   // AI generation operations
   setGenerationPrompt: (prompt) => set({ generationPrompt: prompt }),
@@ -669,44 +1377,24 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       // Save current state to history before generating
       get().saveToHistory();
       
-      // Prepare API endpoint based on whether RAG is enabled
-      const endpoint = get().useRAG 
-        ? '/api/v1/rag/generate-diagram-with-context/' 
-        : '/api/v1/create-diagram/';
-      
-      // Make API request
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          diagram_type: get().diagramType
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Process the response and update the diagram
-    if (data.nodes && data.edges) {
-      // Transform the API response to ReactFlow format
-      const rfNodes = data.nodes.map((node: any) => ({
-        id: node.id,
-        type: node.type || node.data?.type || 'block',
-        // Позиція буде встановлена алгоритмом Dagre
-        position: node.position || { x: 0, y: 0 },
-        data: {
-          label: node.name || node.data?.label || node.label,
-          description: node.description || node.data?.description || '',
-          type: node.data?.type || node.type || 'block',
-          properties: node.properties || node.data?.properties || {},
-          inputs: node.inputs || node.data?.inputs || [],
-          outputs: node.outputs || node.data?.outputs || []
+      if (get().useRAG) {
+        const generateIBD = get().diagramType === 'bdd_enhanced';
+        const response = await fetch('/api/v1/rag/generate-diagram-unified/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text,
+            use_rag: true,
+            generate_ibd: generateIBD,
+            generate_smd: false,
+            name: 'Generated Diagram'
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.statusText}`);
         }
       }));
       const rfEdges = data.edges.map((edge: any) => ({
@@ -735,13 +1423,83 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
         edges: layoutedEdges
       });
       get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
-        
+
         // Validate the generated diagram
         const errors = get().validateDiagram();
         set({ validationErrors: errors });
-        
+
         if (errors.length > 0) {
           set({ showValidationPanel: true });
+        }
+      } else {
+        // Legacy direct generation without RAG/unified flow
+        const response = await fetch('/api/v1/create-diagram/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text,
+            diagram_type: get().diagramType
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.nodes && data.edges) {
+          const rfNodes = data.nodes.map((node: any) => ({
+            id: node.id,
+            type: node.type || node.data?.type || 'block',
+            position: node.position || { x: 0, y: 0 },
+            data: {
+              label: node.name || node.data?.label || node.label,
+              description: node.description || node.data?.description || '',
+              type: node.data?.type || node.type || 'block',
+              properties: node.properties || node.data?.properties || {},
+              inputs: node.inputs || node.data?.inputs || [],
+              outputs: node.outputs || node.data?.outputs || []
+            }
+          }));
+          const rfEdges = data.edges.map((edge: any) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: 'smoothstep',
+            label: edge.label || '',
+            animated: edge.animated || false,
+            style: { stroke: '#555' }
+          }));
+
+          const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
+          console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
+          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+            rfNodes,
+            rfEdges,
+            direction,
+            get().diagramType === 'ibd'
+              ? {
+                  nodeSep: 150,
+                  rankSep: 350
+                }
+              : undefined
+          );
+
+          set({
+            nodes: layoutedNodes,
+            edges: layoutedEdges
+          });
+          get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
+
+          const errors = get().validateDiagram();
+          set({ validationErrors: errors });
+
+          if (errors.length > 0) {
+            set({ showValidationPanel: true });
+          }
         }
       }
     } catch (error) {
@@ -875,8 +1633,9 @@ const useDiagramStore = create<DiagramStoreState>()(persist(
       });
     }
   }
-}),
-{
+      };
+    },
+    {
   name: 'sysml-diagram-storage',
   storage: createJSONStorage(() => sessionStorage),
   partialize: (state) => ({ 

@@ -102,10 +102,42 @@ DB_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
 
 ## API Endpoints
 
+### Core Diagram Generation
 - `GET /api/v1/ping`: Health check
-- `POST /api/v1/create-diagram/`: Generate diagram without RAG
-- `POST /api/v1/rag/generate-diagram-with-context/`: Generate diagram with RAG
-- Database endpoints for embeddings, templates, and components
+- `POST /api/v1/create-diagram/`: Generate diagram without RAG (immediate save to database)
+  - Body: `{text: string, diagram_type: "bdd" | "bdd_enhanced", name: string}`
+  - Returns: Complete diagram with `diagram_id`
+  - Automatically saves to database and creates IBD records
+
+### RAG-Based Generation (Two-Step Process)
+- `POST /api/v1/rag/generate-diagram-with-context/`: Generate diagram with RAG (Redis cache first)
+  - Body: `{text: string, diagram_type: "bdd" | "bdd_enhanced", use_rag: boolean, name: string}`
+  - Returns: `{status: "processing", diagramId: "uuid"}`
+  - Stores result in Redis with TTL (default 3600s)
+
+- `GET /api/v1/rag/diagram-result/{diagram_id}`: Retrieve generated diagram from Redis
+  - Returns: Cached diagram data with status
+
+- `POST /api/v1/rag/save-diagram/`: Save Redis-cached diagram to database
+  - Body: `{diagram_id: string, name: string}`
+  - Saves main BDD diagram to `diagram_embeddings` table
+  - Creates IBD records in `internal_block_diagrams` table
+  - Generates embeddings for RAG
+
+### RAG Database Operations
+- `POST /api/v1/rag/diagrams/`: Store diagram with embedding
+- `POST /api/v1/rag/similar-diagrams/`: Find similar diagrams (vector search)
+  - Body: `{query_text: string, limit: number, diagram_type: string}`
+  - Uses pgvector cosine similarity search
+- `GET /api/v1/rag/templates/{template_type}`: Get SysML templates
+- `GET /api/v1/rag/components/{component_type}`: Get UAV components
+
+### IBD Operations
+- `GET /api/v1/diagrams/ibd/{parent_block_id}`: Get IBD by parent block ID
+  - Returns positioned IBD nodes and edges
+- `POST /api/v1/diagrams/ibd/`: Create or update IBD (upsert)
+  - Body: `{parent_bdd_diagram_id: int, parent_block_id: string, nodes: [], edges: [], source: "ai" | "manual"}`
+  - Automatically updates existing IBD or creates new one
 
 ## Development Notes
 
@@ -177,4 +209,6 @@ The application now features a **tabbed interface** for managing multiple diagra
 - Empty state handling when no diagrams are open
 - All original functionality preserved (save, export, validation, etc.)
 
-### new task
+### NEW TASK
+
+---

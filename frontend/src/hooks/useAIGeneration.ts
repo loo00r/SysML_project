@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import useDiagramStore from '../store/diagramStore';
+import useDiagramStore, { type DiagramType } from '../store/diagramStore';
 import { applyDagreLayout } from '../utils/dagreLayout';
+import { parseSmdTestModeInput } from '../utils/smdTestMode';
 
 // Types for AI generation
 interface AIGenerationOptions {
@@ -9,6 +10,7 @@ interface AIGenerationOptions {
   includeRelationships?: boolean;
   style?: 'technical' | 'conceptual';
   isEnhanced?: boolean;
+  testMode?: boolean;
 }
 
 interface AIGenerationResult {
@@ -17,7 +19,45 @@ interface AIGenerationResult {
   error?: string;
   diagramId?: string;
   ibdData?: any[]; // IBD data from Redis for creating IBD diagrams
+  diagramType?: DiagramType;
+  name?: string;
+  description?: string;
 }
+
+const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGenerationResult> => {
+  const parsed = parseSmdTestModeInput(rawJson);
+  if (parsed.success === false) {
+    return {
+      nodes: [],
+      edges: [],
+      error: parsed.error,
+    };
+  }
+
+  // Apply Dagre layout for better structure with SMD-specific adaptations
+  // Use Left-to-Right direction for natural state machine flow
+  // flexiblePositions allows using all 4 connection sides (top, left, right, bottom)
+  const layouted = applyDagreLayout(
+    parsed.nodes,
+    parsed.edges,
+    'LR', // Left to Right for natural state machine flow
+    {
+      nodeWidth: 180,           // Wider for state names
+      nodeHeight: 80,           // Taller for state content
+      nodeSep: 100,             // Vertical spacing between nodes (increased for top/bottom connections)
+      rankSep: 150,             // Horizontal spacing between ranks (increased for clarity)
+      flexiblePositions: true,  // Allow SMD to use all 4 sides for connections
+    }
+  );
+
+  return {
+    nodes: layouted.nodes,
+    edges: layouted.edges,
+    diagramType: 'smd',
+    name: parsed.name,
+    description: parsed.description,
+  };
+};
 
 // Helper function to poll for diagram result
 const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
@@ -60,12 +100,13 @@ const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): P
 const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
   try {
     // Step 1: Start generation and get diagram ID
-    const endpoint = '/api/v1/rag/generate-diagram-with-context/';
+    const endpoint = '/api/v1/rag/generate-diagram-unified/';
     
     const requestBody = {
       text: options.prompt,
-      diagram_type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
       use_rag: true,
+      generate_ibd: Boolean(options.isEnhanced),
+      generate_smd: false,
       name: 'AI Generated Diagram'
     };
     
@@ -82,8 +123,13 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
 
     const initResult = await response.json();
-    if (initResult.error) {
-      return { nodes: [], edges: [], error: initResult.error };
+    if (initResult.error || initResult.status === 'error') {
+      const message = initResult.error || 'Diagram generation failed to start';
+      return { nodes: [], edges: [], error: message };
+    }
+
+    if (!initResult.diagramId) {
+      return { nodes: [], edges: [], error: 'Missing diagram ID from unified generation endpoint' };
     }
     
     // Step 2: Poll for the actual result
@@ -94,7 +140,13 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     }
     
     // Convert the backend diagram format to ReactFlow format
-    const nodes = data.diagram.elements.map((element: any) => ({
+    const ibdData = data.ibd_data || [];
+    const ibdBlockIds = new Set(
+      ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
+    );
+
+    const diagramElements = data.diagram?.elements || [];
+    const nodes = diagramElements.map((element: any) => ({
       id: element.id,
       type: element.type,
       data: { 
@@ -106,13 +158,14 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
           ...element.properties
         },
         type: element.type,
-        has_ibd: element.data?.has_ibd || false
+        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
     
     // Convert relationships to edges
-    const edges = data.diagram.relationships.map((rel: any) => ({
+    const diagramRelationships = data.diagram?.relationships || [];
+    const edges = diagramRelationships.map((rel: any) => ({
       id: `edge-${rel.source_id}-${rel.target_id}`,
       source: rel.source_id,
       target: rel.target_id,
@@ -129,7 +182,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       nodes, 
       edges, 
       diagramId: initResult.diagramId,
-      ibdData: data.ibd_data || [] // Include IBD data from Redis
+      ibdData // Include IBD data from Redis
     };
   } catch (error) {
     console.error('Error generating diagram:', error);
@@ -184,7 +237,9 @@ export const useAIGeneration = () => {
       }, 300);
       
       // Call the backend API service
-      const result = await callGenerateDiagramAPI(options);
+      const result = options.testMode
+        ? await generateTestModeSmdDiagram(options.prompt)
+        : await callGenerateDiagramAPI(options);
       
       clearInterval(progressInterval);
       
@@ -195,18 +250,32 @@ export const useAIGeneration = () => {
         // Create a new diagram tab with the generated content
         setProgress(100);
         
-        // Generate a name for the new diagram based on the prompt
-        const diagramName = options.prompt.split(' ').slice(0, 3).join(' ') + ' Diagram';
+        const defaultDiagramName = options.testMode
+          ? 'SMD Test Diagram'
+          : `${options.prompt.split(' ').slice(0, 3).join(' ')} Diagram`;
+
+        const resolvedName =
+          result.name && result.name.trim().length > 0
+            ? result.name.trim()
+            : defaultDiagramName.trim().length > 0
+              ? defaultDiagramName
+              : 'Generated Diagram';
+
+        const resolvedType: DiagramType = result.diagramType ?? (options.isEnhanced ? 'bdd_enhanced' : 'bdd');
+        const resolvedDescription =
+          result.description && result.description.trim().length > 0
+            ? result.description.trim()
+            : shortDescription;
         
         // Open a new diagram with the generated content
         openDiagram({
-          name: diagramName,
-          type: options.isEnhanced ? 'bdd_enhanced' : 'bdd',
+          name: resolvedName,
+          type: resolvedType,
           nodes: result.nodes,
           edges: result.edges,
-          description: shortDescription,
+          description: resolvedDescription,
           needsCentering: true, // Center new AI-generated diagrams
-          generatedDiagramId: result.diagramId // Store Redis diagram ID for saving
+          generatedDiagramId: options.testMode ? undefined : result.diagramId // Store Redis diagram ID for saving
         });
         
         // Create IBD diagrams for enhanced diagrams if IBD data exists

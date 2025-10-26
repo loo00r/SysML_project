@@ -4,6 +4,10 @@ import ProcessorNode from './ProcessorNode';
 import PortNode from './PortNode';
 import ConnectionNode from './ConnectionNode';
 import IBDNode from './IBDNode';
+import SmdInitialNode from './SmdInitialNode';
+import SmdFinalNode from './SmdFinalNode';
+import SmdStateNode from './SmdStateNode';
+import SmdChoiceNode from './SmdChoiceNode';
 
 // Export all node components
 export {
@@ -12,7 +16,11 @@ export {
   ProcessorNode,
   PortNode,
   ConnectionNode,
-  IBDNode
+  IBDNode,
+  SmdInitialNode,
+  SmdFinalNode,
+  SmdStateNode,
+  SmdChoiceNode
 };
 
 // BDD node types mapping for ReactFlow
@@ -31,6 +39,15 @@ export const ibdNodeTypes = {
   block: BlockNode, // Blocks can still appear in IBD as referenced elements
   ibd: IBDNode, // IBD block type
   defaultNode: PortNode
+};
+
+// SMD node types mapping for ReactFlow
+export const smdNodeTypes = {
+  smdInitial: SmdInitialNode,
+  smdFinal: SmdFinalNode,
+  smdState: SmdStateNode,
+  smdChoice: SmdChoiceNode,
+  defaultNode: SmdStateNode
 };
 
 // Legacy node types mapping for backward compatibility

@@ -4,7 +4,7 @@ services:
       context: ./backend
     container_name: sysml_backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
     volumes:
       - ./backend:/app
     command: bash launch.sh

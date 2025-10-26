@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, UniqueConstraint
 from pgvector.sqlalchemy import Vector
 
 from app.db.base import Base
@@ -82,6 +82,40 @@ class SimilarDiagramRequest(BaseModel):
     limit: int = 5
     diagram_type: Optional[str] = None
 
+class BDDBlock(Base):
+    __tablename__ = "bdd_blocks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    parent_bdd_diagram_id = Column(Integer, ForeignKey("diagram_embeddings.id"), nullable=False, index=True)
+    block_id = Column(String, nullable=False, index=True)
+    block_name = Column(String, nullable=False)
+    block_type = Column(String, nullable=True)
+    block_description = Column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("parent_bdd_diagram_id", "block_id", name="uq_bdd_block_parent_block"),
+    )
+
+class BDDBlockCreate(BaseModel):
+    parent_bdd_diagram_id: int
+    block_id: str
+    block_name: str
+    block_type: Optional[str] = None
+    block_description: Optional[str] = None
+
+class BDDBlockResponse(BaseModel):
+    id: int
+    parent_bdd_diagram_id: int
+    block_id: str
+    block_name: str
+    block_type: Optional[str] = None
+    block_description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
 class InternalBlockDiagram(Base):
     __tablename__ = "internal_block_diagrams"
     
@@ -93,7 +127,8 @@ class InternalBlockDiagram(Base):
     
     # ID of the block within the parent BDD (e.g., "block-1", "processor-a")
     parent_block_id = Column(String, nullable=False, index=True)
-    
+    parent_block_ref_id = Column(Integer, ForeignKey("bdd_blocks.id"), nullable=True, index=True)
+
     # The actual IBD data
     nodes = Column(JSON, nullable=False)
     edges = Column(JSON, nullable=False)
@@ -104,6 +139,7 @@ class InternalBlockDiagram(Base):
 class InternalBlockDiagramCreate(BaseModel):
     parent_bdd_diagram_id: int
     parent_block_id: str
+    parent_block_ref_id: Optional[int] = None
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
     source: str = 'ai'
@@ -112,10 +148,47 @@ class InternalBlockDiagramResponse(BaseModel):
     id: int
     parent_bdd_diagram_id: int
     parent_block_id: str
+    parent_block_ref_id: Optional[int] = None
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
     source: str
     created_at: datetime
     
+    class Config:
+        orm_mode = True
+
+class StateMachineDiagram(Base):
+    __tablename__ = "state_machine_diagrams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    parent_bdd_diagram_id = Column(Integer, ForeignKey("diagram_embeddings.id"), nullable=False, index=True)
+    parent_block_id = Column(String, nullable=False, index=True)
+    parent_block_ref_id = Column(Integer, ForeignKey("bdd_blocks.id"), nullable=True, index=True)
+    parent_block_name = Column(String, nullable=True)
+    states = Column(JSON, nullable=False)
+    transitions = Column(JSON, nullable=False)
+    source = Column(String, default='ai', nullable=False)
+
+class StateMachineDiagramCreate(BaseModel):
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    parent_block_ref_id: Optional[int] = None
+    parent_block_name: Optional[str] = None
+    states: List[Dict[str, Any]]
+    transitions: List[Dict[str, Any]]
+    source: str = 'ai'
+
+class StateMachineDiagramResponse(BaseModel):
+    id: int
+    parent_bdd_diagram_id: int
+    parent_block_id: str
+    parent_block_ref_id: Optional[int] = None
+    parent_block_name: Optional[str] = None
+    states: List[Dict[str, Any]]
+    transitions: List[Dict[str, Any]]
+    source: str
+    created_at: datetime
+
     class Config:
         orm_mode = True
