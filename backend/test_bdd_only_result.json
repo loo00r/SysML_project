@@ -1,0 +1,61 @@
+{
+  "diagram_raw": {
+    "diagram_type": "bdd",
+    "elements": [
+      {
+        "id": "sensor-1",
+        "type": "sensor",
+        "name": "Temperature Sensor",
+        "description": "Monitors ambient temperature",
+        "properties": {
+          "measurement_unit": "Celsius"
+        }
+      },
+      {
+        "id": "block-1",
+        "type": "block",
+        "name": "Lighting Controller",
+        "description": "Manages lighting based on user preferences and sensor data"
+      },
+      {
+        "id": "block-2",
+        "type": "block",
+        "name": "Security Camera",
+        "description": "Provides video surveillance for security"
+      },
+      {
+        "id": "block-3",
+        "type": "block",
+        "name": "Central Hub",
+        "description": "Coordinates all smart home devices",
+        "properties": {
+          "connectivity": "Wi-Fi"
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "source_id": "sensor-1",
+        "target_id": "block-3",
+        "type": "smoothstep",
+        "name": "Data Transmission"
+      },
+      {
+        "source_id": "block-1",
+        "target_id": "block-3",
+        "type": "smoothstep",
+        "name": "Control Signals"
+      },
+      {
+        "source_id": "block-2",
+        "target_id": "block-3",
+        "type": "smoothstep",
+        "name": "Video Feed"
+      }
+    ]
+  },
+  "raw_text": "Design a smart home system with temperature sensors, lighting controller, security cameras, and central hub",
+  "model_used": "gpt-4o",
+  "rag_used": false,
+  "examples_count": 0
+}

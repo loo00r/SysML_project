@@ -23,6 +23,34 @@ import { applyDagreLayout } from '../utils/dagreLayout';
 import { getNodeChangeId } from '../utils/reactflowChanges';
 import type { ValidationResult } from '../services/validation/smdValidator';
 
+// Helper: poll unified generation result from Redis cache
+const pollUnifiedDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
+
+    if (response.status === 404) {
+      throw new Error('Diagram generation expired or failed');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to retrieve diagram result: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.status === 'completed') {
+      return result;
+    }
+
+    if (result.status === 'error') {
+      throw new Error(result.error || 'Diagram generation failed');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  throw new Error('Diagram generation timed out');
+};
+
 // Define node types based on SysML diagram elements
 export type NodeType =
   | 'block'
@@ -1349,44 +1377,24 @@ const useDiagramStore = create<DiagramStoreState>()(
       // Save current state to history before generating
       get().saveToHistory();
       
-      // Prepare API endpoint based on whether RAG is enabled
-      const endpoint = get().useRAG 
-        ? '/api/v1/rag/generate-diagram-with-context/' 
-        : '/api/v1/create-diagram/';
-      
-      // Make API request
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text,
-          diagram_type: get().diagramType
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Process the response and update the diagram
-    if (data.nodes && data.edges) {
-      // Transform the API response to ReactFlow format
-      const rfNodes = data.nodes.map((node: any) => ({
-        id: node.id,
-        type: node.type || node.data?.type || 'block',
-        // Позиція буде встановлена алгоритмом Dagre
-        position: node.position || { x: 0, y: 0 },
-        data: {
-          label: node.name || node.data?.label || node.label,
-          description: node.description || node.data?.description || '',
-          type: node.data?.type || node.type || 'block',
-          properties: node.properties || node.data?.properties || {},
-          inputs: node.inputs || node.data?.inputs || [],
-          outputs: node.outputs || node.data?.outputs || []
+      if (get().useRAG) {
+        const generateIBD = get().diagramType === 'bdd_enhanced';
+        const response = await fetch('/api/v1/rag/generate-diagram-unified/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text,
+            use_rag: true,
+            generate_ibd: generateIBD,
+            generate_smd: false,
+            name: 'Generated Diagram'
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.statusText}`);
         }
       }));
       const rfEdges = data.edges.map((edge: any) => ({
@@ -1419,9 +1427,79 @@ const useDiagramStore = create<DiagramStoreState>()(
         // Validate the generated diagram
         const errors = get().validateDiagram();
         set({ validationErrors: errors });
-        
+
         if (errors.length > 0) {
           set({ showValidationPanel: true });
+        }
+      } else {
+        // Legacy direct generation without RAG/unified flow
+        const response = await fetch('/api/v1/create-diagram/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text,
+            diagram_type: get().diagramType
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.nodes && data.edges) {
+          const rfNodes = data.nodes.map((node: any) => ({
+            id: node.id,
+            type: node.type || node.data?.type || 'block',
+            position: node.position || { x: 0, y: 0 },
+            data: {
+              label: node.name || node.data?.label || node.label,
+              description: node.description || node.data?.description || '',
+              type: node.data?.type || node.type || 'block',
+              properties: node.properties || node.data?.properties || {},
+              inputs: node.inputs || node.data?.inputs || [],
+              outputs: node.outputs || node.data?.outputs || []
+            }
+          }));
+          const rfEdges = data.edges.map((edge: any) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: 'smoothstep',
+            label: edge.label || '',
+            animated: edge.animated || false,
+            style: { stroke: '#555' }
+          }));
+
+          const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
+          console.log(`🌀 [Generation] Applying Dagre layout (${direction}) for diagram type: ${get().diagramType}`);
+          const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+            rfNodes,
+            rfEdges,
+            direction,
+            get().diagramType === 'ibd'
+              ? {
+                  nodeSep: 150,
+                  rankSep: 350
+                }
+              : undefined
+          );
+
+          set({
+            nodes: layoutedNodes,
+            edges: layoutedEdges
+          });
+          get().updateActiveDiagram({ nodes: layoutedNodes, edges: layoutedEdges });
+
+          const errors = get().validateDiagram();
+          set({ validationErrors: errors });
+
+          if (errors.length > 0) {
+            set({ showValidationPanel: true });
+          }
         }
       }
     } catch (error) {

@@ -1,0 +1,50 @@
+{
+  "summary": {
+    "tests_run": 3,
+    "successful": 3,
+    "average_quality_score": 86.0,
+    "average_components": 5.0,
+    "average_connections": 5.666666666666667
+  },
+  "results": [
+    {
+      "test_name": "Battery Pack (Automotive)",
+      "success": true,
+      "component_count": 5,
+      "connection_count": 5,
+      "has_descriptions": 5,
+      "has_properties": 0,
+      "labeled_edges": 5,
+      "avg_description_length": 53.4,
+      "model_used": "gpt-4o",
+      "quality_score": 85,
+      "quality_grade": "Good"
+    },
+    {
+      "test_name": "Flight Controller (Aerospace)",
+      "success": true,
+      "component_count": 5,
+      "connection_count": 7,
+      "has_descriptions": 5,
+      "has_properties": 0,
+      "labeled_edges": 7,
+      "avg_description_length": 74.4,
+      "model_used": "gpt-4o",
+      "quality_score": 85,
+      "quality_grade": "Good"
+    },
+    {
+      "test_name": "Application Server (IT)",
+      "success": true,
+      "component_count": 5,
+      "connection_count": 5,
+      "has_descriptions": 5,
+      "has_properties": 1,
+      "labeled_edges": 5,
+      "avg_description_length": 63.2,
+      "model_used": "gpt-4o",
+      "quality_score": 88,
+      "quality_grade": "Good"
+    }
+  ]
+}

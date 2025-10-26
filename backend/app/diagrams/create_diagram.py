@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body, HTTPException, Depends
 from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, DiagramPositioning
-from app.crud import crud_ibd
+from app.crud import crud_ibd, crud_bdd_block
 from app.database.models import InternalBlockDiagramCreate
 from app.database.embeddings import store_diagram_with_embedding
 from app.db.dependencies import get_db
@@ -81,30 +81,43 @@ async def create_diagram_endpoint(
             diagram_type=request.diagram_type,
             diagram_json=positioned_diagram  # Save the positioned, clean diagram
         )
-        
+
+        # Sync BDD blocks for manual creation flow
+        bdd_block_map = await crud_bdd_block.sync_bdd_blocks(
+            db=db,
+            parent_bdd_diagram_id=db_diagram.id,
+            elements=positioned_diagram.get("elements", [])
+        )
+
         # 5. Save the parsed IBDs with the parent BDD ID - New Upsert Logic
         for ibd_data in ibd_to_create:
+            parent_block_id = ibd_data["parent_block_id"]
+            block_ref = bdd_block_map.get(parent_block_id)
+            parent_block_ref_id = getattr(block_ref, "id", None)
+
             existing_ibd = await crud_ibd.get_ibd_by_parent_and_block(
                 db=db,
                 parent_bdd_id=db_diagram.id,
-                block_id=ibd_data["parent_block_id"]
+                block_id=parent_block_id
             )
 
             if existing_ibd:
                 # IBD already exists -> UPDATE it
-                print(f"DEBUG: Found existing IBD for block {ibd_data['parent_block_id']}. Updating...")
+                print(f"DEBUG: Found existing IBD for block {parent_block_id}. Updating...")
                 await crud_ibd.update_ibd(
                     db=db,
                     db_ibd=existing_ibd,
                     nodes=ibd_data["nodes"],
-                    edges=ibd_data["edges"]
+                    edges=ibd_data["edges"],
+                    parent_block_ref_id=parent_block_ref_id
                 )
             else:
                 # IBD does not exist -> CREATE it
-                print(f"DEBUG: No existing IBD for block {ibd_data['parent_block_id']}. Creating new...")
+                print(f"DEBUG: No existing IBD for block {parent_block_id}. Creating new...")
                 new_ibd = InternalBlockDiagramCreate(
                     parent_bdd_diagram_id=db_diagram.id,
-                    parent_block_id=ibd_data["parent_block_id"],
+                    parent_block_id=parent_block_id,
+                    parent_block_ref_id=parent_block_ref_id,
                     nodes=ibd_data["nodes"],
                     edges=ibd_data["edges"],
                     source="ai"
@@ -121,5 +134,4 @@ async def create_diagram_endpoint(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating diagram: {str(e)}")
-
 
