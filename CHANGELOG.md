@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.25] - 2025-10-26
 ### Changed
-- Generate Detailed Diagram now links AI-created State Machine Diagrams with the main BDD and IBD outputs.
+- BDD auto-layout keeps system roots at the top while preserving the expanded vertical spacing introduced previously.
+
+## [1.2.24] - 2025-10-26
+### Changed
+- Increased vertical spacing between AI-generated BDD levels for clearer hierarchy.
 
 ## [1.2.23] - 2025-10-26
 ### Changed

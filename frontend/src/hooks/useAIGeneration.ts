@@ -436,13 +436,32 @@ export const useAIGeneration = () => {
           result.description && result.description.trim().length > 0
             ? result.description.trim()
             : shortDescription;
+        let diagramNodes = result.nodes as Node<NodeData>[];
+        let diagramEdges = result.edges as Edge[];
+
+        if (
+          !options.testMode &&
+          (resolvedType === 'bdd' || resolvedType === 'bdd_enhanced')
+        ) {
+          const { nodes: layoutNodes, edges: layoutEdges } = applyDagreLayout(
+            diagramNodes,
+            diagramEdges,
+            'BT',
+            {
+              nodeSep: 160,
+              rankSep: 240,
+            }
+          );
+          diagramNodes = layoutNodes;
+          diagramEdges = layoutEdges;
+        }
         
         // Open a new diagram with the generated content
         openDiagram({
           name: resolvedName,
           type: resolvedType,
-          nodes: result.nodes,
-          edges: result.edges,
+          nodes: diagramNodes,
+          edges: diagramEdges,
           description: resolvedDescription,
           needsCentering: true, // Center new AI-generated diagrams
           generatedDiagramId: options.testMode ? undefined : result.diagramId // Store Redis diagram ID for saving

@@ -1444,7 +1444,11 @@ const useDiagramStore = create<DiagramStoreState>()(
         const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
           rfNodes,
           rfEdges,
-          'TB'
+          'BT',
+          {
+            nodeSep: 160,
+            rankSep: 240,
+          }
         );
 
         set({
@@ -1502,17 +1506,21 @@ const useDiagramStore = create<DiagramStoreState>()(
           style: { stroke: '#555' },
         }));
 
-        const direction = get().diagramType === 'ibd' ? 'LR' : 'TB';
+        const isIbd = get().diagramType === 'ibd';
+        const direction = isIbd ? 'LR' : 'BT';
         const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
           rfNodes,
           rfEdges,
           direction,
-          get().diagramType === 'ibd'
+          isIbd
             ? {
                 nodeSep: 150,
                 rankSep: 350,
               }
-            : undefined
+            : {
+                nodeSep: 160,
+                rankSep: 240,
+              }
         );
 
         set({
