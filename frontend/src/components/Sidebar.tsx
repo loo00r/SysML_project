@@ -22,6 +22,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import PersonIcon from '@mui/icons-material/Person';
 import DataObjectIcon from '@mui/icons-material/DataObject';
+import ChangeCircleIcon from '@mui/icons-material/ChangeCircle';
 
 import useDiagramStore from '../store/diagramStore';
 
@@ -118,8 +119,154 @@ const Sidebar: React.FC = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const renderSmdPalette = () => (
+    <>
+      <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+        State Machine Elements
+      </Typography>
+      <List disablePadding>
+        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+          <Tooltip title="Initial pseudo-state" placement="right">
+            <DraggableItem
+              draggable
+              onDragStart={(e) =>
+                onDragStart(e, 'smdInitial', {
+                  type: 'smdInitial',
+                  label: 'Initial',
+                  name: 'Initial',
+                  stateType: 'initial',
+                  entry: '',
+                  exit: '',
+                  do: '',
+                })
+              }
+            >
+              <Box sx={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                backgroundColor: '#111',
+                border: '2px solid #111',
+              }} />
+              <Typography variant="body2">Initial</Typography>
+            </DraggableItem>
+          </Tooltip>
+        </ListItem>
+
+        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+          <Tooltip title="State with entry/exit/do actions" placement="right">
+            <DraggableItem
+              draggable
+              onDragStart={(e) =>
+                onDragStart(e, 'smdState', {
+                  type: 'smdState',
+                  label: 'State',
+                  name: 'State',
+                  entry: '',
+                  exit: '',
+                  do: '',
+                  stateType: 'state',
+                })
+              }
+            >
+              <Box sx={{
+                width: 24,
+                height: 16,
+                borderRadius: '8px',
+                border: '2px solid #90a4ae',
+                backgroundColor: '#fafafa',
+              }} />
+              <Typography variant="body2">State</Typography>
+            </DraggableItem>
+          </Tooltip>
+        </ListItem>
+
+        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+          <Tooltip title="Branching choice pseudo-state" placement="right">
+            <DraggableItem
+              draggable
+              onDragStart={(e) =>
+                onDragStart(e, 'smdChoice', {
+                  type: 'smdChoice',
+                  label: 'Choice',
+                  name: 'Choice',
+                  stateType: 'choice',
+                })
+              }
+            >
+              <Box sx={{
+                width: 20,
+                height: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Box sx={{
+                  width: 14,
+                  height: 14,
+                  transform: 'rotate(45deg)',
+                  borderRadius: '4px',
+                  border: '2px solid #455a64',
+                  backgroundColor: '#eceff1',
+                }} />
+              </Box>
+              <Typography variant="body2">Choice</Typography>
+            </DraggableItem>
+          </Tooltip>
+        </ListItem>
+
+        <ListItem disablePadding sx={{ display: 'block', mb: 1 }}>
+          <Tooltip title="Final state" placement="right">
+            <DraggableItem
+              draggable
+              onDragStart={(e) =>
+                onDragStart(e, 'smdFinal', {
+                  type: 'smdFinal',
+                  label: 'Final',
+                  name: 'Final',
+                  stateType: 'final',
+                })
+              }
+            >
+              <Box sx={{
+                width: 20,
+                height: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Box sx={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  border: '2px solid #37474f',
+                  backgroundColor: '#fafafa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Box sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    border: '2px solid #37474f',
+                    backgroundColor: '#eceff1',
+                  }} />
+                </Box>
+              </Box>
+              <Typography variant="body2">Final</Typography>
+            </DraggableItem>
+          </Tooltip>
+        </ListItem>
+      </List>
+    </>
+  );
+
   // Render the node palette for block diagrams
   const renderNodePalette = () => {
+    if (activeDiagramType === 'smd') {
+      return renderSmdPalette();
+    }
     // Check if IBD block should be locked (when diagram type is BDD or BDD Enhanced)
     const isIBDLocked = activeDiagramType === 'bdd' || activeDiagramType === 'bdd_enhanced';
     // Check if BDD elements should be locked (when diagram type is IBD)
@@ -287,6 +434,12 @@ const Sidebar: React.FC = () => {
                   <DataObjectIcon fontSize="small" sx={{ color: '#4caf50' }} />
                 </ListItemIcon>
                 <ListItemText primary="Internal Block Diagram (IBD)" secondary="Shows internal structure of a block" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <ChangeCircleIcon fontSize="small" color="secondary" />
+                </ListItemIcon>
+                <ListItemText primary="State Machine Diagram (SMD)" secondary="Illustrates states and transitions" />
               </ListItem>
             </List>
           </AccordionDetails>

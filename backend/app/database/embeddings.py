@@ -149,7 +149,7 @@ async def optimize_diagram_json(diagram_json: Dict[str, Any]) -> Dict[str, Any]:
     Removes positioning and converts nodes/edges to elements/relationships.
     """
     optimized_json = {
-        "diagram_type": "block",
+        "diagram_type": str(base_diagram_type).lower(),
         "elements": [],
         "relationships": []
     }

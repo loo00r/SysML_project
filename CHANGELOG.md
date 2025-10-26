@@ -7,6 +7,752 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.22] - 2025-10-25
+### Fixed
+- SMD Final nodes now consistently appear at the end of diagrams through Dagre rank assignment.
+- Initial nodes now consistently appear at the beginning of diagrams.
+
+### Changed
+- Dagre layout algorithm now uses 'longest-path' ranker for better hierarchical SMD layouts.
+- Automatic rank assignment (Initial=0, Final=999) ensures proper state machine flow visualization.
+
+### Improved
+- More predictable and intuitive SMD diagram layouts in Test Mode.
+- Better visual hierarchy for state machine diagrams.
+
+## [1.2.21] - 2025-10-25
+### Changed
+- AI Diagram Generator now creates detailed diagrams by default (with Internal Blocks and State Machines).
+- Renamed "Generate with Internal Diagrams" toggle to "Generate Detailed Diagram" for better clarity.
+
+### Improved
+- Enhanced default user experience - detailed diagrams provide more comprehensive system models out of the box.
+- More intuitive toggle naming aligned with user expectations.
+
+## [1.2.20] - 2025-10-25
+### Added
+- BDD validation and export now includes all related SMD and IBD diagrams automatically.
+- XMI export now contains nodes and edges from nested state machine and internal block diagrams.
+- Success messages display count of included related diagrams.
+
+### Changed
+- `validateSysMLDiagram` function enhanced to validate nested diagrams with type-specific error prefixes.
+- `generateXMI` function extended to include related diagrams in export output.
+- Validation errors now clearly indicate which nested diagram has issues (e.g., "[SMD] error message").
+
+### Improved
+- Comprehensive BDD validation covering entire system hierarchy including behavioral and structural sub-diagrams.
+- Better export completeness - single XMI file now contains full system model.
+
+## [1.2.19] - 2025-10-25
+### Fixed
+- SMD seed template now uses left handles instead of top handles for State and Final nodes, ensuring arrows render correctly when creating new state machine diagrams.
+- Initial → Idle → Final template transitions now properly display both arrows on canvas.
+
+### Changed
+- Updated tooltip text from "Add SMD" to "Create State Machine Diagram" for Sensor and Processor nodes for consistency with Block nodes.
+- Improved user experience with clearer, more descriptive tooltip messages across all BDD node types.
+
+## [1.2.18] - 2025-10-25
+### Added
+- SMD validation pass with badges and summary toast notifications.
+- VALIDATE button now runs SMD-specific checks for state machine diagrams.
+- Validation rules: exactly one Initial recommended (warning), no dangling transitions (error), Initial → Initial forbidden (error), Final → * forbidden (error).
+- Visual badges on canvas for problematic nodes and edges (red for errors, yellow for warnings).
+- Tooltip display on badges showing validation code and message.
+
+### Changed
+- VALIDATE button behavior now detects diagram type and runs appropriate validation.
+- Validation results automatically clear on any graph mutation (add/remove/connect nodes/edges).
+
+### Improved
+- Better SMD diagram quality checking with user-friendly visual feedback.
+- Clear distinction between errors and warnings with color-coded badges.
+
+## [1.2.17] - 2025-10-25
+### Changed
+- State and Choice nodes now expose only two handles (left inbound, right outbound); top/bottom handles removed for cleaner visual design.
+- Connection validation enhanced to prevent targeting top/bottom sides on State/Choice nodes.
+- Dagre layout algorithm now forces LEFT/RIGHT positioning for State/Choice nodes in SMD diagrams.
+
+### Fixed
+- Normalization ensures imported SMD edges targeting Top/Bottom on State/Choice are remapped to Left to match new handle policy.
+- Test Mode JSON imports automatically normalize invalid target handles for State/Choice nodes.
+- Arrow overlays on State/Choice now only render on allowed left side, eliminating visual confusion.
+- Initial and Final nodes maintain all four handles with existing validation rules unchanged.
+
+## [1.2.16] - 2025-10-24
+### Improved
+- SMD Test Mode layout now supports flexible 4-directional connections (top, left, right, bottom).
+- Dagre layout algorithm adapted for SMD with increased spacing (nodeSep: 100, rankSep: 150) for better clarity.
+- SMD nodes can now utilize all available connection sides based on geometric positioning, not just left-right.
+
+### Changed
+- Added `flexiblePositions` parameter to Dagre layout utility to disable fixed target/source positions for SMD diagrams.
+- Enhanced automatic edge routing to leverage top and left (inbound) and right and bottom (outbound) connections.
+
+## [1.2.15] - 2025-10-24
+### Changed
+- SMD Test Mode (JSON → SMD) now uses Dagre layout algorithm for improved diagram structure.
+- Applied Left-to-Right (LR) flow direction for natural state machine progression.
+- Configured optimized spacing for SMD diagrams: nodeWidth: 180, nodeHeight: 80, nodeSep: 80, rankSep: 120.
+
+### Fixed
+- SMD Test Mode diagrams now have proper hierarchical layout instead of random positioning.
+- State connections are automatically organized for better readability and visual coherence.
+
+## [1.2.14] - 2025-10-24
+### Changed
+- SMD nodes now accept inbound transitions only on LEFT and TOP sides; RIGHT and BOTTOM are source-only.
+- Connection validation prevents creating transitions to RIGHT/BOTTOM sides with user-friendly warnings.
+- Initial nodes have visual handles for symmetry but validation strictly prevents any inbound transitions.
+
+### Fixed
+- Imported/Test-Mode diagrams automatically normalize invalid target sides (RIGHT/BOTTOM → LEFT/TOP).
+- Arrow overlays no longer render on disallowed RIGHT/BOTTOM sides, eliminating duplicate arrow issues.
+- Edge normalization remaps invalid target positions based on geometric heuristics to maintain visual coherence.
+
+## [1.2.13] - 2025-10-24
+### Removed
+- SMD Composite State and all related behaviors (containment, workspace overlay, auto-resize, boundary policies).
+- Composite node type from SMD palette and type registrations.
+- Composite-specific services: resize scheduler, layout scheduler, and Dagre integration.
+- Composite containment logic (parentNode usage for SMD children).
+- Composite-aware edge routing and connection validation.
+
+### Changed
+- Legacy diagrams with composites are migrated on load by flattening children to the root; composite-bound edges are reattached when possible or removed with a migration note.
+- Simplified SMD state machine to support only Initial, State, Final, and Choice pseudo-states.
+
+## [1.2.12]
+### Added
+- Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
+
+## [1.2.11] - 2025-10-24
+### Added
+- Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
+- Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+- Automatic Dagre-based layout for CompositeState children with per-parent debouncing and resize integration.
+- Temporary test mode on the AI generator to accept JSON input and build SMD diagrams without backend calls.
+
+### Improved
+- Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
+- Robust label composition: clean omission of optional parts, no stray brackets or slashes.
+
+### Persistence
+- Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
+
+### Fixed
+- Seeded SMD template transitions now persist top-side metadata so node overlays render arrows on the intended handles after creation and reload.
+
+## [1.2.10] - 2025-10-24
+### Added
+- Automatic Dagre-based layout for CompositeState children with per-parent debouncing and resize integration.
+
+## [1.2.9] - 2025-10-23
+### Fixed
+- Seeded SMD template transitions now persist top-side metadata so node overlays render arrows on the intended handles after creation and reload.
+
+## [1.2.8] - 2025-10-22
+### Added
+- Target-side arrowheads for SMD transitions (node-drawn overlays), matching BDD direction cues.
+
+### Improved
+- Clear, consistent directionality on SMD edges across straight, curved, and self-loop cases.
+
+## [1.2.7] - 2025-10-22
+### Added
+- Structured Event/Guard/Action fields for smdTransition with two-way editing (inline label and inspector).
+
+### Improved
+- Robust label composition: clean omission of optional parts, no stray brackets or slashes.
+
+### Persistence
+- Event/Guard/Action serialized in diagram JSON and restored on rehydrate.
+
+## [1.2.6] - 2025-10-22
+### Added
+- Enabled SMD creation/open for Sensor and Processor blocks on BDD (tab reuse per parent/block pair; deterministic IDs).
+
+### Changed
+- Consistent SMD affordances across all BDD block types with a hover "+" trigger on the bottom-left corner.
+
+## [1.2.5] - 2025-10-21
+### Changed
+- Composite states now grow deterministically by 5% on the second and subsequent palette drops while drags only clamp positions.
+
+## [1.2.4] - 2025-10-21
+### Fixed
+- Composite states now wait for child measurement, using parent-local bounding boxes and no-shrink guards so palette drops always grow the container.
+- Auto-resize scheduling flushes immediately on child add/drag-end via double-RAF, preventing the first child from collapsing the composite.
+
+## [1.2.3] - 2025-10-21
+### Fixed
+- Composite states now wait for child measurement, using parent-local bounding boxes and no-shrink guards so palette drops always grow the container.
+- Auto-resize scheduling flushes immediately on child add/drag-end via double-RAF, preventing the first child from collapsing the composite.
+
+## [1.2.2] - 2025-10-21
+### Fixed
+- React Flow node change handling now uses official type guards, eliminating `NodeChange` union access errors during TypeScript builds.
+
+### Changed
+- Frontend Docker build copies dependency manifests before application code and runs `npm ci` followed by `npm run build` for reliable caching.
+
+## [1.2.1] - 2025-10-21
+### Added
+- Debounced SMD composite auto-resize that recalculates on palette drops, drags, deletes, auto-layout, undo/redo, and rehydrate.
+
+### Fixed
+- Palette drops into composites now derive typed parent IDs and clamp positions, removing bare `parentNode` references that broke builds.
+
+## [1.2.0] - 2025-10-20
+
+### Fixed
+- Composite workspace outline keeps internal SMD edges fully visible without any overlay fill.
+- Internal SMD edges remain visible beneath the composite workspace via a transparent, non-interactive stripe overlay.
+- Composite internal transition tooling and build pipeline follow-ups pending next iteration.
+
+## [1.1.99] - 2025-10-20
+
+### Fixed
+- Composite workspace no longer overlays internal edges — switched to hollow workspace with border/outline only.
+
+## [1.1.98] - 2025-10-20
+
+### Fixed
+- Internal SMD edges hidden by Composite workspace — transparent overlay with pointer-events:none and no opaque fill.
+
+## [1.1.97] - 2025-10-20
+
+### Fixed
+- SMD edge build errors — render paths via BaseEdge, labels via EdgeLabelRenderer, and enforce typed `pointerEvents`.
+
+## [1.1.96] - 2025-10-20
+
+### Fixed
+- Edge label rendering — proper EdgeLabelRenderer usage and CSS `pointerEvents` typing to restore successful builds.
+
+## [1.1.95] - 2025-10-20
+
+### Fixed
+- Enabled child-to-child transitions inside composite states and restored SMD transition labels while keeping the right-to-left external policy.
+
+## [1.1.94] - 2025-10-20
+
+### Changed
+- Composite external connection policy — right-only source port and left-target requirement for outside nodes.
+
+## [1.1.93] - 2025-10-20
+
+### Fixed
+- Allow internal transitions inside Composite state containers and block only cross-boundary child ↔ outside transitions with a soft warning.
+- Enabled composite top/right ports for external connections while keeping arrow rendering and optional labels consistent.
+
+## [1.1.92] - 2025-10-20
+
+### Added
+- Composite State with parent/child containment and soft boundary rules, including in-canvas drag limits and connection guardrails.
+
+## [1.1.91] - 2025-10-20
+
+### Added
+- Contextual SMD creation handle on BDD blocks that seeds Initial → Idle → Final states with arrowed transitions.
+
+### Changed
+- SMD tabs reuse the existing diagram per block/parent pair and persist parent links for quick reopen and focusing.
+
+## [1.1.90] - 2025-10-20
+
+### Changed
+- Clicking the global "+" (and related shortcuts) now opens a new Block Definition Diagram immediately and hides the type chooser menu.
+
+## [1.1.89] - 2025-10-20
+
+### Added
+- SMD diagram scaffold (nodes + arrowed transitions).
+- Introduced the SMD diagram type with initial, state, choice, and final nodes plus arrowed transition edges.
+- Added a State Machine palette section, node components, and custom edge styling for directional transitions.
+
+### Changed
+- Updated diagram persistence to include explicit diagram type metadata (including SMD) when saving or rehydrating diagrams.
+- Enhanced backend diagram JSON optimization to respect incoming diagram types and retain SMD-specific state details.
+
+### Chore
+- Build fixes and clean dependency install.
+
+## [1.1.88] - 2025-08-02
+
+### Fixed
+- Critical IBD diagram save functionality where IBD diagrams were not being saved to database during manual save
+- IBD diagrams now properly save to database along with their parent BDD diagrams
+- Resolved issue where only AI-generated diagrams had IBD save capability while manual IBD creation was ignored
+
+### Added
+- New POST endpoint `/api/v1/diagrams/ibd/` for creating and updating Internal Block Diagrams
+- Comprehensive IBD save logic in frontend that detects and saves all related IBD diagrams
+- Upsert functionality for IBD diagrams preventing duplicate database entries
+- Enhanced save notifications showing count of saved IBD diagrams
+
+### Changed
+- Enhanced manual save workflow to automatically detect and save all IBD diagrams related to active BDD
+- Improved IBD data transformation for proper backend format compatibility
+- Extended handleSave function to process both BDD and IBD diagrams in single operation
+
+### Improved
+- Complete IBD save functionality for both AI-generated and manually created diagrams
+- Better user feedback with detailed save status including IBD diagram counts
+- Robust error handling for IBD save operations with comprehensive logging
+- Unified save experience regardless of diagram creation method (AI vs manual)
+
+## [1.1.87] - 2025-08-02
+
+### Fixed
+- Enhanced diagram generation now keeps BDD diagram active after AI generation instead of switching to IBD tab
+- User now remains on main BDD diagram view after Enhanced generation completes
+- Resolved issue where last created IBD diagram became active, hiding the primary BDD diagram from user
+
+### Changed
+- Enhanced generation workflow now automatically switches back to main BDD diagram after creating all IBD diagrams
+- Improved user experience by maintaining focus on primary diagram while IBD diagrams are created in background
+- Added logic to preserve BDD diagram as active tab after Enhanced generation process
+
+### Improved
+- Better Enhanced diagram generation UX with predictable tab focus behavior
+- Users can immediately see BDD diagram with IBD indicator icons after generation
+- Enhanced generation now provides clear visual feedback with BDD remaining primary focus
+
+## [1.1.86] - 2025-08-02
+
+### Fixed
+- Critical Enhanced diagram generation bug where IBD data was stored in Redis but not processed by frontend
+- IBD diagrams now automatically create from AI-generated Enhanced diagrams with proper node and edge population
+- Resolved empty IBD creation issue when Enhanced generation toggle was enabled
+- Frontend now correctly processes `ibd_data` from Redis response and creates populated IBD diagram tabs
+
+### Added
+- Automatic IBD diagram creation logic in frontend for Enhanced diagram generation
+- IBD data transformation from Redis format to ReactFlow format with proper node and edge mapping
+- Comprehensive logging for IBD creation process to aid debugging
+- Dagre layout application for AI-generated IBD diagrams with optimal Left-to-Right spacing
+
+### Changed
+- Enhanced useAIGeneration hook to process IBD data from Redis and automatically create IBD diagram tabs
+- Updated AIGenerationResult interface to include ibdData property for IBD processing
+- Improved Enhanced diagram workflow to seamlessly create both BDD and IBD diagrams from single generation request
+
+### Improved
+- Enhanced diagrams now properly generate with populated internal block diagrams instead of empty IBDs
+- Better user experience with automatic IBD creation eliminating need for manual IBD setup
+- Complete end-to-end Enhanced diagram generation with properly connected internal components
+- Restored full functionality of Enhanced diagram generation that was broken by Redis architecture changes
+
+## [1.1.85] - 2025-08-02
+
+### Added
+- Two-step save architecture separating diagram generation from database storage
+- New `/api/v1/rag/save-diagram/` endpoint for explicit database saving of AI-generated diagrams
+- `generatedDiagramId` property to DiagramInstance interface for tracking Redis-stored diagrams
+- Smart save logic that differentiates between AI-generated and manual diagrams
+
+### Changed
+- AI diagram generation now only stores in Redis temporarily (no automatic database saving)
+- Save button now uses different endpoints based on diagram origin (AI vs manual)
+- Updated Redis TTL from 15 to 60 minutes for longer temporary diagram storage
+- Enhanced diagram save workflow with dual-path architecture
+
+### Fixed
+- TypeScript compilation error related to generatedDiagramId property
+- Eliminated automatic database saving during AI diagram generation
+- Resolved user confusion about when diagrams are saved to the knowledge base
+
+### Improved
+- User has explicit control over when diagrams are saved to the database
+- Better separation of concerns between temporary generation storage and permanent database storage
+- Enhanced user experience with clear save control and feedback messages
+
+## [1.1.84] - 2025-08-02
+
+### Added
+- Redis-based diagram generation architecture with command/query separation
+- Two-step diagram generation flow: immediate diagramId response followed by result polling
+- Redis client with TTL support for temporary diagram storage
+- New GET endpoint `/api/v1/rag/diagram-result/{diagram_id}` for retrieving generation results
+- Redis service integration in Docker Compose with persistent volume
+- Async polling mechanism in frontend for retrieving generated diagrams
+
+### Changed
+- Refactored `/api/v1/rag/generate-diagram-with-context/` to return 202 status with diagramId immediately
+- Enhanced frontend useAIGeneration hook to use two-step polling approach
+- Updated diagram generation to store results in Redis with 15-minute TTL
+- Improved error handling with Redis-based error storage and retrieval
+
+### Improved
+- Better user experience with immediate response and background processing
+- Enhanced system scalability through command/query separation architecture
+- More reliable diagram generation with temporary storage and retrieval mechanism
+- Reduced frontend waiting time with asynchronous background processing
+
+### Fixed
+- Eliminated blocking API calls during diagram generation
+- Improved system responsiveness through asynchronous processing model
+
+## [1.1.83] - 2025-08-02
+
+### Changed
+- Reverted description text styling back to original distinctive format
+- Description text now uses inline styles with italic font, reduced opacity, and gray color
+- Restored visual distinction between descriptions and other node attributes
+- Enhanced readability through original styling approach with smaller font size and visual separation
+
+### Improved
+- Better visual hierarchy with descriptions standing out from standard node attributes
+- Maintained consistent styling across all node types (BlockNode, SensorNode, ProcessorNode, IBDNode)
+- Enhanced user experience with more readable and visually distinct description text
+- Preserved original design intent for description display with proper visual emphasis
+
+## [1.1.82] - 2025-08-02
+
+### Changed
+- Standardized description text styling to match other node attributes format
+- Updated description display to use consistent "Label: Value" format across all node types
+- Replaced custom inline styles with Material-UI Typography components for better consistency
+- Applied same visual treatment for descriptions as other node properties
+
+### Improved
+- Better visual consistency across all node attributes and descriptions
+- Enhanced readability with standardized typography and formatting
+- More cohesive user interface with unified styling approach
+- Consistent font weights and spacing throughout node components
+
+## [1.1.81] - 2025-08-02
+
+### Added
+- Node descriptions are now displayed directly on canvas blocks for all diagram types
+- Description text rendered inside BlockNode, SensorNode, ProcessorNode, and IBDNode components
+- Visual distinction for description text with italic styling and reduced opacity
+- Multi-line description support with proper text wrapping
+
+### Changed
+- Updated all custom node components to include description rendering in JSX
+- Enhanced node layout to accommodate description text between title and properties
+- Improved self-contained diagram readability without requiring properties panel
+
+### Improved
+- Diagrams are now more informative at a glance with visible component descriptions
+- Better user experience with immediate access to component details on canvas
+- Enhanced visual hierarchy with properly styled description text
+- Consistent description display across all node types (BDD and IBD)
+
+## [1.1.80] - 2025-08-02
+
+### Added
+- Enhanced IBD node generation with AI-populated descriptions and properties fields
+- New prompt rule for generating detailed IBD node information when user provides specifics
+- Rich examples in BDD_ENHANCED_PROMPT_TEMPLATE showing proper IBD node structure with metadata
+
+### Changed
+- Updated BDD_ENHANCED_PROMPT_TEMPLATE to include description and properties in IBD node examples
+- Enhanced AI instruction set to generate meaningful descriptions and properties for internal components
+- Improved IBD node data structure with technical specifications and component details
+
+### Improved
+- IBD nodes now contain detailed technical information (clock speeds, capacities, port types, etc.)
+- Better AI prompt engineering for extracting component specifications from user descriptions
+- More informative Internal Block Diagrams with component-level detail beyond just names
+- Enhanced user experience with richer diagram content and component metadata
+
+## [1.1.79] - 2025-08-02
+
+### Removed
+- Removed unused 'Diagram Type' dropdown from AI Diagram Generator panel
+- Removed unused 'Style' dropdown from AI Diagram Generator panel
+- Cleaned up associated useState hooks and event handlers for removed dropdowns
+- Removed unnecessary MUI imports (Select, MenuItem, FormControl, InputLabel, SelectChangeEvent)
+
+### Changed
+- Simplified AI Diagram Generator interface to show only functional controls
+- Updated generateDiagram function call to remove unused style parameter
+- Streamlined component props and state management
+
+### Improved
+- Cleaner and more focused AI generator UI with reduced visual clutter
+- Smaller bundle size by removing unused MUI components
+- Better user experience with simplified interface showing only relevant options
+- Reduced code complexity and maintenance overhead
+
+## [1.1.78] - 2025-08-02
+
+### Fixed
+- Fixed sidebar lock state synchronization for AI-generated diagrams
+- IBD Block now correctly becomes disabled immediately after AI creates new BDD diagrams
+- Enhanced IBD block locking logic to include both 'bdd' and 'bdd_enhanced' diagram types
+- Resolved sidebar component not re-rendering in response to active diagram type changes
+
+### Changed
+- Updated Sidebar component to use direct state subscription for active diagram type
+- Replaced computed state dependency with live state tracking for better reactivity
+- Improved lock state logic to handle all BDD diagram variants consistently
+
+### Improved
+- Sidebar now instantly reflects the correct element availability when switching between tabs
+- Better user experience with consistent element locking across manual and AI-generated diagrams
+- Enhanced state management for real-time UI updates without manual refresh
+
+## [1.1.77] - 2025-08-02
+
+### Added
+- Smart conditional centering system for new diagrams vs user-modified viewport states
+- `needsCentering` flag to DiagramInstance interface for distinguishing auto-generated content
+- `clearCenteringFlag` action to reset centering flag after fitView execution
+
+### Fixed
+- New AI-generated diagrams now properly center on canvas while preserving user viewport changes
+- IBD diagrams from API and cache now automatically center when first opened
+- Empty fallback IBD diagrams center correctly for better user experience
+
+### Changed
+- Enhanced diagram creation workflow with conditional fitView logic
+- Added useEffect in DiagramWorkspace to handle smart centering with proper cleanup
+- Updated AI generation and IBD creation to set needsCentering flag
+
+### Improved
+- Perfect balance between automatic centering for new content and viewport persistence for user modifications
+- Better user experience with predictable diagram positioning behavior
+- Clean separation of centering logic from viewport management
+
+## [1.1.76] - 2025-08-02
+
+### Fixed
+- Removed automatic viewport centering when switching between diagram tabs
+- Fixed ReactFlow TypeScript compatibility by reverting to supported API props
+- Eliminated fitView auto-centering that was resetting user's custom zoom/pan positions
+
+### Changed
+- Reverted from `viewport`/`onViewportChange` to `defaultViewport`/`onMove` props for ReactFlow v11 compatibility
+- Removed `fitView` prop to preserve user-defined viewport positions across tab switches
+
+### Improved
+- True viewport persistence - zoom and pan positions remain exactly as set when switching tabs
+- Better user experience with preserved custom viewport states
+- Enhanced diagram navigation workflow without unexpected viewport resets
+
+## [1.1.75] - 2025-08-02
+
+### Fixed
+- Enforced strict viewport isolation with controlled React Flow component state
+- Eliminated remaining viewport sharing between diagram tabs
+- Fixed minimap sync issues with per-diagram viewport states
+
+### Changed
+- Converted React Flow from uncontrolled to controlled component pattern
+- Replaced `defaultViewport` and `onMove` with `viewport` and `onViewportChange` props
+- Enhanced viewport state management for instant and reliable restoration
+
+### Improved
+- Complete viewport isolation between BDD and IBD diagrams
+- More reliable pan and zoom state persistence across tab switches
+- Better React Flow component performance with controlled state pattern
+
+## [1.1.74] - 2025-08-02
+
+### Fixed
+- Decoupled canvas viewport state between BDD and IBD diagrams
+- Each diagram tab now maintains its own unique pan and zoom position
+- Fixed issue where panning/zooming in one diagram affected all other open diagrams
+
+### Changed
+- Added `viewport` property to `DiagramInstance` interface for per-diagram viewport storage
+- Added `onViewportChange` action to Zustand store for viewport state management
+- Updated `DiagramWorkspace` component to use individual viewport states with React Flow key-based remounting
+
+### Improved
+- Better user experience with isolated viewport controls for each diagram
+- Viewport state is now persisted and restored when switching between tabs
+- Enhanced tabbed interface with proper viewport isolation
+
+## [1.1.73] - 2025-07-30
+
+### Fixed
+- Implemented upsert logic for IBD storage to prevent duplicate database entries
+- IBD generation now updates existing records instead of creating duplicates for the same block
+- Eliminated database clutter from repeated AI generation on the same blocks
+
+### Changed
+- Added `get_ibd_by_parent_and_block` function to check for existing IBD records
+- Added `update_ibd` function to update existing IBD nodes and edges
+- Replaced IBD creation loops with upsert logic in both RAG and create-diagram endpoints
+- Simplified `get_ibd_by_block_id` function to basic query without duplicate handling
+
+### Improved
+- Cleaner database with one IBD record per block within each parent diagram
+- Better database performance by eliminating unnecessary duplicate rows
+- More efficient IBD retrieval without complex duplicate resolution logic
+- Enhanced debugging with print statements for IBD creation/update operations
+
+## [1.1.72] - 2025-07-28
+
+### Changed
+- Implemented hybrid IBD edge label styling combining above-line positioning with opaque background
+- IBD edge labels now positioned 15px above connection lines using translateY(-15px) transform
+- Both label text and background moved together synchronously for perfect visual alignment
+- Enhanced readability through combination of vertical offset and solid background
+
+### Improved
+- Optimal IBD label positioning that avoids interference with visual flow while maintaining perfect readability
+- Synchronized movement of text and background elements preventing misalignment issues
+- Clean appearance with labels floating above connection lines with solid opaque backgrounds
+- Maximum clarity against any underlying grid or edge lines through hybrid approach
+
+### Fixed
+- Label positioning that combines the best aspects of above-line placement and opaque background coverage
+- Consistent visual separation between labels and connection paths in all IBD diagrams
+- Maintained stroke-width: 4px padding effect while adding vertical positioning transform
+
+## [1.1.71] - 2025-07-28
+
+### Changed
+- Finalized IBD edge label styling with centered positioning and fully opaque background
+- IBD edge labels now use ReactFlow's default centering for consistent placement on all connection orientations
+- Enhanced background opacity with stroke-width: 4px for improved padding effect around label text
+- Implemented clean "cutout" effect that completely obscures connection lines and background grid
+
+### Fixed
+- Consistent IBD label positioning that works for both horizontal and vertical connection lines
+- Robust visual clarity through fully opaque background matching canvas color (#fafafa)
+- Professional appearance with definitive styling that replaces all previous experimental approaches
+
+### Improved
+- Final, production-ready IBD edge label implementation with optimal readability
+- Enhanced visual separation between label text and underlying diagram elements
+- Maintained BDD label styling unchanged while perfecting IBD-specific appearance
+
+## [1.1.70] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels to start near source nodes instead of above connection lines
+- IBD edge labels now use text-anchor: start alignment for better readability in complex diagrams
+- Updated label positioning with translate(15px, -15px) to position near connection handle without overlapping nodes
+- Enhanced label-to-source relationship for clearer visual association with originating components
+
+### Improved
+- Better readability for IBD diagrams with multiple outgoing edges from single nodes
+- Reduced visual clutter by anchoring labels to their source nodes
+- Professional appearance with clear source-to-target relationship indication
+- Eliminated label overlap issues in complex multi-connection IBD layouts
+
+## [1.1.69] - 2025-07-28
+
+### Changed
+- Repositioned IBD edge labels above connection lines instead of centered within them
+- Removed opaque background from IBD edge labels for cleaner visual appearance
+- IBD edge labels now display 15px above connection paths using CSS transform
+- Enhanced label positioning with transparent background eliminating "cutout" effect
+
+### Improved
+- Cleaner aesthetic for IBD diagrams with labels positioned cleanly above connection lines
+- Better visual separation between text labels and connection paths
+- Maintained BDD label styling unchanged while updating only IBD edge labels
+- Enhanced readability through improved label-to-line relationship
+
+## [1.1.68] - 2025-07-27
+
+### Fixed
+- Made IBD edge label backgrounds fully opaque to eliminate faint visibility of connection lines and grid through background
+- Added opacity: 1 to IBD edge label background CSS ensuring complete visual cutout effect
+
+### Improved
+- Clean and distinct "cutout" effect for IBD edge labels with no background bleeding
+- Enhanced visual clarity by completely obscuring connection lines behind label backgrounds
+- Professional appearance with solid white backgrounds that properly interrupt edge paths
+- Maintained selective application only to IBD labels while preserving BDD label styling
+
+## [1.1.67] - 2025-07-27
+
+### Fixed
+- Resolved IBD edge label text misalignment with its opaque background
+- Removed overly specific CSS positioning rules that conflicted with ReactFlow's internal SVG text positioning
+- IBD edge label text now perfectly centers within its background using ReactFlow's default mechanism
+
+### Changed
+- Simplified IBD edge label CSS by removing !important flags and explicit positioning attributes
+- Removed transform: none, text-anchor: middle, and dominant-baseline: middle from IBD text styling
+- Enhanced background styling with stroke-width: 2px for improved "padding" effect around text
+
+### Improved
+- Perfect horizontal and vertical centering of IBD edge label text within opaque backgrounds
+- Clean "cutout" effect with text and background properly interrupting edge lines
+- Better compatibility with ReactFlow's SVG text rendering system
+- Eliminated text offset issues that made labels appear broken
+
+## [1.1.66] - 2025-07-27
+
+### Fixed
+- Resolved CSS specificity conflict preventing IBD edge labels from centering on connection lines
+- Removed conflicting CSS rules that positioned IBD labels above lines instead of in center
+- IBD edge labels now properly render in the center of connection paths with opaque backgrounds
+
+### Changed  
+- Updated IBD edge label CSS selectors to use higher specificity (.react-flow__edge.ibd-edge)
+- Added !important flags to ensure IBD label positioning rules take precedence
+- Enhanced IBD label positioning with transform: none, text-anchor: middle, and dominant-baseline: middle
+
+### Removed
+- Conflicting CSS rules (.react-flow__edge.ibd-animated-edge .react-flow__edge-text) with translateY(-15px)
+- Old background hiding rules that interfered with new opaque background implementation
+
+### Improved
+- IBD edge labels now correctly display in center of connection lines with cutout effect
+- Better visual integration of labels with connection paths
+- Eliminated positioning conflicts between old and new CSS rules
+
+## [1.1.65] - 2025-07-27
+
+### Changed
+- Centered IBD edge labels for improved readability and professional appearance
+- IBD edge labels now render in the center of connection paths instead of offset positioning
+- Added opaque background (#fafafa) to IBD edge labels creating "cutout" effect on connection lines
+
+### Removed
+- Previous CSS transform rules that positioned IBD edge labels above connection lines
+- text-anchor: start and transform: translate(15px, -15px) positioning for IBD edge labels
+
+### Improved
+- Enhanced visual integration of IBD edge labels with diagram flow
+- Better text legibility through opaque backgrounds matching canvas color
+- Cleaner, more professional appearance of IBD connection labels
+- Connection lines now appear visually "interrupted" by label backgrounds for clear text readability
+
+## [1.1.64] - 2025-07-27
+
+### Fixed
+- Removed dynamic edge routing logic from IBD diagrams that caused inconsistent connection styles
+- All IBD connections now use consistent orthogonal (smoothstep) lines regardless of node count
+- Eliminated conditional edge type selection that switched between straight and angled lines based on node count
+
+### Changed
+- Unified IBD edge styling to always use smoothstep type for consistent visual appearance
+- Updated both manual connection creation (onConnect) and API-driven IBD generation to use consistent edge types
+- Simplified edge type logic by removing node count-based conditional styling
+
+### Improved
+- Better visual consistency across all IBD diagrams with uniform connection styles
+- Eliminated potential layout issues caused by mixed edge types in same diagram
+- More predictable IBD connection behavior for users regardless of diagram complexity
+
+## [1.1.63] - 2025-07-26
+
+### Changed
+- Radically increased horizontal spacing (rankSep: 350) for IBD diagrams to prevent node overlap
+- Repositioned IBD edge labels to the start of connection lines instead of center position
+- Enhanced edge label positioning with CSS transform for cleaner visual presentation
+
+### Fixed
+- Eliminated edge label overlap with nodes in IBD diagrams through aggressive horizontal spacing
+- Improved label readability by moving labels away from the center of connection lines
+- Better visual separation in complex IBD layouts with multiple interconnected components
+
+## [1.1.62] - 2025-07-26
+
 ### Added
 - Unified chain prompting endpoint wiring asynchronous IBD generation with Redis preview metadata in `backend/app/database/rag_router.py`.
 - Alembic migration creating `state_machine_diagrams` table linked to `diagram_embeddings` for upcoming SMD support.
@@ -44,6 +790,632 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.98] - 2025-10-23
 ### Added
+- Async IBD fetching functionality for AI-generated blocks with `has_ibd` flags
+- Complete end-to-end IBD retrieval from backend API when blocks contain nested diagrams
+- API-driven IBD loading with automatic fallback to manual creation if needed
+- Enhanced IBD existence checking incorporating both manual creation and AI-generated flags
+
+### Changed
+- Updated `openIbdForBlock` function in diagramStore to be async and support API fetching
+- Modified all node components (BlockNode, SensorNode, ProcessorNode) to handle async IBD operations
+- Enhanced IBD detection logic to check both manual existence and `has_ibd` API flags
+- Improved IBD opening workflow with priority: existing tabs > local storage > API fetch > manual creation
+
+### Fixed
+- TypeScript compilation issues with async function implementations
+- Proper error handling for API calls during IBD fetching
+- Fallback mechanisms when API endpoints return 404 for expected IBDs
+- Integration between frontend IBD display and backend IBD storage
+
+## [1.1.47] - 2025-07-21
+
+### Added
+- Enhanced BDD generation flow in frontend with "Generate with Internal Diagrams" toggle switch
+- Material-UI Switch control in AIGeneratorPanel for enabling enhanced generation
+- Support for `has_ibd` flag recognition in all node components (BlockNode, SensorNode, ProcessorNode)
+- Automatic "View IBD" indicator display for AI-generated blocks with nested IBDs
+
+### Changed
+- Updated useAIGeneration hook to support both 'bdd' and 'bdd_enhanced' diagram types
+- Enhanced API call logic to use new create-diagram endpoint for enhanced generation
+- Modified node components to check both manual IBD existence and API-provided has_ibd flag
+- AIGenerationOptions interface extended to include isEnhanced parameter
+
+### Improved
+- Seamless integration between enhanced AI generation and existing IBD functionality
+- Better user experience with clear indication of blocks containing generated IBDs
+- Maintained backward compatibility with existing manual IBD creation workflow
+- Enhanced visual feedback for generated diagrams with nested internal structures
+
+## [1.1.46] - 2025-07-21
+
+### Added
+- Complete API endpoints for BDD+IBD generation and retrieval
+- New CRUD operations for Internal Block Diagrams in `app/crud/crud_ibd.py`
+- Enhanced POST `/api/v1/create-diagram/` endpoint supporting both 'bdd' and 'bdd_enhanced' types
+- New GET `/api/v1/diagrams/ibd/{parent_block_id}` endpoint for IBD retrieval
+- Automatic parsing and separation of nested IBD data from AI responses
+- Database storage of IBDs linked to parent BDD diagrams via foreign keys
+
+### Changed
+- Updated create_diagram endpoint to handle enhanced AI generation with nested IBDs
+- Enhanced diagram parsing logic to extract internal_diagram objects and mark blocks with `has_ibd: true`
+- DiagramRequest model now supports diagram_type parameter and diagram naming
+- DiagramResponse model includes diagram_id for referencing stored diagrams
+
+### Improved
+- End-to-end flow for generating, parsing, storing, and retrieving enhanced diagrams
+- Automatic positioning applied to both BDD and retrieved IBD diagrams
+- Complete separation between BDD storage and IBD storage in database
+- Enhanced error handling and database transaction management
+
+## [1.1.45] - 2025-07-21
+
+### Added
+- New enhanced AI generation logic for BDD+IBD diagrams
+- BDD_ENHANCED_PROMPT_TEMPLATE for comprehensive system diagrams with nested Internal Block Diagrams
+- Support for 'bdd_enhanced' diagram type that can include internal_diagram structures within blocks
+- Raw JSON response handling without automatic positioning for complex nested structures
+
+### Changed
+- Refactored generate_diagram function into generate_sysml_diagram with diagram_type parameter
+- Enhanced AI prompt selection logic to choose appropriate template based on diagram_type ('bdd' or 'bdd_enhanced')
+- Updated generation flow to return raw diagram data for later processing at API layer
+- Maintained backward compatibility with legacy generate_diagram function
+
+### Improved
+- Better separation of concerns between AI generation and diagram processing
+- More flexible AI generation system supporting both simple and complex diagram structures
+- Enhanced prompt engineering for nested IBD creation within BDD context
+
+## [1.1.44] - 2025-07-21
+
+### Added
+- New database schema for nested Internal Block Diagrams (IBDs)
+- InternalBlockDiagram SQLAlchemy model with foreign key relationship to parent BDD diagrams
+- Database table `internal_block_diagrams` for relational IBD storage
+- Support for parent-child relationship between BDD diagrams and their IBDs via `parent_bdd_diagram_id`
+- Block-specific IBD identification using `parent_block_id` field
+- Source tracking for IBDs (AI-generated vs manual creation)
+- Pydantic models (InternalBlockDiagramCreate, InternalBlockDiagramResponse) for API validation
+
+### Changed
+- Enhanced database architecture to avoid storing large JSON objects in parent diagrams
+- Updated configuration to include DB_URL_SYNC for Alembic migrations
+- Database schema now supports proper relational structure for nested diagram storage
+
+## [1.1.43] - 2025-07-19
+
+### Fixed
+- Fixed IBD cross-contamination between independent diagrams by implementing diagram-specific IBD storage keys
+- IBD diagrams are now isolated per parent diagram using `ibd-for-{parentDiagramId}-{blockId}` format
+- Manual IBDs no longer appear on other diagrams with similar block IDs
+
+### Added
+- Added source tracking ('ai' | 'manual') to IBD creation for better data management
+- Enhanced IBD existence checking to use parent diagram context for proper isolation
+- Improved RAG cleaning to distinguish between manual and AI-created IBD content
+
+### Changed
+- Updated all node components (BlockNode, SensorNode, ProcessorNode) to use diagram-scoped IBD checking
+- Modified `openIbdForBlock` function to create diagram-specific IBD instances
+- Enhanced `cleanDiagramForRAG` to filter only manual IBDs while preserving future AI-created IBDs
+
+## [1.1.42] - 2025-07-19
+
+### Fixed
+- Fixed RAG contamination where manually created IBD data was influencing AI diagram generation
+- Implemented diagram cleaning function to remove IBD-specific content before saving to RAG database
+- Added filtering to exclude IBD blocks, IBD edges, and IBD-related properties from RAG context
+- AI generation now maintains clean BDD-only examples regardless of manual IBD creation
+
+### Changed
+- Enhanced diagram saving logic to always store clean BDD diagrams in RAG database
+- Updated RAG storage to force 'bdd' diagram type for consistency
+- Improved IBD isolation by preventing IBD contamination of training data
+
+## [1.1.41] - 2025-07-19
+
+### Fixed
+- Fixed AI Diagram Generator incorrectly setting diagram_type for RAG requests 
+- Changed persistence storage from localStorage to sessionStorage for session-only data retention
+- AI Generator now correctly requests 'bdd' diagram type instead of complex conditional logic
+- Diagrams now clear when browser is fully closed and reopened, maintaining clean state between sessions
+
+### Changed
+- Updated useAIGeneration to always generate BDD diagrams with correct diagram_type parameter
+- Enhanced data persistence to use sessionStorage for better session management
+- Improved user experience by preventing unwanted IBD creation from AI Generator
+
+## [1.1.40] - 2025-07-19
+
+### Fixed
+- Isolated RAG context by diagram type to prevent unwanted IBD generation when requesting BDD diagrams
+- Removed fallback logic in RAG system that would search all diagram types when specific type wasn't found
+- Enhanced semantic search to strictly enforce diagram type filtering without compromising type isolation
+- BDD generation with RAG now only uses BDD examples as context, preventing automatic IBD creation
+
+### Changed
+- Updated find_similar_diagrams function to enforce strict diagram type filtering
+- Modified RAG router to maintain type isolation instead of falling back to cross-type searches
+- Improved logging for better debugging of RAG type filtering behavior
+
+## [1.1.39] - 2025-07-19
+
+### Added
+- Implemented diagram state persistence on page reload using Zustand persist middleware
+- All open diagrams, active tab, and workspace state now automatically save to localStorage
+- Complete workspace restoration after browser refresh or navigation
+- Automatic state synchronization on any diagram changes (nodes, edges, tabs)
+
+### Changed
+- Enhanced Zustand store to persist openDiagrams, activeDiagramId, and diagramsData
+- Added onRehydrateStorage handler to restore computed state from active diagram
+- Improved user experience by preventing data loss on page reload
+
+## [1.1.38] - 2025-07-19
+
+### Changed
+- Updated "Diagram Types" section in sidebar to include both Block Definition Diagram (BDD) and Internal Block Diagram (IBD)
+- Added IBD description: "Shows internal structure of a block"
+- Modified "Help" section to remove keyboard shortcuts and provide clearer Delete key guidance
+- Replaced "Use keyboard shortcuts: Ctrl+Z (Undo), Ctrl+Y (Redo), Delete (Remove selected)" with "Use 'Delete' key to remove selected elements"
+
+## [1.1.37] - 2025-07-15
+
+### Fixed
+- Fixed edge types to use smoothstep for BDD diagrams and straight for IBD diagrams
+- Restored proper curved connections for BDD blocks while maintaining straight lines for IBD blocks
+- BDD diagrams now have proper smooth corners again while IBD keeps straight animated lines
+
+## [1.1.36] - 2025-07-15
+
+### Fixed
+- Removed white background square from center of IBD animated lines
+- Added comprehensive CSS rules to hide all background elements from IBD edge labels
+- IBD connection lines now display cleanly without any background interference
+
+## [1.1.35] - 2025-07-15
+
+### Fixed
+- Removed white background from IBD edge label text for cleaner visual appearance
+- IBD connection labels now display without background rectangle
+
+## [1.1.34] - 2025-07-15
+
+### Fixed
+- Fixed IBD connection line deviation - lines now render as perfectly straight instead of curved
+- Corrected edge type from 'smoothstep' to 'straight' for IBD diagrams to eliminate downward curve
+
+### Added
+- Added 'IBD Blocks' text label to IBD connection lines
+- Positioned label above the line with proper alignment (end of text at center)
+
+### Changed
+- Updated IBD edge creation logic to apply appropriate styling based on diagram type
+- Enhanced CSS styling for IBD edge labels with consistent positioning
+
+## [1.1.33] - 2025-07-14
+
+### Fixed
+- Fixed IBD icon visibility logic in BDD blocks to persist after tab closure
+- IBD existence check now considers both open diagrams and persistent storage data
+- IBD icons now correctly show as "View IBD" state even when tab is closed
+- Added initial state saving to diagramsData when IBD is first created
+
+### Changed
+- Enhanced IBD existence detection in BlockNode, SensorNode, and ProcessorNode
+- Updated icon display logic to check diagramsData in addition to openDiagrams
+- Improved user experience by maintaining visual IBD indicators across tab operations
+
+### Improved
+- Better persistence of IBD creation state across interface operations
+- More reliable IBD icon state management independent of tab status
+
+## [1.1.32] - 2025-07-14
+
+### Fixed
+- Fixed critical IBD state persistence bug where diagrams were lost when tabs were closed
+- Added proper state saving in `closeDiagram` method for IBD diagrams before removal
+- Enhanced `setActiveDiagram` to save current IBD state before switching to another diagram
+- Improved persist middleware configuration to only save essential `diagramsData`
+- Ensured IBD diagrams maintain their state across tab closures and reopenings
+
+### Changed
+- Modified localStorage persistence to focus on `diagramsData` only, preventing conflicts
+- Enhanced diagram state management with proactive saving during tab operations
+- Improved IBD workflow reliability for better user experience
+
+## [1.1.31] - 2025-07-14
+
+### Added
+- Implemented persistent state system for IBD diagrams using Zustand store
+- Added `diagramsData` field to store diagram states (nodes, edges, viewport) with diagram ID mapping
+- Created `saveDiagramState` action for saving individual diagram states
+- Added `openIbdForBlock` action for creating/opening IBD diagrams with deterministic IDs
+- Integrated localStorage persistence using zustand persist middleware
+- Auto-save functionality triggers on diagram changes for IBD diagrams
+
+### Changed
+- Updated IBD creation logic to use persistent state with `ibd-for-{blockId}` naming pattern
+- Modified BlockNode, SensorNode, and ProcessorNode to use new `openIbdForBlock` action
+- Enhanced store with automatic state persistence for IBD diagrams between sessions
+- Improved IBD tab management with state restoration on reopening
+
+### Fixed
+- IBD diagram state now persists when tabs are closed and reopened
+- Prevented loss of user progress when switching between IBD diagrams
+- Ensured consistent IBD naming and state management across all node types
+
+## [1.1.30] - 2025-07-14
+
+### Fixed
+- Fixed IBD block text color from green to black for consistency with BDD blocks
+- IBD block titles now use black text (#000000) instead of green (#2e7d32)
+- Enhanced visual consistency between BDD and IBD diagram elements
+
+## [1.1.29] - 2025-07-14
+
+### Changed
+- Increased IBD animation speed by 25% for more dynamic visual feedback
+- Animation duration reduced from 2s to 1.6s for faster dash movement
+- Enhanced user experience with more responsive flow visualization
+
+### Improved
+- More engaging and lively animation for IBD diagram connections
+- Better visual feedback for data flow direction in real-time
+
+## [1.1.28] - 2025-07-14
+
+### Added
+- Animated dashed lines for IBD diagram connections showing flow direction
+- CSS keyframe animation `dashFlow` for moving dash pattern from left to right
+- Professional flow visualization without traditional arrow markers
+
+### Changed
+- Replaced static arrows with animated dashed lines in IBD diagrams
+- IBD edges now use thicker lines (strokeWidth: 2) with dashed pattern (8 4)
+- Enhanced visual indication of data/signal flow through animated dash movement
+
+### Improved
+- Better flow visualization in IBD diagrams with continuous animation
+- More intuitive direction indication through animated dash progression
+- Consistent gray color scheme maintained across both BDD and IBD diagrams
+
+## [1.1.27] - 2025-07-14
+
+### Fixed
+- Fixed arrow visibility issues in IBD diagrams by switching to standard ReactFlow arrows
+- Unified edge styling between BDD and IBD diagrams for better consistency
+- Removed problematic custom SVG arrow markers that weren't displaying properly
+
+### Changed
+- IBD diagram edges now use the same gray color (#555) as BDD diagrams
+- Simplified edge configuration to use single style for both diagram types
+- Improved visual consistency across all diagram types
+
+## [1.1.26] - 2025-07-14
+
+### Fixed
+- Restored arrow markers on IBD diagram connections that were missing
+- Added custom SVG arrow markers for both IBD (black) and BDD (gray) diagrams
+- Fixed markerEnd configuration with proper URL references to custom arrow definitions
+- Ensured visual consistency between BDD and IBD connection arrows
+
+### Added
+- Custom SVG marker definitions for black and gray arrow heads
+- Proper markerEnd configuration in defaultEdgeOptions for both diagram types
+
+## [1.1.25] - 2025-07-14
+
+### Fixed
+- Fixed IBD block connection handles to use single centered handle per side
+- Resolved connection routing issues caused by multiple overlapping handles
+- Improved connection behavior with proper left (target) and right (source) handle positioning
+- Eliminated erratic connection paths that went in wrong directions before connecting
+
+### Changed
+- Simplified IBD block handle configuration from 4 handles to 2 handles per block
+- Left handle now serves as input (target), right handle as output (source)
+- All handles are properly centered on their respective sides
+
+## [1.1.24] - 2025-07-14
+
+### Changed
+- Improved IBD diagram readability with standardized black edge colors
+- Modified IBD blocks to use exclusive horizontal connectivity (left and right sides only)
+- Replaced top and bottom connection handles with side handles for cleaner horizontal flow
+- Enhanced IBD block design with multiple connection points per side (30% and 70% positions)
+- Added support for both source and target connections on each side of IBD blocks
+
+### Improved
+- Better visual consistency between BDD and IBD diagrams with uniform edge styling
+- Cleaner diagram layouts with horizontal connection patterns for IBD elements
+- More flexible connectivity options for complex IBD structures
+
+## [1.1.23] - 2025-07-14
+
+### Changed
+- Refined IBD behavior by removing "Create IBD" functionality from IBD nodes themselves
+- IBD blocks can no longer create sub-IBD diagrams (only BDD blocks retain this capability)
+- Implemented contextual locking for BDD elements in IBD diagrams
+- System Block, Sensor, and Processor elements are now locked and grayed out in IBD diagrams
+- Enhanced sidebar tooltips to explain element availability based on diagram context
+
+### Fixed
+- Prevented inappropriate element usage across different diagram types
+- Ensured proper separation between BDD and IBD element functionality
+- Improved user experience with clear visual indicators for locked elements
+
+## [1.1.22] - 2025-07-14
+
+### Added
+- New IBD (Internal Block Diagram) Block node type with distinct green styling
+- IBD blocks now available in sidebar with drag-and-drop functionality
+- Conditional locking system for IBD blocks in Block Definition Diagrams (BDD)
+- Visual indicators for locked/disabled IBD blocks when diagram type is BDD
+- IBD blocks display grayed out appearance and disabled cursor when locked
+
+### Changed
+- Updated node type configuration to include IBD blocks in appropriate diagram types
+- Enhanced sidebar with IBD block component featuring green color scheme
+- Modified DiagramWorkspace to handle IBD node types in drop logic and minimap
+- Added green color support (#4caf50, #e8f5e8) throughout the application for IBD nodes
+
+### Fixed
+- IBD blocks properly prevented from being dropped onto BDD diagrams
+- Conditional rendering ensures IBD blocks are only functional in appropriate diagram contexts
+
+## [1.1.21] - 2025-07-13
+
+### Changed
+- Realigned IBD icons from center-bottom to bottom-right corner of parent blocks
+- Updated positioning for all three node types (Block, Sensor, Processor)
+- IBD icons now use `right: 10px` instead of `left: 50%` to prevent overlapping with connection lines
+- Removed `transform: translateX(-50%)` in favor of `transform: none` for cleaner positioning
+
+### Fixed
+- IBD icons no longer overlap with vertical connection lines drawn from bottom of blocks
+- Improved visual clarity and professional appearance of diagram layouts
+- Connection lines now have clear path without visual interference from IBD indicators
+
+## [1.1.20] - 2025-07-13
+
+### Changed
+- Adjusted Sensor IBD icon color to lighter pink (#f792be) for better visual balance
+- Reduced color saturation to prevent overpowering the interface design
+- Improved overall visual harmony while maintaining sufficient visibility
+
+## [1.1.19] - 2025-07-13
+
+### Changed
+- Updated Sensor IBD icon color from red (#ef4444) to pink (#ec4899) for better visual harmony
+- Sensor IBD icons now use high visibility pink that avoids conflict with red node borders
+- Improved visual coherence between Sensor nodes and their IBD indicators
+- Block and Processor IBD icon colors remain unchanged for consistency
+
+## [1.1.18] - 2025-07-13
+
+### Improved
+- Further enhanced IBD icon visibility by increasing saturation for Block and Sensor colors
+- Block IBD icons now use highly saturated blue (#3b82f6) for optimal visibility
+- Sensor IBD icons now use highly saturated red (#ef4444) for optimal visibility  
+- Processor IBD icons remain unchanged (#fcd34d) as they already had perfect visibility
+- All IBD icons now have consistent high visibility matching the Processor standard
+
+### Changed
+- Color consistency across all node types with uniform saturation levels
+- Enhanced user experience with clearly visible IBD indicators on all node types
+
+## [1.1.17] - 2025-07-13
+
+### Improved
+- Enhanced visibility of adaptive IBD icons with darker, more saturated colors
+- Updated color palette for better contrast against white canvas background
+- Block IBD icons now use richer blue (#93c5fd) instead of light blue
+- Sensor IBD icons now use richer pink/red (#fca5a5) instead of light pink
+- Processor IBD icons now use richer yellow/amber (#fcd34d) instead of light yellow
+
+### Fixed
+- Poor contrast issue with IBD icons being too light to see clearly
+- Improved user experience with more visible icon indicators
+
+## [1.1.16] - 2025-07-13
+
+### Added
+- Created adaptive color system for 'View IBD' icons that match their parent node colors
+- New AdaptiveIbdIcon SVG component with customizable background colors
+- Node-specific color mapping (Block: light blue, Sensor: light pink, Processor: light yellow)
+
+### Changed
+- Replaced static Article icons with dynamic AdaptiveIbdIcon in all node types
+- IBD view icons now provide clear visual connection to their parent nodes
+- Enhanced visual coherence between nodes and their internal diagrams
+
+### Improved
+- Better user experience with color-coded IBD indicators
+- Consistent design language across all node types
+
+## [1.1.15] - 2025-07-13
+
+### Added
+- Extended IBD (Internal Block Diagram) functionality to Sensor and Processor nodes
+- All container-like nodes (Block, Sensor, Processor) now support IBD creation and viewing
+- Consistent IBD trigger icons appear below all relevant node types
+- Unified hover-to-reveal behavior for Add IBD functionality across all node types
+
+### Changed
+- SensorNode and ProcessorNode components now include complete IBD logic
+- Replicated smart IBD indicator system from BlockNode to ensure consistent UX
+- Enhanced modularity by applying identical IBD patterns to all container nodes
+
+## [1.1.14] - 2025-07-13
+
+### Fixed
+- Fixed hover animation that caused View IBD icon to shift position during mouse hover
+- Removed scale transform from view-ibd hover effect to keep icon stationary
+- Improved icon stability and user interaction experience
+
+## [1.1.13] - 2025-07-13
+
+### Changed
+- Refined View IBD icon visual style for better consistency with application design
+- Removed blue background and border from persistent View IBD icon 
+- Changed to transparent background with clean, minimal appearance
+- Enhanced hover effects with brightness filter and subtle background
+- Added smooth transitions for better user feedback
+
+## [1.1.12] - 2025-07-13
+
+### Added
+- Implemented embedded IBD (Internal Block Diagram) functionality in frontend
+- Added support for 'bdd' and 'ibd' diagram types in Zustand store
+- Created smart IBD indicator icon below BlockNode components
+- New IBD-specific node types: PortNode and ConnectionNode for Internal Block Diagrams
+- Conditional rendering of node types based on active diagram type (BDD vs IBD)
+
+### Changed
+- Updated diagram type system to use lowercase conventions ('bdd', 'ibd')
+- Enhanced BlockNode component with IBD trigger functionality
+- Added visual indicator showing IBD existence status with hover-to-reveal behavior
+- Fixed CSS hover trap issue preventing proper icon interaction
+- Restructured component hierarchy to support extended hover areas
+
+### Fixed
+- Resolved hover trap where IBD trigger icon disappeared before users could click it
+- Enhanced hover mechanics with proper container structure and CSS positioning
+- Improved icon accessibility and interaction reliability
+
+## [1.1.11] - 2025-07-09
+
+### Fixed
+- Fixed add tab button (+) positioning when tabs are present
+- StyledTabs now uses flex: 'none' when less than 10 tabs to allow proper inline positioning
+- Add button now appears directly adjacent to tabs instead of being pushed to the far right
+- Only uses flex: 1 when scrolling is needed (10+ tabs) to maintain proper layout with fixed positioning
+
+## [1.1.10] - 2025-07-09
+
+### Changed
+- Improved add tab button (+) behavior to match browser interface standards
+- Add button now appears inline directly after tabs when less than 10 tabs are present
+- When 10+ tabs trigger scrolling, add button automatically switches to fixed position
+- Restored original AddButton styling for inline positioning
+- Created FixedAddButton component for scrolling mode with enhanced styling
+- TabsContainer now dynamically adjusts positioning based on scrolling state
+- Enhanced user experience with contextual button positioning that adapts to tab count
+
+## [1.1.9] - 2025-07-09
+
+### Changed
+- Redesigned add tab button (+) to match browser-like interface behavior
+- Fixed add button position next to tabs with absolute positioning
+- Add button now remains in fixed position when tab scrolling is activated (10+ tabs)
+- Enhanced add button styling with background, border, and proper z-index
+- Reserved space in tabs container (48px padding-right) to prevent overlap with add button
+- Add button is now always active and accessible regardless of tab count
+
+## [1.1.8] - 2025-07-09
+
+### Added
+- Restored bottom status panel showing diagram name, node count, and connection count
+- Status panel positioned at bottom-left of canvas as in previous versions
+
+### Fixed
+- Missing status information display that was accidentally removed in previous updates
+
+## [1.1.7] - 2025-07-09
+
+### Changed
+- Adjusted tab scrolling activation threshold from 10 tabs to 9 tabs for better space utilization
+- Updated tab width calculation ranges: 1-5 tabs (large), 6-7 tabs (medium), 8-9 tabs (compact), 10+ tabs (minimal with scrolling)
+- Modified font size threshold to activate smaller text at 9+ tabs instead of 10+ tabs
+- Improved tab overflow prevention by activating scrolling earlier to maintain consistent layout
+
+## [1.1.6] - 2025-07-09
+
+### Fixed
+- Tab overflow issue where 11th+ tabs would extend beyond interface boundaries into toolbar area
+- Enhanced tab scrolling functionality to activate automatically when more than 10 tabs are present
+- Improved tab width calculation for better space utilization with different tab counts
+
+### Changed
+- Increased gap between FloatingTabPanel and ToolbarPanel from 8px to 16px for better visual separation
+- Updated FloatingTabPanel maxWidth calculation to prevent overlap with toolbar
+- Modified DiagramTabs to use scrollable variant only when needed (>10 tabs)
+- Optimized tab sizing: 5 tabs or fewer get larger width, 8-10 tabs get medium width, 10+ tabs use compact width with scrolling
+
+## [1.1.5] - 2025-07-09
+
+### Changed
+- Restructured toolbar to be positioned horizontally alongside FloatingTabPanel instead of vertically below it
+- Created TopContainer component to manage horizontal layout of tabs and toolbar
+- Split FloatingTabPanel and ToolbarPanel into separate components for better layout control
+- Enhanced tab scrolling functionality to prevent toolbar overlap when there are many diagrams
+- Improved workspace layout with toolbar positioned on the right side of the tab panel
+
+### Removed
+- Bottom status panel showing diagram name and connection count
+- Vertical toolbar layout from previous implementation
+
+## [1.1.4] - 2025-07-09
+
+### Changed
+- Integrated toolbar directly into FloatingTabPanel component instead of separate workspace area
+- Modified FloatingTabPanel to use column layout with tabs on top and toolbar below
+- Added ToolbarRow component for consistent toolbar styling within the unified panel
+- Enhanced workspace layout by combining diagram tabs and toolbar controls in single cohesive interface
+- Toolbar buttons are now disabled when no diagram is active for better UX
+
+## [1.1.3] - 2025-07-09
+
+### Changed
+- Moved toolbar from ReactFlow Panel to standalone component in upper part of DiagramWorkspace
+- Positioned toolbar below floating tabs with full-width styling to match design specifications
+- Enhanced toolbar visual integration with right-aligned buttons and consistent spacing
+- Improved workspace layout by positioning toolbar in dedicated area above the canvas
+
+## [1.1.2] - 2025-07-09
+
+### Changed
+- Relocated canvas toolbar from top to bottom of DiagramWorkspace component
+- Toolbar now appears above the status bar for improved visual hierarchy
+- Updated toolbar positioning to create a cleaner, more minimalist interface
+- Enhanced user experience with more balanced layout focusing on the main diagram canvas
+
+## [1.1.1] - 2025-07-08
+
+### Added
+- CHANGELOG.md file for tracking project changes
+- Changelog maintenance instructions in CLAUDE.md
+- Development workflow for version management and change tracking
+
+### Changed
+- Enhanced development documentation with changelog guidelines
+
+## [1.1.0] - 2025-07-08
+
+### Added
+- Unified application versioning system
+- Single source of truth for version management in .env file
+- APP_VERSION and VITE_APP_VERSION environment variables
+- Backend API endpoint `/api/v1/version/` for version retrieval
+- Dynamic version display in frontend sidebar
+- Docker build arguments for proper version embedding in frontend
+
+### Changed
+- FastAPI application now uses version from environment settings
+- Frontend version display moved from bottom-right to sidebar (bottom-left)
+- Updated Dockerfile to accept version as build argument
+- Updated docker-compose.yml to pass version as build argument
+
+### Removed
+- Hardcoded version strings in frontend and backend
+- Redundant VersionDisplay component in bottom-right corner
+
+### Fixed
+- Version display now correctly shows v1.1 instead of v1.0
+- Proper environment variable handling during Docker build process
 - Helper and unit test to identify BDD block candidates for IBD and SMD generation in `backend/app/database/rag_router.py`.
 
 ## [1.1.97] - 2025-10-23
