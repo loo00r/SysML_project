@@ -86,34 +86,37 @@ export const parseSmdTransitionLabel = (label: string | undefined): Required<Smd
 };
 
 /**
- * Normalizes SMD edge target side for State and Choice nodes.
- * State/Choice nodes can only accept inbound transitions on LEFT side.
- * This function remaps any Top/Right/Bottom target to Left.
+ * Normalizes SMD edge target handles to canonical inbound identifiers.
+ * Accepts common aliases and defaults to the left handle when unspecified.
  */
 export interface NormalizeSmdTargetSideParams {
   targetHandle?: string | null;
   targetNodeType?: string;
 }
 
+const CANONICAL_INBOUND_HANDLES: Record<string, string> = {
+  left: 'in-left',
+  right: 'in-right',
+  top: 'in-top',
+  bottom: 'in-bottom',
+  'in-left': 'in-left',
+  'in-right': 'in-right',
+  'in-top': 'in-top',
+  'in-bottom': 'in-bottom',
+  'out-left': 'in-left',
+  'out-right': 'in-right',
+  'out-top': 'in-top',
+  'out-bottom': 'in-bottom',
+};
+
 export const normalizeSmdTargetSide = (
   edge: NormalizeSmdTargetSideParams & { targetHandle?: string | null }
 ): string => {
-  const targetNodeType = edge.targetNodeType;
-  const targetHandle = edge.targetHandle?.toLowerCase();
+  const targetHandleKey = edge.targetHandle?.toLowerCase();
 
-  // Only normalize for State and Choice nodes
-  if (targetNodeType !== 'smdState' && targetNodeType !== 'smdChoice') {
-    return edge.targetHandle || 'in-left';
+  if (targetHandleKey && CANONICAL_INBOUND_HANDLES[targetHandleKey]) {
+    return CANONICAL_INBOUND_HANDLES[targetHandleKey];
   }
 
-  // For State/Choice, any target that's not LEFT gets remapped to LEFT
-  if (
-    targetHandle &&
-    (targetHandle.includes('left') || targetHandle === 'in-left')
-  ) {
-    return edge.targetHandle || 'in-left';
-  }
-
-  // Remap everything else to LEFT for State/Choice
   return 'in-left';
 };

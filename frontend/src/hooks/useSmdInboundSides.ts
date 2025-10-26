@@ -23,8 +23,8 @@ const POSITION_TO_SIDE: Record<string, ArrowSide> = {
 
 const ORDER: ArrowSide[] = ['top', 'right', 'bottom', 'left'];
 
-// SMD policy: only LEFT and TOP can be inbound (target) sides
-const ALLOWED_INBOUND_SIDES: Set<ArrowSide> = new Set(['left', 'top']);
+// SMD policy now allows inbound transitions on all four sides
+const ALLOWED_INBOUND_SIDES: Set<ArrowSide> = new Set(ORDER);
 
 const normalizeKey = (value?: string | null): string | null =>
   value ? value.toLowerCase() : null;
@@ -106,21 +106,13 @@ const useSmdInboundSides = (nodeId: string): ArrowSide[] => {
 
       const side = inferSide(edge, nodeMap.get(edge.source ?? ''), nodeMap.get(edge.target ?? ''));
 
-      // Filter out disallowed inbound sides (RIGHT/BOTTOM globally)
+      // Filter out sides that are not yet supported (should not occur with current policy)
       if (!side || !ALLOWED_INBOUND_SIDES.has(side)) {
         return;
       }
 
-      // Additional filter for State/Choice: only LEFT is allowed (no TOP)
-      if (currentNode?.type === 'smdState' || currentNode?.type === 'smdChoice') {
-        if (side === 'left') {
-          sideSet.add(side);
-        }
-        // Ignore 'top' for State/Choice even if edge says so
-      } else {
-        // For Initial/Final, both left and top are allowed
-        sideSet.add(side);
-      }
+      // Allow all supported inbound indicators for SMD nodes
+      sideSet.add(side);
     });
 
     return ORDER.filter((side) => sideSet.has(side));

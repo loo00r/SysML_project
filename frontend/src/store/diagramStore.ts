@@ -194,25 +194,32 @@ const deriveSideFromGeometry = (
   return dy > 0 ? 'bottom' : 'top';
 };
 
-const normalizeSmdTargetSide = (side: SmdSide | null, sourceNode: Node<NodeData> | undefined, targetNode: Node<NodeData> | undefined): SmdSide => {
-  // SMD Policy: Only LEFT and TOP are allowed as target sides
-  if (side === 'left' || side === 'top') {
+const normalizeSmdTargetSide = (
+  side: SmdSide | null,
+  sourceNode: Node<NodeData> | undefined,
+  targetNode: Node<NodeData> | undefined,
+): SmdSide => {
+  if (side) {
     return side;
   }
 
-  // If RIGHT or BOTTOM (or null), remap to allowed side based on geometry
   if (!sourceNode || !targetNode) {
-    return 'left'; // Default fallback
-  }
-
-  const dx = sourceNode.position.x - targetNode.position.x;
-  const dy = sourceNode.position.y - targetNode.position.y;
-
-  // If horizontal distance dominates, use LEFT; otherwise use TOP
-  if (Math.abs(dx) >= Math.abs(dy)) {
     return 'left';
   }
-  return 'top';
+
+  const sourceX = sourceNode.position?.x ?? 0;
+  const sourceY = sourceNode.position?.y ?? 0;
+  const targetX = targetNode.position?.x ?? 0;
+  const targetY = targetNode.position?.y ?? 0;
+
+  const dx = sourceX - targetX;
+  const dy = sourceY - targetY;
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+
+  return dy > 0 ? 'bottom' : 'top';
 };
 
 const applySmdEdgeMetadata = (
@@ -231,7 +238,7 @@ const applySmdEdgeMetadata = (
     ) ??
     deriveSideFromGeometry(edge, sourceNode, targetNode);
 
-  // Normalize target side to only allow LEFT/TOP
+  // Normalize target side, defaulting via geometry when unspecified
   const targetSide = normalizeSmdTargetSide(rawTargetSide, sourceNode, targetNode);
 
   if (!targetSide) {

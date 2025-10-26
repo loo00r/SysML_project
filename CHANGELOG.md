@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- SMD JSON import and normalization now honor explicit state and choice target handles on all four sides, preserving top/bottom transitions from Test Mode prompts.
+
+### Fixed
+- Restored top and bottom connection handles for SMD State and Choice nodes to support vertical transitions again.
+
+## [1.2.24] - 2025-10-26
+### Changed
+- SMD JSON import and normalization now honor explicit state and choice target handles on all four sides, preserving top/bottom transitions from Test Mode prompts.
+
+### Fixed
+- Restored top and bottom connection handles for SMD State and Choice nodes to support vertical transitions again.
+
+## [1.2.23] - 2025-10-25
+### Fixed
+- Restored top and bottom connection handles for SMD State and Choice nodes to support vertical transitions again.
 
 ## [1.2.22] - 2025-10-25
 ### Fixed

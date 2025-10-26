@@ -45,9 +45,11 @@ const SmdChoiceNode: React.FC<NodeProps> = ({ selected, id }) => {
 
   return (
     <Container>
-      {/* Choice nodes only have LEFT (target) and RIGHT (source) handles */}
+      {/* Choice nodes expose LEFT/TOP targets and RIGHT/BOTTOM sources */}
+      <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} isConnectable />
       <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} isConnectable />
       <Handle id="out-right" type="source" position={Position.Right} style={handleStyle} isConnectable />
+      <Handle id="out-bottom" type="source" position={Position.Bottom} style={handleStyle} isConnectable />
       <Diamond selected={selected} />
 
       {inboundSides.map((side) => (

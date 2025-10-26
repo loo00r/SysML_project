@@ -71,9 +71,11 @@ const SmdStateNode: React.FC<NodeProps<NodeData>> = ({ data, selected, id }) => 
 
   return (
     <Container>
-      {/* State nodes only have LEFT (target) and RIGHT (source) handles */}
+      {/* State nodes expose LEFT/TOP targets and RIGHT/BOTTOM sources */}
+      <Handle id="in-top" type="target" position={Position.Top} style={handleStyle} isConnectable />
       <Handle id="in-left" type="target" position={Position.Left} style={handleStyle} isConnectable />
       <Handle id="out-right" type="source" position={Position.Right} style={handleStyle} isConnectable />
+      <Handle id="out-bottom" type="source" position={Position.Bottom} style={handleStyle} isConnectable />
 
       <StateCard elevation={selected ? 6 : 2} selected={selected}>
         <LabelTypography>{name}</LabelTypography>
