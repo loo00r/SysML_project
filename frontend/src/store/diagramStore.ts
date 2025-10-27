@@ -24,28 +24,49 @@ import { getNodeChangeId } from '../utils/reactflowChanges';
 import type { ValidationResult } from '../services/validation/smdValidator';
 
 // Helper: poll unified generation result from Redis cache
-const pollUnifiedDiagramResult = async (diagramId: string, maxAttempts: number = 120): Promise<any> => {
+const pollUnifiedDiagramResult = async (
+  diagramId: string,
+  maxAttempts: number = 120,
+  onProgress?: (progress: number) => void
+): Promise<any> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
+    try {
+      // Update progress based on polling attempt (0-90% during polling)
+      const pollingProgress = (attempt / maxAttempts) * 90;
+      if (onProgress) {
+        onProgress(pollingProgress);
+      }
 
-    if (response.status === 404) {
-      throw new Error('Diagram generation expired or failed');
+      const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
+
+      if (response.status === 404) {
+        throw new Error('Diagram generation expired or failed');
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to retrieve diagram result: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.status === 'completed') {
+        // Boost to 95% when data received
+        if (onProgress) {
+          onProgress(95);
+        }
+        return result;
+      }
+
+      if (result.status === 'error') {
+        throw new Error(result.error || 'Diagram generation failed');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error) {
+      if (attempt === maxAttempts - 1) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
-
-    if (!response.ok) {
-      throw new Error(`Failed to retrieve diagram result: ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (result.status === 'completed') {
-      return result;
-    }
-
-    if (result.status === 'error') {
-      throw new Error(result.error || 'Diagram generation failed');
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   throw new Error('Diagram generation timed out');

@@ -224,28 +224,55 @@ const transformSmdEdgesFromApi = (rawEdges: unknown[], validNodeIds: Set<string>
 };
 
 // Helper function to poll for diagram result
-const pollDiagramResult = async (diagramId: string, maxAttempts: number = 120): Promise<any> => {
+const pollDiagramResult = async (
+  diagramId: string,
+  maxAttempts: number = 120,
+  onProgress?: (progress: number) => void
+): Promise<any> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
+      // Update progress based on polling attempt
+      // Progress calculation: 0-90% during polling, 90-100% during data processing
+      const pollingProgress = (attempt / maxAttempts) * 90;
+      if (onProgress) {
+        onProgress(pollingProgress);
+      }
+
       const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
-      
+
       if (response.status === 404) {
         // Diagram not found or expired
         throw new Error('Diagram generation expired or failed');
       }
-      
+
       if (!response.ok) {
         throw new Error(`Failed to retrieve diagram result: ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       if (result.status === 'completed') {
+        // Final progress boost to 95% when data is received
+        if (onProgress) {
+          onProgress(95);
+        }
         return result;
+      } else if (result.status === 'processing' && result.diagram) {
+        // Partial result available (BDD complete, IBD/SMD still generating)
+        // Return partial result to show BDD immediately
+        if (onProgress) {
+          onProgress(Math.min(75 + (attempt / maxAttempts) * 15, 90));
+        }
+        // Check if this is good enough or continue polling
+        if (result.progress === 'bdd_complete') {
+          // Continue polling for complete result with IBD/SMD
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
       } else if (result.status === 'error') {
         throw new Error(result.error || 'Diagram generation failed');
       }
-      
+
       // Still processing, wait and retry
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
     } catch (error) {
@@ -256,16 +283,19 @@ const pollDiagramResult = async (diagramId: string, maxAttempts: number = 120): 
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
-  
+
   throw new Error('Diagram generation timed out');
 };
 
 // Call the backend API to generate a diagram
-const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
+const callGenerateDiagramAPI = async (
+  options: AIGenerationOptions,
+  onProgress?: (progress: number) => void
+): Promise<AIGenerationResult> => {
   try {
     // Step 1: Start generation and get diagram ID
     const endpoint = '/api/v1/rag/generate-diagram-unified/';
-    
+
     const requestBody = {
       text: options.prompt,
       use_rag: true,
@@ -273,7 +303,7 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       generate_smd: Boolean(options.isEnhanced),
       name: 'AI Generated Diagram'
     };
-    
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -295,9 +325,9 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     if (!initResult.diagramId) {
       return { nodes: [], edges: [], error: 'Missing diagram ID from unified generation endpoint' };
     }
-    
-    // Step 2: Poll for the actual result
-    const data = await pollDiagramResult(initResult.diagramId);
+
+    // Step 2: Poll for the actual result with progress callback
+    const data = await pollDiagramResult(initResult.diagramId, 120, onProgress);
     
     if (data.error) {
       return { nodes: [], edges: [], error: data.error };
@@ -388,36 +418,31 @@ export const useAIGeneration = () => {
     setIsGenerating(true);
     setError(null);
     setProgress(0);
-    
+
     try {
       // Save the original prompt text to the store for future reference
       // This is critical for ensuring the RAG database gets the original text
       setGenerationPrompt(options.prompt);
-      
+
       // Also set a shorter version as the diagram description
       const shortDescription = options.prompt.substring(0, 100) + (options.prompt.length > 100 ? '...' : '');
       setDiagramDescription(shortDescription);
-      
-      // Start progress animation
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 10;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-      }, 300);
-      
-      // Call the backend API service
+
+      // Progress callback to update progress bar in real-time
+      const handleProgress = (progressValue: number) => {
+        setProgress(progressValue);
+      };
+
+      // Call the backend API service with progress callback
       const result = options.testMode
         ? await generateTestModeSmdDiagram(options.prompt)
-        : await callGenerateDiagramAPI(options);
-      
-      clearInterval(progressInterval);
+        : await callGenerateDiagramAPI(options, handleProgress);
       
       if (result.error) {
         setError(result.error);
         setProgress(0);
       } else {
-        // Create a new diagram tab with the generated content
+        // Processing complete - set progress to 100%
         setProgress(100);
         
         const defaultDiagramName = options.testMode
