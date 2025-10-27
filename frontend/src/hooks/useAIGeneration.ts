@@ -224,7 +224,7 @@ const transformSmdEdgesFromApi = (rawEdges: unknown[], validNodeIds: Set<string>
 };
 
 // Helper function to poll for diagram result
-const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
+const pollDiagramResult = async (diagramId: string, maxAttempts: number = 120): Promise<any> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);

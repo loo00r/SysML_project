@@ -24,7 +24,7 @@ import { getNodeChangeId } from '../utils/reactflowChanges';
 import type { ValidationResult } from '../services/validation/smdValidator';
 
 // Helper: poll unified generation result from Redis cache
-const pollUnifiedDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
+const pollUnifiedDiagramResult = async (diagramId: string, maxAttempts: number = 120): Promise<any> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
 
