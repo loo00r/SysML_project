@@ -11,28 +11,39 @@ class RedisClient:
     def __init__(self):
         self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
     
-    def store_diagram(self, diagram_data: dict) -> str:
+    def generate_diagram_id(self) -> str:
         """
-        Store diagram data in Redis with auto-generated ID and TTL
-        
+        Generate a new unique diagram ID
+
+        Returns:
+            str: A new UUID for a diagram
+        """
+        return str(uuid.uuid4())
+
+    def store_diagram(self, diagram_data: dict, diagram_id: Optional[str] = None) -> str:
+        """
+        Store diagram data in Redis with optional custom ID and TTL
+
         Args:
             diagram_data: The diagram JSON data to store
-            
+            diagram_id: Optional custom diagram ID (generates new UUID if not provided)
+
         Returns:
-            str: The generated diagram ID
+            str: The diagram ID (generated or provided)
         """
-        diagram_id = str(uuid.uuid4())
-        
+        if diagram_id is None:
+            diagram_id = self.generate_diagram_id()
+
         # Convert dict to JSON string
         json_data = json.dumps(diagram_data)
-        
+
         # Store with TTL
         self.redis.setex(
             name=f"diagram:{diagram_id}",
             time=settings.REDIS_TTL,
             value=json_data
         )
-        
+
         return diagram_id
     
     def get_diagram(self, diagram_id: str) -> Optional[dict]:

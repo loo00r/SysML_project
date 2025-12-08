@@ -1,7 +1,13 @@
 import { useState, useCallback } from 'react';
-import useDiagramStore, { type DiagramType } from '../store/diagramStore';
+import type { Edge, Node } from 'reactflow';
+import useDiagramStore, { type DiagramType, type NodeData } from '../store/diagramStore';
 import { applyDagreLayout } from '../utils/dagreLayout';
 import { parseSmdTestModeInput } from '../utils/smdTestMode';
+import {
+  composeSmdTransitionLabel,
+  ensureSmdTransitionData,
+  parseSmdTransitionLabel,
+} from '../utils/smdTransition';
 
 // Types for AI generation
 interface AIGenerationOptions {
@@ -19,6 +25,7 @@ interface AIGenerationResult {
   error?: string;
   diagramId?: string;
   ibdData?: any[]; // IBD data from Redis for creating IBD diagrams
+  smdData?: any[]; // SMD data from Redis for creating SMD diagrams
   diagramType?: DiagramType;
   name?: string;
   description?: string;
@@ -43,9 +50,9 @@ const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGeneration
     'LR', // Left to Right for natural state machine flow
     {
       nodeWidth: 180,           // Wider for state names
-      nodeHeight: 80,           // Taller for state content
-      nodeSep: 100,             // Vertical spacing between nodes (increased for top/bottom connections)
-      rankSep: 150,             // Horizontal spacing between ranks (increased for clarity)
+      nodeHeight: 90,           // Slightly taller for multi-line labels
+      nodeSep: 160,             // Increased vertical spacing between rows
+      rankSep: 220,             // Increased horizontal spacing between ranks
       flexiblePositions: true,  // Allow SMD to use all 4 sides for connections
     }
   );
@@ -59,29 +66,213 @@ const generateTestModeSmdDiagram = async (rawJson: string): Promise<AIGeneration
   };
 };
 
+const SMD_NODE_TYPE_MAP: Record<string, NodeData['type']> = {
+  initial: 'smdInitial',
+  final: 'smdFinal',
+  state: 'smdState',
+  choice: 'smdChoice',
+};
+
+const toTrimmedString = (value: unknown): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}`;
+  }
+  return undefined;
+};
+
+const normalizeSmdNodeType = (value: unknown): NodeData['type'] | null => {
+  const raw = toTrimmedString(value);
+  if (!raw) {
+    return null;
+  }
+  const key = raw.toLowerCase();
+  return SMD_NODE_TYPE_MAP[key] ?? null;
+};
+
+const stateTypeForNodeType = (nodeType: NodeData['type']): NodeData['stateType'] | undefined => {
+  switch (nodeType) {
+    case 'smdInitial':
+      return 'initial';
+    case 'smdFinal':
+      return 'final';
+    case 'smdChoice':
+      return 'choice';
+    case 'smdState':
+      return 'state';
+    default:
+      return undefined;
+  }
+};
+
+const transformSmdNodesFromApi = (rawNodes: unknown[]): { nodes: Node<NodeData>[]; nodeIdSet: Set<string> } => {
+  const nodes: Node<NodeData>[] = [];
+  const nodeIdSet = new Set<string>();
+
+  rawNodes.forEach((rawNode, index) => {
+    if (!rawNode || typeof rawNode !== 'object') {
+      return;
+    }
+
+    const nodeRecord = rawNode as Record<string, unknown>;
+    const nodeId = toTrimmedString(nodeRecord.id) ?? `smd-node-${index}`;
+    const nodeType = normalizeSmdNodeType(nodeRecord.type);
+
+    if (!nodeType) {
+      return;
+    }
+
+    const preferredLabel =
+      toTrimmedString(nodeRecord.name) ??
+      toTrimmedString(nodeRecord.label) ??
+      (nodeType === 'smdInitial'
+        ? 'Initial'
+        : nodeType === 'smdFinal'
+        ? 'Final'
+        : nodeType === 'smdChoice'
+        ? 'Choice'
+        : 'State');
+
+    const description = toTrimmedString(nodeRecord.description) ?? '';
+    const entry = toTrimmedString(nodeRecord.entry) ?? '';
+    const exit = toTrimmedString(nodeRecord.exit) ?? '';
+    const doActivity = toTrimmedString((nodeRecord as Record<string, unknown>)['do']) ?? '';
+
+    nodes.push({
+      id: nodeId,
+      type: nodeType,
+      position: { x: 0, y: index * 120 },
+      data: {
+        label: preferredLabel,
+        description,
+        type: nodeType,
+        name: preferredLabel,
+        entry,
+        exit,
+        do: doActivity,
+        stateType: stateTypeForNodeType(nodeType),
+      },
+    });
+    nodeIdSet.add(nodeId);
+  });
+
+  return { nodes, nodeIdSet };
+};
+
+const transformSmdEdgesFromApi = (rawEdges: unknown[], validNodeIds: Set<string>): Edge[] => {
+  const edges: Edge[] = [];
+
+  rawEdges.forEach((rawEdge, index) => {
+    if (!rawEdge || typeof rawEdge !== 'object') {
+      return;
+    }
+
+    const edgeRecord = rawEdge as Record<string, unknown>;
+    const source =
+      toTrimmedString(edgeRecord.source) ??
+      toTrimmedString(edgeRecord.source_id) ??
+      toTrimmedString(edgeRecord.from);
+    const target =
+      toTrimmedString(edgeRecord.target) ??
+      toTrimmedString(edgeRecord.target_id) ??
+      toTrimmedString(edgeRecord.to);
+
+    if (!source || !target) {
+      return;
+    }
+
+    if (validNodeIds.size > 0 && (!validNodeIds.has(source) || !validNodeIds.has(target))) {
+      return;
+    }
+
+    const edgeId = toTrimmedString(edgeRecord.id) ?? `smd-edge-${source}-${target}-${index}`;
+
+    const baseData = ensureSmdTransitionData({
+      event: toTrimmedString(edgeRecord.event) ?? toTrimmedString(edgeRecord.trigger),
+      guard: toTrimmedString(edgeRecord.guard),
+      action: toTrimmedString(edgeRecord.action) ?? toTrimmedString(edgeRecord.effect),
+    });
+
+    let derivedData = baseData;
+    let label = toTrimmedString(edgeRecord.label);
+
+    if (label) {
+      const parsed = parseSmdTransitionLabel(label);
+      derivedData = ensureSmdTransitionData({
+        event: derivedData.event || parsed.event,
+        guard: derivedData.guard || parsed.guard,
+        action: derivedData.action || parsed.action,
+      });
+    } else {
+      label = composeSmdTransitionLabel(baseData);
+    }
+
+    edges.push({
+      id: edgeId,
+      source,
+      target,
+      type: 'smdTransition',
+      label: label ?? '',
+      data: derivedData,
+    });
+  });
+
+  return edges;
+};
+
 // Helper function to poll for diagram result
-const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): Promise<any> => {
+const pollDiagramResult = async (
+  diagramId: string,
+  maxAttempts: number = 120,
+  onProgress?: (progress: number) => void
+): Promise<any> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
+      // Update progress based on polling attempt
+      // Progress calculation: 0-90% during polling, 90-100% during data processing
+      const pollingProgress = (attempt / maxAttempts) * 90;
+      if (onProgress) {
+        onProgress(pollingProgress);
+      }
+
       const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
-      
+
       if (response.status === 404) {
         // Diagram not found or expired
         throw new Error('Diagram generation expired or failed');
       }
-      
+
       if (!response.ok) {
         throw new Error(`Failed to retrieve diagram result: ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       if (result.status === 'completed') {
+        // Final progress boost to 95% when data is received
+        if (onProgress) {
+          onProgress(95);
+        }
         return result;
+      } else if (result.status === 'processing' && result.diagram) {
+        // Partial result available (BDD complete, IBD/SMD still generating)
+        // Return partial result to show BDD immediately
+        if (onProgress) {
+          onProgress(Math.min(75 + (attempt / maxAttempts) * 15, 90));
+        }
+        // Check if this is good enough or continue polling
+        if (result.progress === 'bdd_complete') {
+          // Continue polling for complete result with IBD/SMD
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
       } else if (result.status === 'error') {
         throw new Error(result.error || 'Diagram generation failed');
       }
-      
+
       // Still processing, wait and retry
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
     } catch (error) {
@@ -92,24 +283,27 @@ const pollDiagramResult = async (diagramId: string, maxAttempts: number = 30): P
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
-  
+
   throw new Error('Diagram generation timed out');
 };
 
 // Call the backend API to generate a diagram
-const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIGenerationResult> => {
+const callGenerateDiagramAPI = async (
+  options: AIGenerationOptions,
+  onProgress?: (progress: number) => void
+): Promise<AIGenerationResult> => {
   try {
     // Step 1: Start generation and get diagram ID
     const endpoint = '/api/v1/rag/generate-diagram-unified/';
-    
+
     const requestBody = {
       text: options.prompt,
       use_rag: true,
       generate_ibd: Boolean(options.isEnhanced),
-      generate_smd: false,
+      generate_smd: Boolean(options.isEnhanced),
       name: 'AI Generated Diagram'
     };
-    
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -131,9 +325,9 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     if (!initResult.diagramId) {
       return { nodes: [], edges: [], error: 'Missing diagram ID from unified generation endpoint' };
     }
-    
-    // Step 2: Poll for the actual result
-    const data = await pollDiagramResult(initResult.diagramId);
+
+    // Step 2: Poll for the actual result with progress callback
+    const data = await pollDiagramResult(initResult.diagramId, 120, onProgress);
     
     if (data.error) {
       return { nodes: [], edges: [], error: data.error };
@@ -143,6 +337,10 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
     const ibdData = data.ibd_data || [];
     const ibdBlockIds = new Set(
       ibdData.map((item: any) => item.parent_block_id).filter(Boolean)
+    );
+    const smdData = data.smd_data || [];
+    const smdBlockIds = new Set(
+      smdData.map((item: any) => item.parent_block_id).filter(Boolean)
     );
 
     const diagramElements = data.diagram?.elements || [];
@@ -158,7 +356,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
           ...element.properties
         },
         type: element.type,
-        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false
+        has_ibd: element.data?.has_ibd || ibdBlockIds.has(element.id) || false,
+        has_smd: element.data?.has_smd || smdBlockIds.has(element.id) || false
       },
       position: element.position || { x: Math.random() * 500, y: Math.random() * 500 },
     }));
@@ -182,7 +381,8 @@ const callGenerateDiagramAPI = async (options: AIGenerationOptions): Promise<AIG
       nodes, 
       edges, 
       diagramId: initResult.diagramId,
-      ibdData // Include IBD data from Redis
+      ibdData, // Include IBD data from Redis
+      smdData // Include SMD data from Redis
     };
   } catch (error) {
     console.error('Error generating diagram:', error);
@@ -218,36 +418,31 @@ export const useAIGeneration = () => {
     setIsGenerating(true);
     setError(null);
     setProgress(0);
-    
+
     try {
       // Save the original prompt text to the store for future reference
       // This is critical for ensuring the RAG database gets the original text
       setGenerationPrompt(options.prompt);
-      
+
       // Also set a shorter version as the diagram description
       const shortDescription = options.prompt.substring(0, 100) + (options.prompt.length > 100 ? '...' : '');
       setDiagramDescription(shortDescription);
-      
-      // Start progress animation
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 10;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-      }, 300);
-      
-      // Call the backend API service
+
+      // Progress callback to update progress bar in real-time
+      const handleProgress = (progressValue: number) => {
+        setProgress(progressValue);
+      };
+
+      // Call the backend API service with progress callback
       const result = options.testMode
         ? await generateTestModeSmdDiagram(options.prompt)
-        : await callGenerateDiagramAPI(options);
-      
-      clearInterval(progressInterval);
+        : await callGenerateDiagramAPI(options, handleProgress);
       
       if (result.error) {
         setError(result.error);
         setProgress(0);
       } else {
-        // Create a new diagram tab with the generated content
+        // Processing complete - set progress to 100%
         setProgress(100);
         
         const defaultDiagramName = options.testMode
@@ -266,13 +461,32 @@ export const useAIGeneration = () => {
           result.description && result.description.trim().length > 0
             ? result.description.trim()
             : shortDescription;
+        let diagramNodes = result.nodes as Node<NodeData>[];
+        let diagramEdges = result.edges as Edge[];
+
+        if (
+          !options.testMode &&
+          (resolvedType === 'bdd' || resolvedType === 'bdd_enhanced')
+        ) {
+          const { nodes: layoutNodes, edges: layoutEdges } = applyDagreLayout(
+            diagramNodes,
+            diagramEdges,
+            'BT',
+            {
+              nodeSep: 160,
+              rankSep: 240,
+            }
+          );
+          diagramNodes = layoutNodes;
+          diagramEdges = layoutEdges;
+        }
         
         // Open a new diagram with the generated content
         openDiagram({
           name: resolvedName,
           type: resolvedType,
-          nodes: result.nodes,
-          edges: result.edges,
+          nodes: diagramNodes,
+          edges: diagramEdges,
           description: resolvedDescription,
           needsCentering: true, // Center new AI-generated diagrams
           generatedDiagramId: options.testMode ? undefined : result.diagramId // Store Redis diagram ID for saving
@@ -346,6 +560,69 @@ export const useAIGeneration = () => {
           // After creating all IBD diagrams, switch back to the main BDD diagram
           if (currentDiagramId) {
             console.log(`🔄 Switching back to main BDD diagram: ${currentDiagramId}`);
+            setActiveDiagram(currentDiagramId);
+          }
+        }
+
+        if (options.isEnhanced && result.smdData && result.smdData.length > 0) {
+          console.log(`🚀 Creating ${result.smdData.length} SMD diagrams from AI generation`);
+
+          const currentDiagramId = useDiagramStore.getState().activeDiagramId;
+
+          result.smdData.forEach((smdEntry: any, index: number) => {
+            const rawNodes = Array.isArray(smdEntry?.nodes) ? smdEntry.nodes : [];
+            if (!rawNodes.length) {
+              const identifier = smdEntry?.parent_block_id ?? `index-${index}`;
+              console.warn(`⚠️ Skipping SMD creation for block ${identifier}: no nodes provided`);
+              return;
+            }
+
+            const rawEdges = Array.isArray(smdEntry?.edges) ? smdEntry.edges : [];
+            const { nodes: smdNodes, nodeIdSet } = transformSmdNodesFromApi(rawNodes);
+            const smdEdges = transformSmdEdgesFromApi(rawEdges, nodeIdSet);
+
+            const { nodes: layoutedNodes, edges: layoutedEdges } = applyDagreLayout(
+              smdNodes,
+              smdEdges,
+              'LR',
+              {
+                nodeWidth: 180,
+                nodeHeight: 90,
+                nodeSep: 160,
+                rankSep: 220,
+                flexiblePositions: true,
+              }
+            );
+
+            const blockLabel =
+              toTrimmedString(smdEntry?.parent_block_name) ??
+              toTrimmedString(smdEntry?.parent_block_id) ??
+              `Block ${index + 1}`;
+
+            const smdCustomId =
+              currentDiagramId && smdEntry?.parent_block_id
+                ? `smd-for-${currentDiagramId}-${smdEntry.parent_block_id}`
+                : undefined;
+
+            console.log(
+              `🔧 Creating SMD: ${blockLabel} with ${layoutedNodes.length} nodes and ${layoutedEdges.length} edges`
+            );
+
+            openNewDiagramTab({
+              name: `SMD for ${blockLabel}`,
+              type: 'smd',
+              nodes: layoutedNodes,
+              edges: layoutedEdges,
+              description: `State Machine Diagram for ${blockLabel}`,
+              customId: smdCustomId,
+              needsCentering: true,
+              parentBlockId: toTrimmedString(smdEntry?.parent_block_id),
+              parentDiagramId: currentDiagramId || undefined,
+            });
+          });
+
+          if (currentDiagramId) {
+            console.log(`🔄 Switching back to main BDD diagram after SMD creation: ${currentDiagramId}`);
             setActiveDiagram(currentDiagramId);
           }
         }

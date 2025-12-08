@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.26] - 2025-10-26
+### Changed
+- State Machine Diagram auto-layout increases horizontal and vertical spacing for clearer AI-generated results.
+
+## [1.2.25] - 2025-10-26
+### Changed
+- BDD auto-layout keeps system roots at the top while preserving the expanded vertical spacing introduced previously.
+
+## [1.2.24] - 2025-10-26
+### Changed
+- Increased vertical spacing between AI-generated BDD levels for clearer hierarchy.
+
+## [1.2.23] - 2025-10-26
+### Changed
+- AI-generated detailed diagrams automatically open State Machine Diagram tabs for eligible blocks alongside their BDD and IBD counterparts.
+
 ## [1.2.22] - 2025-10-25
 ### Fixed
 - SMD Final nodes now consistently appear at the end of diagrams through Dagre rank assignment.
@@ -2830,4 +2846,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Version display now correctly shows v1.1 instead of v1.0
 - Proper environment variable handling during Docker build process
-
