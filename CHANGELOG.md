@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Upcoming maintenance items will continue refining the new multi-LLM diagram pipeline.
+
+## [1.2.27] - 2025-12-08
+### Added
+- Introduced a three-stage LLM pipeline (intent extraction, diagram generation, validation) to keep diagram requests structured and reviewable.
+
+### Changed
+- `/create-diagram` now runs the new pipeline, persists the effective diagram type, and returns optional intent plus validation metadata alongside the diagram payload.
 
 ## [1.2.26] - 2025-10-26
 ### Changed

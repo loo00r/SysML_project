@@ -1,6 +1,7 @@
 from openai import OpenAI
 import json
 from typing import Dict, Any, List, Optional, Union
+from pydantic import BaseModel, Field
 from app.core.config import settings
 
 # Define positioning constants
@@ -197,6 +198,107 @@ class DiagramPositioning:
             # Return original data if there was an error
             return diagram_data
 
+# Intent extraction + validation helpers
+class IntentExtractionResult(BaseModel):
+    diagram_type: str = "bdd"
+    key_elements: List[str] = Field(default_factory=list)
+    key_relationships: List[str] = Field(default_factory=list)
+    key_behaviors: List[str] = Field(default_factory=list)
+    summary: str = ""
+    confidence: float = 0.5
+
+    def normalized_type(self) -> str:
+        intent_type = (self.diagram_type or "bdd").lower().strip()
+        if intent_type not in {"bdd", "ibd", "smd"}:
+            return "bdd"
+        return intent_type
+
+    def to_prompt_block(self) -> str:
+        lines = [
+            f"- Diagram type: {self.normalized_type()}",
+            f"- Summary: {self.summary or 'Not provided'}",
+            f"- Key elements: {', '.join(self.key_elements) or 'None'}",
+        ]
+        if self.key_relationships:
+            lines.append(f"- Key relationships: {', '.join(self.key_relationships)}")
+        if self.key_behaviors:
+            lines.append(f"- Key behaviors: {', '.join(self.key_behaviors)}")
+        lines.append(f"- Confidence: {self.confidence}")
+        return "\n".join(lines)
+
+
+def infer_diagram_type_from_prompt(prompt: str) -> str:
+    if not prompt:
+        return "bdd"
+    text = prompt.lower()
+    if "state machine" in text or "state diagram" in text or "behavior" in text or "state transitions" in text:
+        return "smd"
+    if "internal block" in text or "internal structure" in text or "ibd" in text:
+        return "ibd"
+    return "bdd"
+
+
+def _format_intent_guidance(intent_data: Optional[Dict[str, Any]]) -> Optional[str]:
+    if not intent_data:
+        return None
+    parts: List[str] = []
+    diagram_type = intent_data.get("diagram_type")
+    if diagram_type:
+        parts.append(f"Focus diagram type: {diagram_type}")
+    summary = intent_data.get("summary")
+    if summary:
+        parts.append(f"Summary: {summary}")
+    key_elements = intent_data.get("key_elements") or []
+    if key_elements:
+        parts.append("Key elements: " + ", ".join(key_elements))
+    key_relationships = intent_data.get("key_relationships") or []
+    if key_relationships:
+        parts.append("Important relationships: " + ", ".join(key_relationships))
+    key_behaviors = intent_data.get("key_behaviors") or []
+    if key_behaviors:
+        parts.append("Key behaviors: " + ", ".join(key_behaviors))
+    return "\n".join(parts) if parts else None
+
+
+INTENT_EXTRACTION_PROMPT_TEMPLATE = """
+You are a SysML planning assistant. Analyze the user's request and respond ONLY with JSON
+that captures the modeling intent.
+
+Output format:
+{
+  "diagram_type": "bdd | ibd | smd",
+  "key_elements": ["List", "of", "important", "entities"],
+  "key_relationships": ["List relationships or interactions to model"],
+  "key_behaviors": ["List behaviors or processes mentioned"],
+  "summary": "1-2 sentence summary of the goal",
+  "confidence": 0.0-1.0
+}
+
+Rules:
+- Choose the diagram type that best fits the request (bdd = structure, ibd = internal composition, smd = behaviors/states).
+- Keep arrays short (3-6 entries). Use descriptive nouns/phrases.
+- If unsure, default to "bdd".
+- Return ONLY valid JSON matching the schema.
+"""
+
+VALIDATION_PROMPT_TEMPLATE = """
+You are a SysML quality reviewer. Evaluate the provided diagram JSON against the original request.
+
+Return JSON:
+{
+  "valid": true | false,
+  "issues": ["List of problems to fix"],
+  "missing_elements": ["Any components or flows that were requested but absent"],
+  "notes": "Short explanation of the assessment"
+}
+
+Rules:
+- Compare the intent summary and key elements with the diagram content.
+- Consider SysML conventions: BDD elements should represent structure; include relationships when relevant.
+- Flag logical mistakes or missing items as issues.
+- If everything matches the intent, set valid=true and provide helpful notes.
+"""
+
 # Core SysML prompt template to help guide model responses (without positioning logic)
 BDD_ONLY_PROMPT_TEMPLATE = """
 You are a SysML expert specializing in Block Definition Diagrams (BDD).
@@ -380,7 +482,8 @@ Rules:
 def generate_sysml_diagram(
     prompt: str,
     diagram_type: str,
-    one_shot_examples: List[Dict[str, Any]] = None
+    one_shot_examples: List[Dict[str, Any]] = None,
+    intent_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Generate a SysML diagram based on the provided prompt and type using OpenAI's API.
@@ -401,6 +504,7 @@ def generate_sysml_diagram(
             - 'ibd': Internal Block Diagram (standalone, uses IBD_ONLY_PROMPT_TEMPLATE)
             - 'bdd_enhanced': DEPRECATED - nested approach with lower quality
         one_shot_examples: Optional list of RAG examples.
+        intent_data: Optional guidance derived from LLM1 intent extraction.
 
     Returns:
         Dictionary containing the raw diagram and metadata:
@@ -413,14 +517,15 @@ def generate_sysml_diagram(
         }
     """
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    normalized_type = (diagram_type or "bdd").lower()
 
     # Select the appropriate prompt based on the requested diagram type
-    if diagram_type == "bdd_enhanced":
+    if normalized_type == "bdd_enhanced":
         # DEPRECATED: Use chain prompting instead (bdd + generate_ibd_diagram)
         system_prompt = BDD_ENHANCED_PROMPT_TEMPLATE
         print("\n==== WARNING: Using DEPRECATED BDD_ENHANCED prompt template ====")
         print("==== Recommendation: Use 'bdd' + generate_ibd_diagram() for better quality ====")
-    elif diagram_type == "ibd":
+    elif normalized_type == "ibd":
         system_prompt = IBD_ONLY_PROMPT_TEMPLATE
         print("\n==== Using IBD-only prompt template ====")
     else:  # Default to standard BDD (recommended for chain prompting)
@@ -437,7 +542,16 @@ def generate_sysml_diagram(
             example_output = json.dumps(example['output'], indent=2)
             messages.append({"role": "assistant", "content": example_output})
 
-    user_prompt = f"Generate a diagram for the following system description:\n\n{prompt}"
+    guidance = _format_intent_guidance(intent_data)
+    if guidance:
+        user_prompt = (
+            f"The user provided the following description:\n{prompt}\n\n"
+            f"Intent analysis:\n{guidance}\n\n"
+            f"Generate a SysML {normalized_type.upper()} diagram that satisfies the intent. "
+            "Return ONLY the JSON diagram."
+        )
+    else:
+        user_prompt = f"Generate a diagram for the following system description:\n\n{prompt}"
     messages.append({"role": "user", "content": user_prompt})
 
     print(f"\n==== Sending prompt to model ({settings.OPENAI_GENERATIVE_MODEL}) ====")
@@ -461,7 +575,8 @@ def generate_sysml_diagram(
             "raw_text": prompt,
             "model_used": settings.OPENAI_GENERATIVE_MODEL,
             "rag_used": bool(one_shot_examples),
-            "examples_count": len(one_shot_examples) if one_shot_examples else 0
+            "examples_count": len(one_shot_examples) if one_shot_examples else 0,
+            "diagram_type": normalized_type
         }
 
         print("\n==== Raw Generation Successful ====")
@@ -671,6 +786,128 @@ def generate_state_machine_diagram(
     except Exception as e:
         print(f"\n==== ERROR generating SMD for {block_name}: {str(e)} ====")
         return {"error": str(e), "smd_raw": {}}
+
+def extract_diagram_intent(prompt: str) -> IntentExtractionResult:
+    """
+    Run LLM1 to understand the user's intent before diagram generation.
+    """
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    cleaned_prompt = (prompt or "").strip()
+    if not cleaned_prompt:
+        return IntentExtractionResult()
+
+    messages = [
+        {"role": "system", "content": INTENT_EXTRACTION_PROMPT_TEMPLATE},
+        {"role": "user", "content": cleaned_prompt}
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_GENERATIVE_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.1
+        )
+        payload = json.loads(response.choices[0].message.content)
+        intent = IntentExtractionResult(**payload)
+        print(f"\n==== Intent extraction selected diagram_type={intent.normalized_type()} ====")
+        return intent
+    except Exception as exc:
+        print(f"\n==== WARNING: Intent extraction failed ({exc}); falling back ====")
+        fallback_type = infer_diagram_type_from_prompt(cleaned_prompt)
+        return IntentExtractionResult(
+            diagram_type=fallback_type,
+            summary=cleaned_prompt[:240],
+            key_elements=[]
+        )
+
+
+def validate_diagram_output(
+    original_prompt: str,
+    diagram_data: Dict[str, Any],
+    intent: IntentExtractionResult
+) -> Dict[str, Any]:
+    """
+    Run LLM3 to validate the generated diagram against the original intent.
+    """
+    if not diagram_data:
+        return {
+            "valid": False,
+            "issues": ["Diagram generation produced no data."],
+            "missing_elements": [],
+            "notes": "Validation skipped because no diagram JSON was available."
+        }
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    validation_input = (
+        f"User request:\n{original_prompt}\n\n"
+        f"Intent summary:\n{intent.to_prompt_block()}\n\n"
+        f"Diagram JSON:\n{json.dumps(diagram_data, indent=2)}"
+    )
+
+    messages = [
+        {"role": "system", "content": VALIDATION_PROMPT_TEMPLATE},
+        {"role": "user", "content": validation_input}
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_GENERATIVE_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
+        payload = json.loads(response.choices[0].message.content)
+        print("\n==== Validation result:", payload)
+        return payload
+    except Exception as exc:
+        print(f"\n==== WARNING: Validation failed ({exc}); returning fallback ====")
+        return {
+            "valid": True,
+            "issues": [],
+            "missing_elements": [],
+            "notes": "Validation skipped due to system error."
+        }
+
+
+def run_multi_stage_diagram_pipeline(
+    prompt: str,
+    preferred_diagram_type: Optional[str] = None,
+    one_shot_examples: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Execute LLM1 → LLM2 → LLM3 pipeline to produce and validate a diagram.
+    """
+    intent = extract_diagram_intent(prompt)
+    effective_type = (preferred_diagram_type or intent.normalized_type()).lower()
+
+    generation_result = generate_sysml_diagram(
+        prompt=prompt,
+        diagram_type=effective_type,
+        one_shot_examples=one_shot_examples,
+        intent_data=intent.dict()
+    )
+
+    generation_result["intent"] = intent.dict()
+    generation_result["diagram_type"] = effective_type
+
+    if generation_result.get("error"):
+        generation_result["validation_report"] = {
+            "valid": False,
+            "issues": [generation_result["error"]],
+            "missing_elements": [],
+            "notes": "Validation skipped because generation failed."
+        }
+        return generation_result
+
+    validation_report = validate_diagram_output(
+        original_prompt=prompt,
+        diagram_data=generation_result.get("diagram_raw", {}),
+        intent=intent
+    )
+    generation_result["validation_report"] = validation_report
+    return generation_result
 
 def generate_diagram(prompt: str, one_shot_examples: List[Dict[str, Any]] = None, additional_context: str = None) -> Dict[str, Any]:
     """

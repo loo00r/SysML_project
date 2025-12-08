@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Body, HTTPException, Depends
-from app.AI.diagram_generation import generate_diagram, generate_sysml_diagram, DiagramPositioning
+from app.AI.diagram_generation import (
+    DiagramPositioning,
+    run_multi_stage_diagram_pipeline,
+)
 from app.crud import crud_ibd, crud_bdd_block
 from app.database.models import InternalBlockDiagramCreate
 from app.database.embeddings import store_diagram_with_embedding
@@ -21,6 +24,8 @@ class DiagramResponse(BaseModel):
     model_used: str
     error: str = None
     diagram_id: int = None
+    intent: Dict[str, Any] | None = None
+    validation_report: Dict[str, Any] | None = None
 
 @router.post("/", response_model=DiagramResponse)
 async def create_diagram_endpoint(
@@ -39,17 +44,20 @@ async def create_diagram_endpoint(
         The generated diagram structure and metadata
     """
     try:
-        # 1. Call the new generation function
-        generation_result = generate_sysml_diagram(
+        # 1. Execute the multi-stage LLM pipeline
+        pipeline_result = run_multi_stage_diagram_pipeline(
             prompt=request.text,
-            diagram_type=request.diagram_type,
-            one_shot_examples=[]  # TODO: Add RAG logic here if needed
+            preferred_diagram_type=request.diagram_type,
+            one_shot_examples=[]  # TODO: Add RAG guidance in later phases
         )
         
-        if "error" in generation_result:
-            raise HTTPException(status_code=500, detail=generation_result["error"])
+        if "error" in pipeline_result:
+            raise HTTPException(status_code=500, detail=pipeline_result["error"])
         
-        raw_diagram = generation_result["diagram_raw"]
+        raw_diagram = pipeline_result["diagram_raw"]
+        intent_data = pipeline_result.get("intent")
+        validation_report = pipeline_result.get("validation_report")
+        effective_diagram_type = pipeline_result.get("diagram_type", request.diagram_type)
         
         # 2. Parse for IBDs and prepare the main diagram
         ibd_to_create = []
@@ -76,9 +84,9 @@ async def create_diagram_endpoint(
         db_diagram = await store_diagram_with_embedding(
             db=db,
             name=request.name,
-            description=f"Generated {request.diagram_type} diagram",
-            raw_text=generation_result["raw_text"],
-            diagram_type=request.diagram_type,
+            description=f"Generated {effective_diagram_type} diagram",
+            raw_text=pipeline_result["raw_text"],
+            diagram_type=effective_diagram_type,
             diagram_json=positioned_diagram  # Save the positioned, clean diagram
         )
 
@@ -128,10 +136,11 @@ async def create_diagram_endpoint(
         return DiagramResponse(
             diagram=positioned_diagram,
             raw_text=request.text,
-            model_used=generation_result["model_used"],
-            diagram_id=db_diagram.id
+            model_used=pipeline_result["model_used"],
+            diagram_id=db_diagram.id,
+            intent=intent_data,
+            validation_report=validation_report
         )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating diagram: {str(e)}")
-
