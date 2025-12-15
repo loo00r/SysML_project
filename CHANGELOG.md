@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.30] - 2025-12-15
+### Added
+- Added a detailed phased implementation plan for the SAR Validator-in-the-Loop update (`docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md`).
+
+## [1.2.29] - 2025-12-15
+### Changed
+- Updated `AGENTS.md` with current backend architecture, endpoints, and configuration notes.
+
 ## [1.2.26] - 2025-10-26
 ### Changed
 - State Machine Diagram auto-layout increases horizontal and vertical spacing for clearer AI-generated results.
