@@ -1,4 +1,5 @@
 import asyncio
+import time
 from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Callable, List, Dict, Tuple, Optional
@@ -33,6 +34,7 @@ from app.AI.diagram_generation import (
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
 from app.domain.detector import detect_domain_and_mode
 from app.validation.deterministic import validate_sar_unified_payload
+from app.validation.refinement import build_refinement_prompt
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -334,6 +336,18 @@ async def _generate_diagram_in_background(
                     redis_client.store_diagram(detected_payload, diagram_id=diagram_id)
                     print(f"Background: Domain detection -> domain={domain}, mode={command_mode}, confidence={detection.confidence}")
 
+            def _append_event(payload: Dict[str, Any], event_type: str, msg: str, **extra: Any) -> None:
+                events = payload.get("events")
+                if not isinstance(events, list):
+                    events = []
+                event = {"ts": time.time(), "type": event_type, "msg": msg}
+                event.update(extra)
+                events.append(event)
+                payload["events"] = events
+
+            bdd_version = 1
+            max_bdd_iterations = 2
+
             # Step 1: Generate BDD with optional RAG support.
             bdd_examples: List[Dict[str, Any]] = []
             if use_rag:
@@ -406,7 +420,16 @@ async def _generate_diagram_in_background(
                 "quality_score": quality_score,
                 "domain": domain,
                 "command_mode": command_mode,
+                "bdd_version": bdd_version,
             }
+            _append_event(partial_payload, "BDD_GENERATED", f"BDD v{bdd_version} generated", version=bdd_version)
+            if validation_report:
+                _append_event(
+                    partial_payload,
+                    "BDD_VALIDATED",
+                    f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
+                    version=bdd_version,
+                )
             redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
             print(f"Background: BDD completed and stored for {diagram_id}")
 
@@ -426,10 +449,125 @@ async def _generate_diagram_in_background(
                     "quality_score": quality_score,
                     "domain": domain,
                     "command_mode": command_mode,
+                    "bdd_version": bdd_version,
+                    "events": partial_payload.get("events", []),
                 }
                 redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
                 print(f"Background: Fail-fast validation stored for {diagram_id}")
                 return
+
+            if domain == "sar" and validation_report and validation_report.get("recommendation") == "refine":
+                iterations_used = 0
+                while iterations_used < max_bdd_iterations and validation_report.get("recommendation") == "refine":
+                    refinement_prompt = build_refinement_prompt(
+                        original_text=text,
+                        diagram_json=raw_bdd,
+                        validation_report=report,
+                        diagram_kind="bdd",
+                    )
+
+                    refining_payload = {
+                        "status": "processing",
+                        "message": f"Refining BDD... (attempt {iterations_used + 1}/{max_bdd_iterations})",
+                        "diagram": positioned_bdd,
+                        "raw_text": text,
+                        "progress": "bdd_refining",
+                        "validation_report": validation_report,
+                        "quality_score": quality_score,
+                        "domain": domain,
+                        "command_mode": command_mode,
+                        "bdd_version": bdd_version,
+                        "events": partial_payload.get("events", []),
+                    }
+                    _append_event(
+                        refining_payload,
+                        "BDD_REFINING",
+                        f"Starting refinement for BDD v{bdd_version} (attempt {iterations_used + 1})",
+                        version=bdd_version,
+                    )
+                    redis_client.store_diagram(refining_payload, diagram_id=diagram_id)
+
+                    bdd_result = await asyncio.to_thread(
+                        generate_sysml_diagram,
+                        prompt=refinement_prompt,
+                        diagram_type="bdd",
+                        one_shot_examples=bdd_examples or None,
+                        domain=domain,
+                        command_mode=command_mode,
+                    )
+                    if bdd_result.get("error"):
+                        error_payload = {
+                            "status": "error",
+                            "error": bdd_result["error"],
+                            "domain": domain,
+                            "command_mode": command_mode,
+                            "events": refining_payload.get("events", []),
+                        }
+                        redis_client.store_diagram(error_payload, diagram_id=diagram_id)
+                        return
+
+                    raw_bdd = bdd_result.get("diagram_raw", {})
+                    positioned_bdd = DiagramPositioning.apply_positioning(raw_bdd)
+                    elements = raw_bdd.get("elements", [])
+                    relationships = raw_bdd.get("relationships", [])
+                    bdd_version += 1
+
+                    report = validate_sar_unified_payload(
+                        text=text,
+                        bdd_diagram=raw_bdd,
+                        ibd_data=None,
+                        smd_data=None,
+                        mode=command_mode,
+                        stage="BDD",
+                    )
+                    validation_report = report.model_dump()
+                    quality_score = report.quality_score
+
+                    partial_payload = {
+                        "status": "processing",
+                        "message": "BDD refined, generating IBD and SMD...",
+                        "diagram": positioned_bdd,
+                        "raw_text": text,
+                        "progress": "bdd_complete",
+                        "validation_report": validation_report,
+                        "quality_score": quality_score,
+                        "domain": domain,
+                        "command_mode": command_mode,
+                        "bdd_version": bdd_version,
+                        "events": refining_payload.get("events", []),
+                    }
+                    _append_event(partial_payload, "BDD_REFINED", f"BDD v{bdd_version} generated", version=bdd_version)
+                    _append_event(
+                        partial_payload,
+                        "BDD_VALIDATED",
+                        f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
+                        version=bdd_version,
+                    )
+                    redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
+
+                    if validation_report.get("recommendation") == "fail_fast":
+                        fail_fast_payload = {
+                            "status": "completed",
+                            "message": "Fail-fast validation triggered; skipping downstream generation.",
+                            "diagram": positioned_bdd,
+                            "raw_text": text,
+                            "model_used": bdd_result.get("model_used"),
+                            "saved_to_rag": False,
+                            "used_rag": use_rag and bool(bdd_examples),
+                            "examples_count": len(bdd_examples),
+                            "ibd_data": [],
+                            "smd_data": [],
+                            "validation_report": validation_report,
+                            "quality_score": quality_score,
+                            "domain": domain,
+                            "command_mode": command_mode,
+                            "bdd_version": bdd_version,
+                            "events": partial_payload.get("events", []),
+                        }
+                        redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
+                        return
+
+                    iterations_used += 1
 
             # Step 2: Identify candidate blocks.
             ibd_candidates: List[Dict[str, Any]] = []
@@ -512,7 +650,16 @@ async def _generate_diagram_in_background(
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
+                        "bdd_version": bdd_version,
+                        "events": partial_payload.get("events", []),
                     }
+                    _append_event(
+                        progress_payload,
+                        "SUBDIAGRAM_PROGRESS",
+                        f"{done_tasks}/{total_tasks} subdiagrams completed",
+                        done=done_tasks,
+                        total=total_tasks,
+                    )
                     redis_client.store_diagram(progress_payload, diagram_id=diagram_id)
             else:
                 print("Background: No generation tasks to execute")
@@ -546,7 +693,10 @@ async def _generate_diagram_in_background(
                 "quality_score": quality_score,
                 "domain": domain,
                 "command_mode": command_mode,
+                "bdd_version": bdd_version,
+                "events": partial_payload.get("events", []),
             }
+            _append_event(redis_payload, "COMPLETED", "Generation completed")
             redis_client.store_diagram(redis_payload, diagram_id=diagram_id)
 
             print(f"Background: Stored completed result under ID {diagram_id}")

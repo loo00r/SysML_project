@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.36] - 2025-12-16
+### Added
+- Added bounded BDD self-refinement loop (max 2 attempts) with Redis `events` timeline and `bdd_version` tracking.
+
+### Changed
+- Unified async generation now writes incremental Redis updates during BDD refine/validate and subdiagram progress.
+
 ## [1.2.35] - 2025-12-16
 ### Added
 - Added SAR prompt injection via `build_domain_context()` and propagated `domain`/`command_mode` into BDD/IBD/SMD generators.
