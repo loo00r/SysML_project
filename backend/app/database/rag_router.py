@@ -347,6 +347,7 @@ async def _generate_diagram_in_background(
                     ibd_data=None,
                     smd_data=None,
                     mode=command_mode,
+                    stage="BDD",
                 )
                 validation_report = report.model_dump()
                 quality_score = report.quality_score
@@ -469,6 +470,7 @@ async def _generate_diagram_in_background(
                     ibd_data=ibd_to_create if generate_ibd else None,
                     smd_data=smd_to_create if generate_smd else None,
                     mode=command_mode,
+                    stage="UNIFIED",
                 )
                 validation_report = final_report.model_dump()
                 quality_score = final_report.quality_score

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- SAR validation reports include `stage` plus ruleset/spec version metadata, and deterministic checks handle both `elements/relationships` and `nodes/edges`.
+
+## [1.2.32] - 2025-12-16
+### Changed
+- Deterministic SAR validator now uses a nodes/edges adapter (`elements/relationships` ↔ `nodes/edges`) and annotates reports with `stage`, `constraints_version`, and `sar_spec_version`.
+- `command_mode` handling is explicit: without it, ICS/GSB mixing is reported as a warning; with it, mixing becomes fail-fast.
+
+### Added
+- Added `unittest`-based smoke tests for deterministic SAR validation (for environments without `pytest`).
+
 ## [1.2.31] - 2025-12-16
 ### Added
 - Added SAR v0.1 domain spec (`docs/SAR_DOMAIN_SPEC.md`) and machine-readable ruleset (`backend/app/domain/sar_constraints.json`).

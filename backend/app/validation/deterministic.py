@@ -63,15 +63,24 @@ def _quality_score_for_issues(issues: List[ValidationIssue]) -> int:
     return max(score, 0)
 
 
-def _extract_bdd_elements(diagram: Dict[str, Any]) -> List[Dict[str, Any]]:
-    elements = diagram.get("elements") or []
-    return elements if isinstance(elements, list) else []
+def _get_nodes(diagram: Dict[str, Any]) -> List[Dict[str, Any]]:
+    nodes = diagram.get("elements")
+    if isinstance(nodes, list):
+        return nodes
+    nodes = diagram.get("nodes")
+    if isinstance(nodes, list):
+        return nodes
+    return []
 
 
-def _extract_smd_nodes_edges(smd: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    nodes = smd.get("nodes") or []
-    edges = smd.get("edges") or []
-    return (nodes if isinstance(nodes, list) else [], edges if isinstance(edges, list) else [])
+def _get_edges(diagram: Dict[str, Any]) -> List[Dict[str, Any]]:
+    edges = diagram.get("relationships")
+    if isinstance(edges, list):
+        return edges
+    edges = diagram.get("edges")
+    if isinstance(edges, list):
+        return edges
+    return []
 
 
 def validate_sar_unified_payload(
@@ -81,10 +90,14 @@ def validate_sar_unified_payload(
     ibd_data: Optional[List[Dict[str, Any]]] = None,
     smd_data: Optional[List[Dict[str, Any]]] = None,
     mode: Optional[str] = None,
+    stage: str = "UNIFIED",
     constraints: Optional[Dict[str, Any]] = None,
 ) -> ValidationReport:
     constraints = constraints or load_sar_constraints()
     issues: List[ValidationIssue] = []
+
+    if stage not in {"BDD", "IBD", "SMD", "UNIFIED"}:
+        stage = "UNIFIED"
 
     all_strings = list(_walk_strings({"text": text, "bdd": bdd_diagram, "ibd": ibd_data, "smd": smd_data}))
     diagram_strings = list(_walk_strings({"bdd": bdd_diagram, "ibd": ibd_data, "smd": smd_data}))
@@ -112,11 +125,16 @@ def validate_sar_unified_payload(
     found_ics_roles = {role for role in ics_roles if _contains_term(all_strings, role)}
     found_gsb_roles = {role for role in gsb_roles if _contains_term(all_strings, role)}
     if found_ics_roles and found_gsb_roles:
+        if mode is None:
+            severity = "warning"
+        else:
+            severity = _issue_severity("MODE_MIXED_ICS_GSB", constraints)
         issues.append(
             ValidationIssue(
                 code="MODE_MIXED_ICS_GSB",
-                severity=_issue_severity("MODE_MIXED_ICS_GSB", constraints),
+                severity=severity,
                 message="ICS and GSB roles appear together; choose exactly one command mode.",
+                suggestion="Set command_mode to 'ICS' or 'GSB'.",
                 details={"ics_roles": sorted(found_ics_roles), "gsb_roles": sorted(found_gsb_roles)},
             )
         )
@@ -136,8 +154,8 @@ def validate_sar_unified_payload(
 
     # 3) BDD required blocks (fail-fast)
     required_blocks = bdd_rules.get("required_blocks") or []
-    bdd_elements = _extract_bdd_elements(bdd_diagram)
-    element_names = [str(el.get("name") or "") for el in bdd_elements if isinstance(el, dict)]
+    bdd_nodes = _get_nodes(bdd_diagram)
+    element_names = [str(el.get("name") or "") for el in bdd_nodes if isinstance(el, dict)]
     for block in required_blocks:
         if not _contains_normalized(element_names, block):
             issues.append(
@@ -191,7 +209,8 @@ def validate_sar_unified_payload(
         for smd in smd_data:
             if not isinstance(smd, dict):
                 continue
-            nodes, edges = _extract_smd_nodes_edges(smd)
+            nodes = _get_nodes(smd)
+            edges = _get_edges(smd)
             node_name_by_id = {
                 str(node.get("id")): str(node.get("name") or node.get("id") or "")
                 for node in nodes
@@ -311,10 +330,14 @@ def validate_sar_unified_payload(
         "total": len(issues),
     }
 
+    version = str(constraints.get("version") or "0.1")
     return ValidationReport(
         domain=constraints.get("domain") or "Flood_Rescue_SAR",
-        ruleset_version=constraints.get("version") or "0.1",
+        ruleset_version=version,
+        constraints_version=version,
+        sar_spec_version=version,
         mode=mode,
+        stage=stage,  # type: ignore[arg-type]
         recommendation=recommendation,  # type: ignore[arg-type]
         issues=issues,
         counts=counts,

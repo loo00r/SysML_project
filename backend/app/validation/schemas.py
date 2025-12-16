@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 Severity = Literal["critical", "warning"]
 Recommendation = Literal["fail_fast", "refine", "pass"]
+Stage = Literal["BDD", "IBD", "SMD", "UNIFIED"]
 
 
 class ValidationIssue(BaseModel):
@@ -20,9 +21,11 @@ class ValidationIssue(BaseModel):
 class ValidationReport(BaseModel):
     domain: str
     ruleset_version: str
+    constraints_version: str
+    sar_spec_version: str
     mode: Optional[str] = None
+    stage: Stage = "UNIFIED"
     recommendation: Recommendation
     issues: List[ValidationIssue] = Field(default_factory=list)
     counts: Dict[str, int] = Field(default_factory=dict)
     quality_score: int = 100
-

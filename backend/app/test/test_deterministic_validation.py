@@ -78,6 +78,17 @@ def test_deterministic_validator_mixed_ics_and_gsb_roles_fails_fast():
         constraints=load_sar_constraints(),
     )
 
-    assert report.recommendation == "fail_fast"
+    assert report.recommendation == "refine"
     assert any(issue.code == "MODE_MIXED_ICS_GSB" for issue in report.issues)
 
+
+def test_deterministic_validator_mixed_ics_and_gsb_roles_fail_fast_when_mode_set():
+    report = validate_sar_unified_payload(
+        text="Incident Commander coordinates with Gold Commander.",
+        bdd_diagram=_valid_min_bdd(),
+        mode="ICS",
+        constraints=load_sar_constraints(),
+    )
+
+    assert report.recommendation == "fail_fast"
+    assert any(issue.code == "MODE_MIXED_ICS_GSB" and issue.severity == "critical" for issue in report.issues)
