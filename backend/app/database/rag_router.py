@@ -31,7 +31,7 @@ from app.AI.diagram_generation import (
     DiagramPositioning
 )
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
-from app.domain.detector import detect_command_mode, detect_domain
+from app.domain.detector import detect_domain_and_mode
 from app.validation.deterministic import validate_sar_unified_payload
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
@@ -308,6 +308,26 @@ async def _generate_diagram_in_background(
 
         # Create new DB session for background task
         async with AsyncSessionLocal() as db:
+            if not domain:
+                domain = "generic"
+
+            if domain == "generic" or (domain == "sar" and command_mode is None):
+                detection = await asyncio.to_thread(detect_domain_and_mode, text)
+                if detection is not None:
+                    if domain == "generic":
+                        domain = detection.domain
+                    if command_mode is None and detection.command_mode is not None:
+                        command_mode = detection.command_mode
+
+                    detected_payload = {
+                        "status": "processing",
+                        "message": "Domain detected; starting generation",
+                        "domain": domain,
+                        "command_mode": command_mode,
+                    }
+                    redis_client.store_diagram(detected_payload, diagram_id=diagram_id)
+                    print(f"Background: Domain detection -> domain={domain}, mode={command_mode}, confidence={detection.confidence}")
+
             # Step 1: Generate BDD with optional RAG support.
             bdd_examples: List[Dict[str, Any]] = []
             if use_rag:
@@ -552,12 +572,6 @@ async def generate_diagram_unified(
 
     if not domain:
         domain = "generic"
-    if domain == "generic":
-        inferred_domain = detect_domain(text)
-        if inferred_domain:
-            domain = inferred_domain
-    if domain == "sar" and command_mode is None:
-        command_mode = detect_command_mode(text)
 
     # Store initial "processing" status in Redis
     initial_payload = {
