@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.37] - 2025-12-16
+### Fixed
+- Unified async Redis payload now always stores `validation_report` as an object (empty `{}` when not validated) for simpler client handling.
+- BDD self-refinement now emits `BDD_MAX_ITERATIONS` when the refinement cap is hit and continues with best-effort output.
+- Added `OPENAI_DETECTOR_MODEL` to `.env.example` for explicit domain detector configuration.
+
+### Changed
+- Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` phase status to reflect current implementation (Phase 2/5 done).
+
 ## [1.2.36] - 2025-12-16
 ### Added
 - Added bounded BDD self-refinement loop (max 2 attempts) with Redis `events` timeline and `bdd_version` tracking.

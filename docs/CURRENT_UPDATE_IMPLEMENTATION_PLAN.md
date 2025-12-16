@@ -97,7 +97,7 @@ Acceptance criteria:
 
 Ціль: щоб генератор стабільно "бачив" SAR-обмеження, навіть без LLM-валідатора.
 
-**Статус**: 20% завершено (API параметри є, але промпти не оновлені)
+**Статус**: ✅ 100% завершено (інжекція додана в BDD/IBD/SMD промпти + `domain`/`command_mode` прокинуті в unified flow)
 
 **Що є**:
 - ✅ `backend/app/domain/constraints.py` з `load_sar_constraints()`
@@ -273,7 +273,7 @@ Acceptance criteria:
 
 Ціль: автоматично виправляти очевидні помилки 1–2 ітераціями.
 
-**Статус**: 0% (не імплементовано)
+**Статус**: ✅ ~90% (BDD refinement loop працює; incremental Redis updates + events + bounded iterations)
 
 **Що потрібно додати**:
 
@@ -529,40 +529,30 @@ Acceptance criteria:
 
 ### Що не завершено ⚠️
 
-#### Фаза 2: Domain Injection — **20% (CRITICAL GAP)**
-- ⚠️ `backend/app/domain/constraints.py` майже порожній (лише `load_sar_constraints()`)
-- ❌ Немає `build_domain_context()` для генерації prompt context
-- ❌ Domain контекст **НЕ прокинутий** у генератори:
-  - `generate_sysml_diagram()` — не бачить SAR правил
-  - `generate_ibd_diagram()` — не бачить SAR правил
-  - `generate_state_machine_diagram()` — не бачить SAR правил
-- ⚠️ API параметр `domain` є, але використовується **тільки для валідації**, не для генерації
+#### Фаза 2: Domain Injection — ✅ **100%**
+- ✅ `build_domain_context()` реалізовано і інтегровано в `generate_sysml_diagram()` / `generate_ibd_diagram()` / `generate_state_machine_diagram()`.
+- ✅ `domain`/`command_mode` прокинуті через unified async flow (`rag_router.py`) у всі генератори.
 
-**РИЗИК**: Генератор створює generic діаграми → валідатор завжди знаходить помилки → система не показує переваг.
+#### Фаза 5: Self-Refinement — ✅ **~90%**
+- ✅ BDD: bounded refinement loop (max 2) з incremental Redis updates, `events` timeline, `bdd_version`, і fail-fast skip IBD/SMD.
+- ⚠️ TODO: винести refinement loop у reusable helper (`refine_with_validation`) і розширити на IBD/SMD (можна лишити на наступну фазу).
 
-#### Фаза 5: Self-Refinement — **0% (MISSING)**
-- ❌ Немає циклу "validate → refine prompt → regenerate"
-- ❌ При `recommendation="refine"` немає retry логіки
-- ❌ `max_iterations` не імплементовано
-- ❌ Валідація запускається, але помилки не виправляються автоматично
+#### Фаза 6: Frontend Integration — 🟡 **~10%**
+- ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, і progress counters для subdiagrams.
+- ❌ UI компоненти (timeline/quality/issues/polling UX) ще не додані.
 
-#### Фаза 6: Frontend Integration — **5% (BACKEND READY)**
-- ⚠️ Backend повертає `validation_report` + `quality_score` в Redis
-- ❌ Frontend не показує ці дані (немає UI компонентів)
+#### Фаза 7: Тести — 🟡 **40%**
+- ✅ Unit-тести для детермінованої SAR валідації
+- ❌ Немає smoke-tests для unified flow (fail-fast/refine paths)
+- ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
-#### Фаза 7: Тести — **40%**
-- ✅ Unit-тести для детермінованої валідації
-- ❌ Немає smoke-tests для unified flow з fail-fast
-- ⚠️ Poetry не налаштований в Docker (тести не запускаються в CI)
-
-### Загальний прогрес: **~45%**
+### Загальний прогрес: **~75%**
 
 ### Критичні проблеми для вирішення
-
-1. **Domain Injection відсутня** — найважливіша фіча для MVP
-2. **Self-Refinement не працює** — валідатор виявляє, але не виправляє
-3. **Fail-fast не зупиняє pipeline** — при critical errors IBD/SMD все одно генеруються
-4. **Frontend не показує validation results** — UX неповний
+1. **Frontend не показує validation/progress/timeline** — UX неповний
+2. **Progress payload не повністю структурований** (`done/total/current_step` для всіх кроків)
+3. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
+4. **Smoke/CI тести** для unified flow
 
 ---
 
@@ -807,4 +797,3 @@ eventSource.onmessage = (e) => {
 - [ ] Error handling для всіх edge cases
 - [ ] Документація API endpoints
 - [ ] Changelog + version bump
-

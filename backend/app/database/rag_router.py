@@ -410,13 +410,14 @@ async def _generate_diagram_in_background(
                 quality_score = report.quality_score
 
             # Update Redis with BDD result immediately (partial result)
+            validation_report_payload = validation_report or {}
             partial_payload = {
                 "status": "processing",
                 "message": "BDD generated, generating IBD and SMD...",
                 "diagram": positioned_bdd,
                 "raw_text": text,
                 "progress": "bdd_complete",
-                "validation_report": validation_report,
+                "validation_report": validation_report_payload,
                 "quality_score": quality_score,
                 "domain": domain,
                 "command_mode": command_mode,
@@ -445,7 +446,7 @@ async def _generate_diagram_in_background(
                     "examples_count": len(bdd_examples),
                     "ibd_data": [],
                     "smd_data": [],
-                    "validation_report": validation_report,
+                    "validation_report": validation_report or {},
                     "quality_score": quality_score,
                     "domain": domain,
                     "command_mode": command_mode,
@@ -472,7 +473,7 @@ async def _generate_diagram_in_background(
                         "diagram": positioned_bdd,
                         "raw_text": text,
                         "progress": "bdd_refining",
-                        "validation_report": validation_report,
+                        "validation_report": validation_report or {},
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
@@ -529,7 +530,7 @@ async def _generate_diagram_in_background(
                         "diagram": positioned_bdd,
                         "raw_text": text,
                         "progress": "bdd_complete",
-                        "validation_report": validation_report,
+                        "validation_report": validation_report or {},
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
@@ -557,7 +558,7 @@ async def _generate_diagram_in_background(
                             "examples_count": len(bdd_examples),
                             "ibd_data": [],
                             "smd_data": [],
-                            "validation_report": validation_report,
+                            "validation_report": validation_report or {},
                             "quality_score": quality_score,
                             "domain": domain,
                             "command_mode": command_mode,
@@ -568,6 +569,30 @@ async def _generate_diagram_in_background(
                         return
 
                     iterations_used += 1
+
+                if iterations_used >= max_bdd_iterations and validation_report.get("recommendation") == "refine":
+                    limit_payload = {
+                        "status": "processing",
+                        "message": f"Max BDD refinement attempts reached ({max_bdd_iterations}); continuing with best-effort result.",
+                        "diagram": positioned_bdd,
+                        "raw_text": text,
+                        "progress": "bdd_refine_limit",
+                        "validation_report": validation_report or {},
+                        "quality_score": quality_score,
+                        "domain": domain,
+                        "command_mode": command_mode,
+                        "bdd_version": bdd_version,
+                        "events": partial_payload.get("events", []),
+                    }
+                    _append_event(
+                        limit_payload,
+                        "BDD_MAX_ITERATIONS",
+                        f"Reached max refinement attempts ({max_bdd_iterations}); continuing with best-effort BDD.",
+                        version=bdd_version,
+                        max_iterations=max_bdd_iterations,
+                    )
+                    redis_client.store_diagram(limit_payload, diagram_id=diagram_id)
+                    partial_payload = limit_payload
 
             # Step 2: Identify candidate blocks.
             ibd_candidates: List[Dict[str, Any]] = []
@@ -646,7 +671,7 @@ async def _generate_diagram_in_background(
                         "progress_detail": {"done": done_tasks, "total": total_tasks},
                         "ibd_data": ibd_to_create,
                         "smd_data": smd_to_create,
-                        "validation_report": validation_report,
+                        "validation_report": validation_report or {},
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
@@ -689,7 +714,7 @@ async def _generate_diagram_in_background(
                 "ibd_data": ibd_to_create,
                 "smd_data": smd_to_create,
                 "status": "completed",
-                "validation_report": validation_report,
+                "validation_report": validation_report or {},
                 "quality_score": quality_score,
                 "domain": domain,
                 "command_mode": command_mode,
