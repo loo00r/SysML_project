@@ -76,7 +76,9 @@ async def generate_smd_for_block_async(
     block: Dict[str, Any],
     system_context: str,
     db: Optional[AsyncSession],
-    use_rag: bool
+    use_rag: bool,
+    domain: str = "generic",
+    command_mode: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Async helper to generate a State Machine Diagram for a single block."""
     block_id = block.get("id")
@@ -102,6 +104,8 @@ async def generate_smd_for_block_async(
             block_type=block_type,
             system_context=system_context,
             one_shot_examples=one_shot_examples or None,
+            domain=domain,
+            command_mode=command_mode,
         )
 
         if smd_result.get("error"):
@@ -135,6 +139,8 @@ async def generate_ibd_for_block_async(
     db: Optional[AsyncSession],
     use_rag: bool,
     db_session_factory: Optional[Callable[[], Any]] = None,
+    domain: str = "generic",
+    command_mode: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Async helper to generate an Internal Block Diagram for a single block.
@@ -172,15 +178,13 @@ async def generate_ibd_for_block_async(
                             block_type=block_type,
                             limit=2,
                         )
-                elif db is not None:
+                else:
                     similar_ibds = await find_similar_ibds(
                         db=db,
                         block_name=block_name,
                         block_type=block_type,
                         limit=2,
                     )
-                else:
-                    similar_ibds = []
             except Exception as rag_error:
                 print(f"generate_ibd_for_block_async: RAG lookup failed for {block_name}: {rag_error}")
                 similar_ibds = []
@@ -204,6 +208,8 @@ async def generate_ibd_for_block_async(
             system_context=system_context,
             parent_relationships=block_relationships,
             one_shot_examples=one_shot_examples or None,
+            domain=domain,
+            command_mode=command_mode,
         )
 
         if ibd_result.get("error"):
@@ -352,10 +358,13 @@ async def _generate_diagram_in_background(
                     else:
                         print("Background: No similar BDD examples found")
 
-            bdd_result = generate_sysml_diagram(
+            bdd_result = await asyncio.to_thread(
+                generate_sysml_diagram,
                 prompt=text,
                 diagram_type="bdd",
-                one_shot_examples=bdd_examples or None
+                one_shot_examples=bdd_examples or None,
+                domain=domain,
+                command_mode=command_mode,
             )
 
             if bdd_result.get("error"):
@@ -452,6 +461,8 @@ async def _generate_diagram_in_background(
                         db=None,
                         use_rag=use_rag,
                         db_session_factory=AsyncSessionLocal,
+                        domain=domain,
+                        command_mode=command_mode,
                     ),
                 )
 
@@ -463,6 +474,8 @@ async def _generate_diagram_in_background(
                         system_context=text,
                         db=None,
                         use_rag=use_rag,
+                        domain=domain,
+                        command_mode=command_mode,
                     ),
                 )
 

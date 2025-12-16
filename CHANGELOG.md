@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.35] - 2025-12-16
+### Added
+- Added SAR prompt injection via `build_domain_context()` and propagated `domain`/`command_mode` into BDD/IBD/SMD generators.
+
 ### Changed
-- SAR validation reports include `stage` plus ruleset/spec version metadata, and deterministic checks handle both `elements/relationships` and `nodes/edges`.
-- Unified async generation avoids cross-event-loop threading for IBD/SMD tasks and writes incremental progress snapshots to Redis.
-- SAR domain detection now uses an OpenAI micro-call classifier (no regex heuristics).
+- Unified async generation injects SAR domain context into prompts when `domain` resolves to SAR (client-provided or auto-detected).
 
 ## [1.2.34] - 2025-12-16
 ### Added

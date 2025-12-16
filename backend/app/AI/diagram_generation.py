@@ -380,7 +380,9 @@ Rules:
 def generate_sysml_diagram(
     prompt: str,
     diagram_type: str,
-    one_shot_examples: List[Dict[str, Any]] = None
+    one_shot_examples: List[Dict[str, Any]] = None,
+    domain: str = "generic",
+    command_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate a SysML diagram based on the provided prompt and type using OpenAI's API.
@@ -414,6 +416,12 @@ def generate_sysml_diagram(
     """
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
+    from app.domain.constraints import build_domain_context
+
+    domain_context = build_domain_context(domain, command_mode)
+    if domain_context:
+        print("\n==== Injecting SAR domain context into prompt ====")
+
     # Select the appropriate prompt based on the requested diagram type
     if diagram_type == "bdd_enhanced":
         # DEPRECATED: Use chain prompting instead (bdd + generate_ibd_diagram)
@@ -426,6 +434,9 @@ def generate_sysml_diagram(
     else:  # Default to standard BDD (recommended for chain prompting)
         system_prompt = BDD_ONLY_PROMPT_TEMPLATE
         print("\n==== Using BDD-only prompt template (chain prompting mode) ====")
+
+    if domain_context:
+        system_prompt = f"{system_prompt}\n\nDOMAIN CONTEXT:\n{domain_context}\n"
 
     messages = [{"role": "system", "content": system_prompt}]
 
@@ -478,7 +489,9 @@ def generate_ibd_diagram(
     block_type: str,
     system_context: str,
     parent_relationships: List[Dict],
-    one_shot_examples: List[Dict] = None
+    one_shot_examples: List[Dict] = None,
+    domain: str = "generic",
+    command_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate IBD for a specific block using chain prompting with full context from BDD.
@@ -511,6 +524,12 @@ def generate_ibd_diagram(
         for r in parent_relationships
     ]) if parent_relationships else "None"
 
+    from app.domain.constraints import build_domain_context
+
+    domain_context = build_domain_context(domain, command_mode)
+    if domain_context:
+        print(f"\n==== Injecting SAR domain context into IBD prompt for {block_name} ====")
+
     # Build context-aware prompt using the existing IBD_ONLY_PROMPT_TEMPLATE
     # Add context information before the template
     context_intro = f"""
@@ -522,6 +541,8 @@ CONTEXT FOR THIS IBD GENERATION:
 - Block Description: {block_description}
 - Block Connections in Parent BDD:
 {rel_text}
+
+{("DOMAIN CONTEXT:\\n" + domain_context) if domain_context else ""}
 
 TASK: Generate an Internal Block Diagram for the block "{block_name}" showing its internal components and their connections.
 
@@ -601,7 +622,9 @@ def generate_state_machine_diagram(
     block_description: str,
     block_type: str,
     system_context: str,
-    one_shot_examples: List[Dict] = None
+    one_shot_examples: List[Dict] = None,
+    domain: str = "generic",
+    command_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate an SMD for a specific block using chain prompting with behavioral context.
@@ -618,6 +641,13 @@ def generate_state_machine_diagram(
         block_type=block_type,
         block_id=block_id
     )
+
+    from app.domain.constraints import build_domain_context
+
+    domain_context = build_domain_context(domain, command_mode)
+    if domain_context:
+        print(f"\n==== Injecting SAR domain context into SMD prompt for {block_name} ====")
+        system_prompt = f"{system_prompt}\n\nDOMAIN CONTEXT:\n{domain_context}\n"
 
     messages = [{"role": "system", "content": system_prompt}]
 
