@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - SAR validation reports include `stage` plus ruleset/spec version metadata, and deterministic checks handle both `elements/relationships` and `nodes/edges`.
+- Unified async generation avoids cross-event-loop threading for IBD/SMD tasks and writes incremental progress snapshots to Redis.
+
+## [1.2.33] - 2025-12-16
+### Changed
+- Unified async IBD/SMD generation uses safe `asyncio` concurrency (no event-loop mixing) and writes incremental Redis progress updates.
+- SAR `domain`/`command_mode` can be auto-detected from prompt text when not provided by the client.
 
 ## [1.2.32] - 2025-12-16
 ### Changed

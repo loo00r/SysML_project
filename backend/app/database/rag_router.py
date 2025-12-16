@@ -1,8 +1,7 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Callable, List, Dict, Tuple, Optional
 import json
 
 from app.db.dependencies import get_db
@@ -32,6 +31,7 @@ from app.AI.diagram_generation import (
     DiagramPositioning
 )
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
+from app.domain.detector import detect_command_mode, detect_domain
 from app.validation.deterministic import validate_sar_unified_payload
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
@@ -75,7 +75,7 @@ def identify_diagram_candidates(
 async def generate_smd_for_block_async(
     block: Dict[str, Any],
     system_context: str,
-    db: AsyncSession,
+    db: Optional[AsyncSession],
     use_rag: bool
 ) -> Optional[Dict[str, Any]]:
     """Async helper to generate a State Machine Diagram for a single block."""
@@ -94,13 +94,14 @@ async def generate_smd_for_block_async(
             # Placeholder for future RAG lookup (e.g., find_similar_smds)
             pass
 
-        smd_result = generate_state_machine_diagram(
+        smd_result = await asyncio.to_thread(
+            generate_state_machine_diagram,
             block_id=block_id,
             block_name=block_name,
             block_description=block_description,
             block_type=block_type,
             system_context=system_context,
-            one_shot_examples=one_shot_examples or None
+            one_shot_examples=one_shot_examples or None,
         )
 
         if smd_result.get("error"):
@@ -131,8 +132,9 @@ async def generate_ibd_for_block_async(
     block: Dict[str, Any],
     system_context: str,
     relationships: List[Dict[str, Any]],
-    db: AsyncSession,
-    use_rag: bool
+    db: Optional[AsyncSession],
+    use_rag: bool,
+    db_session_factory: Optional[Callable[[], Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Async helper to generate an Internal Block Diagram for a single block.
@@ -162,12 +164,23 @@ async def generate_ibd_for_block_async(
         one_shot_examples: List[Dict[str, Any]] = []
         if use_rag:
             try:
-                similar_ibds = await find_similar_ibds(
-                    db=db,
-                    block_name=block_name,
-                    block_type=block_type,
-                    limit=2
-                )
+                if db_session_factory is not None:
+                    async with db_session_factory() as rag_db:
+                        similar_ibds = await find_similar_ibds(
+                            db=rag_db,
+                            block_name=block_name,
+                            block_type=block_type,
+                            limit=2,
+                        )
+                elif db is not None:
+                    similar_ibds = await find_similar_ibds(
+                        db=db,
+                        block_name=block_name,
+                        block_type=block_type,
+                        limit=2,
+                    )
+                else:
+                    similar_ibds = []
             except Exception as rag_error:
                 print(f"generate_ibd_for_block_async: RAG lookup failed for {block_name}: {rag_error}")
                 similar_ibds = []
@@ -182,14 +195,15 @@ async def generate_ibd_for_block_async(
             else:
                 print(f"No similar IBDs found for {block_name}, proceeding without RAG examples")
 
-        ibd_result = generate_ibd_diagram(
+        ibd_result = await asyncio.to_thread(
+            generate_ibd_diagram,
             block_id=block_id,
             block_name=block_name,
             block_description=block_description,
             block_type=block_type,
             system_context=system_context,
             parent_relationships=block_relationships,
-            one_shot_examples=one_shot_examples or None
+            one_shot_examples=one_shot_examples or None,
         )
 
         if ibd_result.get("error"):
@@ -361,6 +375,8 @@ async def _generate_diagram_in_background(
                 "progress": "bdd_complete",
                 "validation_report": validation_report,
                 "quality_score": quality_score,
+                "domain": domain,
+                "command_mode": command_mode,
             }
             redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
             print(f"Background: BDD completed and stored for {diagram_id}")
@@ -379,6 +395,8 @@ async def _generate_diagram_in_background(
                     "smd_data": [],
                     "validation_report": validation_report,
                     "quality_score": quality_score,
+                    "domain": domain,
+                    "command_mode": command_mode,
                 }
                 redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
                 print(f"Background: Fail-fast validation stored for {diagram_id}")
@@ -398,66 +416,71 @@ async def _generate_diagram_in_background(
                 smd_candidates = []
 
             # Step 3: Parallel generation for IBD and SMD
-            ibd_tasks = [
-                generate_ibd_for_block_async(
-                    block=block,
-                    system_context=text,
-                    relationships=relationships,
-                    db=db,
-                    use_rag=use_rag
-                )
-                for block in ibd_candidates
-            ]
-
-            smd_tasks = [
-                generate_smd_for_block_async(
-                    block=block,
-                    system_context=text,
-                    db=db,
-                    use_rag=use_rag
-                )
-                for block in smd_candidates
-            ]
-
-            all_tasks = ibd_tasks + smd_tasks
             ibd_to_create: List[Dict[str, Any]] = []
             smd_to_create: List[Dict[str, Any]] = []
 
-            if all_tasks:
-                print(f"Background: Launching {len(all_tasks)} tasks in PARALLEL using ThreadPoolExecutor")
+            total_tasks = len(ibd_candidates) + len(smd_candidates)
+            done_tasks = 0
 
-                # Use ThreadPoolExecutor for true parallelism with sync functions
-                loop = asyncio.get_event_loop()
-                with ThreadPoolExecutor(max_workers=10) as executor:
-                    # Convert async tasks to futures running in thread pool
-                    futures = []
-                    for task in all_tasks:
-                        # Run each coroutine in executor
-                        future = loop.run_in_executor(
-                            executor,
-                            lambda t=task: asyncio.run(t)
-                        )
-                        futures.append(future)
+            async def run_ibd(block: Dict[str, Any]) -> Tuple[str, Optional[Dict[str, Any]]]:
+                return (
+                    "ibd",
+                    await generate_ibd_for_block_async(
+                        block=block,
+                        system_context=text,
+                        relationships=relationships,
+                        db=None,
+                        use_rag=use_rag,
+                        db_session_factory=AsyncSessionLocal,
+                    ),
+                )
 
-                    # Wait for all futures to complete
+            async def run_smd(block: Dict[str, Any]) -> Tuple[str, Optional[Dict[str, Any]]]:
+                return (
+                    "smd",
+                    await generate_smd_for_block_async(
+                        block=block,
+                        system_context=text,
+                        db=None,
+                        use_rag=use_rag,
+                    ),
+                )
+
+            tasks = [asyncio.create_task(run_ibd(block)) for block in ibd_candidates] + [
+                asyncio.create_task(run_smd(block)) for block in smd_candidates
+            ]
+
+            if tasks:
+                print(f"Background: Launching {len(tasks)} IBD/SMD tasks in PARALLEL using asyncio.gather")
+                for completed in asyncio.as_completed(tasks):
                     try:
-                        results = await asyncio.gather(*futures, return_exceptions=True)
-                        print(f"Background: All {len(results)} tasks completed")
-                    except Exception as gather_error:
-                        print(f"Background: Parallel generation failed: {gather_error}")
-                        results = []
+                        kind, result = await completed
+                    except Exception as task_error:
+                        print(f"Background: Subtask raised exception: {task_error}")
+                        kind, result = ("unknown", None)
 
-                ibd_task_count = len(ibd_tasks)
-                for index, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        print(f"Background: Task {index} raised exception: {result}")
-                        continue
-                    if result is None:
-                        continue
-                    if index < ibd_task_count:
-                        ibd_to_create.append(result)
-                    else:
-                        smd_to_create.append(result)
+                    done_tasks += 1
+                    if isinstance(result, dict):
+                        if kind == "ibd":
+                            ibd_to_create.append(result)
+                        elif kind == "smd":
+                            smd_to_create.append(result)
+
+                    progress_payload = {
+                        "status": "processing",
+                        "message": f"Generating IBD and SMD... ({done_tasks}/{total_tasks})",
+                        "diagram": positioned_bdd,
+                        "raw_text": text,
+                        "progress": "subdiagrams_generating",
+                        "progress_detail": {"done": done_tasks, "total": total_tasks},
+                        "ibd_data": ibd_to_create,
+                        "smd_data": smd_to_create,
+                        "validation_report": validation_report,
+                        "quality_score": quality_score,
+                        "domain": domain,
+                        "command_mode": command_mode,
+                    }
+                    redis_client.store_diagram(progress_payload, diagram_id=diagram_id)
             else:
                 print("Background: No generation tasks to execute")
 
@@ -488,6 +511,8 @@ async def _generate_diagram_in_background(
                 "status": "completed",
                 "validation_report": validation_report,
                 "quality_score": quality_score,
+                "domain": domain,
+                "command_mode": command_mode,
             }
             redis_client.store_diagram(redis_payload, diagram_id=diagram_id)
 
@@ -525,10 +550,21 @@ async def generate_diagram_unified(
     # Generate diagram ID immediately
     diagram_id = redis_client.generate_diagram_id()
 
+    if not domain:
+        domain = "generic"
+    if domain == "generic":
+        inferred_domain = detect_domain(text)
+        if inferred_domain:
+            domain = inferred_domain
+    if domain == "sar" and command_mode is None:
+        command_mode = detect_command_mode(text)
+
     # Store initial "processing" status in Redis
     initial_payload = {
         "status": "processing",
-        "message": "Diagram generation started"
+        "message": "Diagram generation started",
+        "domain": domain,
+        "command_mode": command_mode,
     }
     redis_client.store_diagram(initial_payload, diagram_id=diagram_id)
 
@@ -551,7 +587,9 @@ async def generate_diagram_unified(
     return {
         "status": "processing",
         "diagramId": diagram_id,
-        "message": "Diagram generation started in background"
+        "message": "Diagram generation started in background",
+        "domain": domain,
+        "command_mode": command_mode,
     }
 
 @router.post("/generate-diagram-with-context/", status_code=202)
