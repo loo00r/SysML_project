@@ -32,6 +32,7 @@ from app.AI.diagram_generation import (
     DiagramPositioning
 )
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
+from app.validation.deterministic import validate_sar_unified_payload
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -276,7 +277,9 @@ async def _generate_diagram_in_background(
     use_rag: bool,
     generate_ibd: bool,
     generate_smd: bool,
-    name: str
+    name: str,
+    domain: str,
+    command_mode: Optional[str],
 ):
     """
     Background task to generate BDD, IBD, and SMD diagrams.
@@ -287,7 +290,7 @@ async def _generate_diagram_in_background(
     try:
         print(f"\n==== BACKGROUND GENERATION START for {diagram_id} ====")
         print(f"Input excerpt: {text[:120]}")
-        print(f"Options -> RAG: {use_rag}, IBD: {generate_ibd}, SMD: {generate_smd}")
+        print(f"Options -> RAG: {use_rag}, IBD: {generate_ibd}, SMD: {generate_smd}, domain: {domain}, mode: {command_mode}")
 
         # Create new DB session for background task
         async with AsyncSessionLocal() as db:
@@ -335,16 +338,50 @@ async def _generate_diagram_in_background(
             elements = raw_bdd.get("elements", [])
             relationships = raw_bdd.get("relationships", [])
 
+            validation_report = None
+            quality_score = None
+            if domain == "sar":
+                report = validate_sar_unified_payload(
+                    text=text,
+                    bdd_diagram=raw_bdd,
+                    ibd_data=None,
+                    smd_data=None,
+                    mode=command_mode,
+                )
+                validation_report = report.model_dump()
+                quality_score = report.quality_score
+
             # Update Redis with BDD result immediately (partial result)
             partial_payload = {
                 "status": "processing",
                 "message": "BDD generated, generating IBD and SMD...",
                 "diagram": positioned_bdd,
                 "raw_text": text,
-                "progress": "bdd_complete"
+                "progress": "bdd_complete",
+                "validation_report": validation_report,
+                "quality_score": quality_score,
             }
             redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
             print(f"Background: BDD completed and stored for {diagram_id}")
+
+            if domain == "sar" and validation_report and validation_report.get("recommendation") == "fail_fast":
+                fail_fast_payload = {
+                    "status": "completed",
+                    "message": "Fail-fast validation triggered; skipping downstream generation.",
+                    "diagram": positioned_bdd,
+                    "raw_text": text,
+                    "model_used": bdd_result.get("model_used"),
+                    "saved_to_rag": False,
+                    "used_rag": use_rag and bool(bdd_examples),
+                    "examples_count": len(bdd_examples),
+                    "ibd_data": [],
+                    "smd_data": [],
+                    "validation_report": validation_report,
+                    "quality_score": quality_score,
+                }
+                redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
+                print(f"Background: Fail-fast validation stored for {diagram_id}")
+                return
 
             # Step 2: Identify candidate blocks.
             ibd_candidates: List[Dict[str, Any]] = []
@@ -425,6 +462,17 @@ async def _generate_diagram_in_background(
 
             print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
 
+            if domain == "sar":
+                final_report = validate_sar_unified_payload(
+                    text=text,
+                    bdd_diagram=raw_bdd,
+                    ibd_data=ibd_to_create if generate_ibd else None,
+                    smd_data=smd_to_create if generate_smd else None,
+                    mode=command_mode,
+                )
+                validation_report = final_report.model_dump()
+                quality_score = final_report.quality_score
+
             # Step 4: Store final payload in Redis.
             redis_payload = {
                 "diagram": positioned_bdd,
@@ -435,7 +483,9 @@ async def _generate_diagram_in_background(
                 "examples_count": len(bdd_examples),
                 "ibd_data": ibd_to_create,
                 "smd_data": smd_to_create,
-                "status": "completed"
+                "status": "completed",
+                "validation_report": validation_report,
+                "quality_score": quality_score,
             }
             redis_client.store_diagram(redis_payload, diagram_id=diagram_id)
 
@@ -457,6 +507,8 @@ async def generate_diagram_unified(
     use_rag: bool = Body(True, embed=True),
     generate_ibd: bool = Body(True, embed=True),
     generate_smd: bool = Body(False, embed=True),
+    domain: str = Body("generic", embed=True),
+    command_mode: Optional[str] = Body(None, embed=True),
     name: str = Body("Generated Diagram", embed=True)
 ):
     """
@@ -488,7 +540,9 @@ async def generate_diagram_unified(
         use_rag=use_rag,
         generate_ibd=generate_ibd,
         generate_smd=generate_smd,
-        name=name
+        name=name,
+        domain=domain,
+        command_mode=command_mode,
     )
 
     # Return immediately

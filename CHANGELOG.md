@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.31] - 2025-12-16
+### Added
+- Added SAR v0.1 domain spec (`docs/SAR_DOMAIN_SPEC.md`) and machine-readable ruleset (`backend/app/domain/sar_constraints.json`).
+- Added deterministic SAR validator scaffolding (`backend/app/validation/*`) with basic unit tests.
+
+### Changed
+- Unified async generation now supports `domain`/`command_mode` inputs and returns `validation_report` + `quality_score` in Redis payloads.
+
 ## [1.2.30] - 2025-12-15
 ### Added
 - Added a detailed phased implementation plan for the SAR Validator-in-the-Loop update (`docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md`).

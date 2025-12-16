@@ -1,0 +1,113 @@
+{
+  "domain": "Flood_Rescue_SAR",
+  "version": "0.1",
+  "modes_supported": ["ICS", "GSB"],
+  "terminology": {
+    "must_use": [
+      "Incident Commander",
+      "Operations Section Chief",
+      "Safety Officer",
+      "Liaison Officer",
+      "Incident Command Post",
+      "Emergency Operations Center"
+    ],
+    "synonyms": {
+      "Manager": "Incident Commander",
+      "Field Commander": "Incident Commander",
+      "Ops Chief": "Operations Section Chief",
+      "Comms Lead": "Communications Unit Leader"
+    }
+  },
+  "bdd": {
+    "required_blocks": [
+      "CommandAndControl",
+      "CommunicationsSubsystem",
+      "SearchAssets",
+      "RescueAssets",
+      "MedicalTriage"
+    ],
+    "mode_requirements": {
+      "ICS": {
+        "required_roles": ["Incident Commander", "Operations Section Chief"],
+        "forbidden_roles": ["Gold Commander", "Silver Commander", "Bronze Commander"]
+      },
+      "GSB": {
+        "required_roles": ["Gold Commander", "Silver Commander", "Bronze Commander"],
+        "forbidden_roles": [
+          "Incident Commander",
+          "Operations Section Chief",
+          "Safety Officer"
+        ]
+      }
+    }
+  },
+  "ibd": {
+    "communications": {
+      "critical_roles": [
+        "Incident Commander",
+        "Operations Section Chief",
+        "Boat Team Leader"
+      ],
+      "required_interfaces": ["PrimaryComms", "BackupComms"],
+      "forbidden_single_points_of_failure": ["CellularOnly"]
+    },
+    "ppe_rules": {
+      "water_zone_requires": ["PFD"]
+    }
+  },
+  "smd": {
+    "required_phases": ["Alert", "Deployment", "Search", "Rescue", "Triage"],
+    "forbidden_transitions": [
+      {
+        "from": "Alert",
+        "to": "Rescue",
+        "condition": "target_location_unknown"
+      },
+      {
+        "from": "Rescue",
+        "to": "Conclusion",
+        "condition": "triage_missing"
+      },
+      {
+        "from": "Rescue",
+        "to": "Transport",
+        "condition": "triage_missing"
+      }
+    ]
+  },
+  "assets": {
+    "team_types": {
+      "Type_B_Boat_Team": {
+        "required_components": ["MotorizedRescueBoat"],
+        "nested_required": {
+          "MotorizedRescueBoat": ["Motor"]
+        }
+      },
+      "Type_D_First_Responder": {
+        "prohibited_actions": ["InWaterRescue", "LiveBaitSwim"]
+      }
+    },
+    "drone_rules": {
+      "if_present_requires_behavior": ["ReturnToHome"]
+    }
+  },
+  "severity": {
+    "critical": [
+      "MODE_MIXED_ICS_GSB",
+      "MISSING_REQUIRED_BDD_BLOCK",
+      "MISSING_MISSION_PHASE",
+      "FORBIDDEN_TRANSITION",
+      "TYPE_B_NO_MOTOR",
+      "TYPE_D_IN_WATER_RESCUE",
+      "COMMS_NO_BACKUP_FOR_CRITICAL_ROLE",
+      "DRONE_NO_RTH"
+    ],
+    "warning": [
+      "TERMINOLOGY_SYNONYM_USED",
+      "SPAN_OF_CONTROL_SUSPECTED",
+      "SEARCH_PATTERN_MISMATCH",
+      "EOC_ICP_ROLE_CONFUSION"
+    ]
+  }
+}
+
