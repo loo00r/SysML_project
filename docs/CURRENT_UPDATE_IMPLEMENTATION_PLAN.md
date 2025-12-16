@@ -1,7 +1,8 @@
-# План імплементації змін з `Current_update.docx` (Flood Rescue / SAR, Validator-in-the-Loop)
+                                          # План імплементації змін з `Current_update.docx` (Flood Rescue / SAR, Validator-in-the-Loop)
+            
 
-## 0) Контекст і ціль
-
+##                                                                                                  0) Контекст і ціль
+        
 `Current_update.docx` описує перехід від “одного генеруючого LLM” до **асинхронного ланцюжка генерації** (BDD → IBD → SMD) з патернами:
 
 - **Domain-Specific Constraints Injection** (Flood Rescue & Search and Rescue / SAR): вбудовування доменних правил у промпти та/або перевірки.
