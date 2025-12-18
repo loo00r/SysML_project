@@ -39,6 +39,71 @@ from app.validation.refinement import build_refinement_prompt
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
 
+def _safe_event_list(value: Any) -> List[Dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _dedupe_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Keep a stable timeline even when the Redis payload is overwritten frequently.
+    """
+    seen: set[str] = set()
+    deduped: List[Dict[str, Any]] = []
+    for event in events:
+        try:
+            key = json.dumps(event, sort_keys=True, default=str)
+        except TypeError:
+            key = str(event)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(event)
+    return deduped
+
+
+def _make_event(event_type: str, msg: str, **extra: Any) -> Dict[str, Any]:
+    event: Dict[str, Any] = {"ts": time.time(), "type": event_type, "msg": msg}
+    event.update(extra)
+    return event
+
+
+def _progress_detail(
+    *,
+    stage: str,
+    current_step: str,
+    done: Optional[int] = None,
+    total: Optional[int] = None,
+) -> Dict[str, Any]:
+    detail: Dict[str, Any] = {"stage": stage, "current_step": current_step}
+    if done is not None:
+        detail["done"] = done
+    if total is not None:
+        detail["total"] = total
+    return detail
+
+
+def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
+    """
+    Store a payload to Redis while preserving and accumulating `events`.
+    """
+    existing = redis_client.get_diagram(diagram_id) or {}
+
+    existing_events = _safe_event_list(existing.get("events"))
+    payload_events = _safe_event_list(payload.get("events"))
+    merged_events = _dedupe_events(existing_events + payload_events)
+
+    merged_payload = {**existing, **payload, "events": merged_events}
+    validation_report = merged_payload.get("validation_report")
+    if validation_report is None:
+        merged_payload["validation_report"] = {}
+    elif not isinstance(validation_report, dict):
+        merged_payload["validation_report"] = {}
+
+    redis_client.store_diagram(merged_payload, diagram_id=diagram_id)
+
+
 def build_ibd_one_shot_example(
     block_name: str,
     ibd: InternalBlockDiagram
@@ -329,21 +394,25 @@ async def _generate_diagram_in_background(
 
                     detected_payload = {
                         "status": "processing",
+                        "stage": "DETECTED",
                         "message": "Domain detected; starting generation",
                         "domain": domain,
                         "command_mode": command_mode,
+                        "progress_detail": _progress_detail(stage="DETECTED", current_step="Domain detected"),
+                        "events": [
+                            _make_event(
+                                "DOMAIN_DETECTED",
+                                "Domain detected; starting generation",
+                                domain=domain,
+                                command_mode=command_mode,
+                                confidence=getattr(detection, "confidence", None),
+                            )
+                        ],
                     }
-                    redis_client.store_diagram(detected_payload, diagram_id=diagram_id)
-                    print(f"Background: Domain detection -> domain={domain}, mode={command_mode}, confidence={detection.confidence}")
-
-            def _append_event(payload: Dict[str, Any], event_type: str, msg: str, **extra: Any) -> None:
-                events = payload.get("events")
-                if not isinstance(events, list):
-                    events = []
-                event = {"ts": time.time(), "type": event_type, "msg": msg}
-                event.update(extra)
-                events.append(event)
-                payload["events"] = events
+                    _store_diagram_merged(diagram_id, detected_payload)
+                    print(
+                        f"Background: Domain detection -> domain={domain}, mode={command_mode}, confidence={detection.confidence}"
+                    )
 
             bdd_version = 1
             max_bdd_iterations = 2
@@ -384,9 +453,12 @@ async def _generate_diagram_in_background(
             if bdd_result.get("error"):
                 error_payload = {
                     "status": "error",
+                    "stage": "ERROR",
                     "error": bdd_result["error"]
                 }
-                redis_client.store_diagram(error_payload, diagram_id=diagram_id)
+                error_payload["progress_detail"] = _progress_detail(stage="ERROR", current_step="BDD generation failed")
+                error_payload["events"] = [_make_event("ERROR", "BDD generation failed", error=bdd_result["error"])]
+                _store_diagram_merged(diagram_id, error_payload)
                 print(f"Background: Error stored for {diagram_id}")
                 return
 
@@ -409,53 +481,60 @@ async def _generate_diagram_in_background(
                 validation_report = report.model_dump()
                 quality_score = report.quality_score
 
-            # Update Redis with BDD result immediately (partial result)
-            validation_report_payload = validation_report or {}
-            partial_payload = {
-                "status": "processing",
-                "message": "BDD generated, generating IBD and SMD...",
-                "diagram": positioned_bdd,
-                "raw_text": text,
-                "progress": "bdd_complete",
-                "validation_report": validation_report_payload,
-                "quality_score": quality_score,
-                "domain": domain,
-                "command_mode": command_mode,
-                "bdd_version": bdd_version,
-            }
-            _append_event(partial_payload, "BDD_GENERATED", f"BDD v{bdd_version} generated", version=bdd_version)
-            if validation_report:
-                _append_event(
-                    partial_payload,
-                    "BDD_VALIDATED",
-                    f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
-                    version=bdd_version,
-                )
-            redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
-            print(f"Background: BDD completed and stored for {diagram_id}")
-
-            if domain == "sar" and validation_report and validation_report.get("recommendation") == "fail_fast":
-                fail_fast_payload = {
-                    "status": "completed",
-                    "message": "Fail-fast validation triggered; skipping downstream generation.",
+                # Update Redis with BDD result immediately (partial result)
+                validation_report_payload = validation_report or {}
+                partial_payload = {
+                    "status": "processing",
+                    "stage": "BDD",
+                    "message": "BDD generated, generating IBD and SMD...",
                     "diagram": positioned_bdd,
                     "raw_text": text,
-                    "model_used": bdd_result.get("model_used"),
-                    "saved_to_rag": False,
-                    "used_rag": use_rag and bool(bdd_examples),
-                    "examples_count": len(bdd_examples),
-                    "ibd_data": [],
-                    "smd_data": [],
-                    "validation_report": validation_report or {},
+                    "progress": "bdd_complete",
+                    "progress_detail": _progress_detail(stage="BDD", current_step=f"BDD v{bdd_version} generated"),
+                    "validation_report": validation_report_payload,
                     "quality_score": quality_score,
                     "domain": domain,
                     "command_mode": command_mode,
                     "bdd_version": bdd_version,
-                    "events": partial_payload.get("events", []),
+                    "events": [_make_event("BDD_GENERATED", f"BDD v{bdd_version} generated", version=bdd_version)],
                 }
-                redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
-                print(f"Background: Fail-fast validation stored for {diagram_id}")
-                return
+                if validation_report:
+                    partial_payload["events"].append(
+                        _make_event(
+                            "BDD_VALIDATED",
+                            f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
+                            version=bdd_version,
+                            score=quality_score,
+                            recommendation=validation_report.get("recommendation"),
+                        )
+                    )
+                _store_diagram_merged(diagram_id, partial_payload)
+                print(f"Background: BDD completed and stored for {diagram_id}")
+
+                if domain == "sar" and validation_report and validation_report.get("recommendation") == "fail_fast":
+                    fail_fast_payload = {
+                        "status": "completed",
+                        "stage": "FAILED_FAST",
+                        "message": "Fail-fast validation triggered; skipping downstream generation.",
+                        "diagram": positioned_bdd,
+                        "raw_text": text,
+                        "model_used": bdd_result.get("model_used"),
+                        "saved_to_rag": False,
+                        "used_rag": use_rag and bool(bdd_examples),
+                        "examples_count": len(bdd_examples),
+                        "ibd_data": [],
+                        "smd_data": [],
+                        "validation_report": validation_report or {},
+                        "quality_score": quality_score,
+                        "domain": domain,
+                        "command_mode": command_mode,
+                        "bdd_version": bdd_version,
+                        "progress_detail": _progress_detail(stage="FAILED_FAST", current_step="Fail-fast: skipping downstream"),
+                        "events": [_make_event("FAIL_FAST", "Fail-fast validation triggered; skipping downstream generation.")],
+                    }
+                    _store_diagram_merged(diagram_id, fail_fast_payload)
+                    print(f"Background: Fail-fast validation stored for {diagram_id}")
+                    return
 
             if domain == "sar" and validation_report and validation_report.get("recommendation") == "refine":
                 iterations_used = 0
@@ -469,6 +548,7 @@ async def _generate_diagram_in_background(
 
                     refining_payload = {
                         "status": "processing",
+                        "stage": "BDD_REFINING",
                         "message": f"Refining BDD... (attempt {iterations_used + 1}/{max_bdd_iterations})",
                         "diagram": positioned_bdd,
                         "raw_text": text,
@@ -478,15 +558,21 @@ async def _generate_diagram_in_background(
                         "domain": domain,
                         "command_mode": command_mode,
                         "bdd_version": bdd_version,
-                        "events": partial_payload.get("events", []),
+                        "progress_detail": _progress_detail(
+                            stage="BDD_REFINING",
+                            current_step=f"Refining BDD v{bdd_version} (attempt {iterations_used + 1}/{max_bdd_iterations})",
+                        ),
+                        "events": [
+                            _make_event(
+                                "BDD_REFINING",
+                                f"Starting refinement for BDD v{bdd_version} (attempt {iterations_used + 1})",
+                                version=bdd_version,
+                                attempt=iterations_used + 1,
+                                max_attempts=max_bdd_iterations,
+                            )
+                        ],
                     }
-                    _append_event(
-                        refining_payload,
-                        "BDD_REFINING",
-                        f"Starting refinement for BDD v{bdd_version} (attempt {iterations_used + 1})",
-                        version=bdd_version,
-                    )
-                    redis_client.store_diagram(refining_payload, diagram_id=diagram_id)
+                    _store_diagram_merged(diagram_id, refining_payload)
 
                     bdd_result = await asyncio.to_thread(
                         generate_sysml_diagram,
@@ -499,12 +585,14 @@ async def _generate_diagram_in_background(
                     if bdd_result.get("error"):
                         error_payload = {
                             "status": "error",
+                            "stage": "ERROR",
                             "error": bdd_result["error"],
                             "domain": domain,
                             "command_mode": command_mode,
-                            "events": refining_payload.get("events", []),
                         }
-                        redis_client.store_diagram(error_payload, diagram_id=diagram_id)
+                        error_payload["progress_detail"] = _progress_detail(stage="ERROR", current_step="BDD refinement failed")
+                        error_payload["events"] = [_make_event("ERROR", "BDD refinement failed", error=bdd_result["error"])]
+                        _store_diagram_merged(diagram_id, error_payload)
                         return
 
                     raw_bdd = bdd_result.get("diagram_raw", {})
@@ -526,29 +614,34 @@ async def _generate_diagram_in_background(
 
                     partial_payload = {
                         "status": "processing",
+                        "stage": "BDD",
                         "message": "BDD refined, generating IBD and SMD...",
                         "diagram": positioned_bdd,
                         "raw_text": text,
                         "progress": "bdd_complete",
+                        "progress_detail": _progress_detail(stage="BDD", current_step=f"BDD v{bdd_version} refined"),
                         "validation_report": validation_report or {},
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
                         "bdd_version": bdd_version,
-                        "events": refining_payload.get("events", []),
+                        "events": [
+                            _make_event("BDD_REFINED", f"BDD v{bdd_version} generated", version=bdd_version),
+                            _make_event(
+                                "BDD_VALIDATED",
+                                f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
+                                version=bdd_version,
+                                score=quality_score,
+                                recommendation=validation_report.get("recommendation"),
+                            ),
+                        ],
                     }
-                    _append_event(partial_payload, "BDD_REFINED", f"BDD v{bdd_version} generated", version=bdd_version)
-                    _append_event(
-                        partial_payload,
-                        "BDD_VALIDATED",
-                        f"BDD v{bdd_version} validated: {validation_report.get('recommendation')}, score={quality_score}",
-                        version=bdd_version,
-                    )
-                    redis_client.store_diagram(partial_payload, diagram_id=diagram_id)
+                    _store_diagram_merged(diagram_id, partial_payload)
 
                     if validation_report.get("recommendation") == "fail_fast":
                         fail_fast_payload = {
                             "status": "completed",
+                            "stage": "FAILED_FAST",
                             "message": "Fail-fast validation triggered; skipping downstream generation.",
                             "diagram": positioned_bdd,
                             "raw_text": text,
@@ -563,9 +656,18 @@ async def _generate_diagram_in_background(
                             "domain": domain,
                             "command_mode": command_mode,
                             "bdd_version": bdd_version,
-                            "events": partial_payload.get("events", []),
+                            "progress_detail": _progress_detail(
+                                stage="FAILED_FAST",
+                                current_step="Fail-fast: skipping downstream",
+                            ),
+                            "events": [
+                                _make_event(
+                                    "FAIL_FAST",
+                                    "Fail-fast validation triggered; skipping downstream generation.",
+                                )
+                            ],
                         }
-                        redis_client.store_diagram(fail_fast_payload, diagram_id=diagram_id)
+                        _store_diagram_merged(diagram_id, fail_fast_payload)
                         return
 
                     iterations_used += 1
@@ -573,25 +675,30 @@ async def _generate_diagram_in_background(
                 if iterations_used >= max_bdd_iterations and validation_report.get("recommendation") == "refine":
                     limit_payload = {
                         "status": "processing",
+                        "stage": "BDD",
                         "message": f"Max BDD refinement attempts reached ({max_bdd_iterations}); continuing with best-effort result.",
                         "diagram": positioned_bdd,
                         "raw_text": text,
                         "progress": "bdd_refine_limit",
+                        "progress_detail": _progress_detail(
+                            stage="BDD",
+                            current_step=f"Max refinement attempts reached ({max_bdd_iterations}); continuing",
+                        ),
                         "validation_report": validation_report or {},
                         "quality_score": quality_score,
                         "domain": domain,
                         "command_mode": command_mode,
                         "bdd_version": bdd_version,
-                        "events": partial_payload.get("events", []),
+                        "events": [
+                            _make_event(
+                                "BDD_MAX_ITERATIONS",
+                                f"Reached max refinement attempts ({max_bdd_iterations}); continuing with best-effort BDD.",
+                                version=bdd_version,
+                                max_iterations=max_bdd_iterations,
+                            )
+                        ],
                     }
-                    _append_event(
-                        limit_payload,
-                        "BDD_MAX_ITERATIONS",
-                        f"Reached max refinement attempts ({max_bdd_iterations}); continuing with best-effort BDD.",
-                        version=bdd_version,
-                        max_iterations=max_bdd_iterations,
-                    )
-                    redis_client.store_diagram(limit_payload, diagram_id=diagram_id)
+                    _store_diagram_merged(diagram_id, limit_payload)
                     partial_payload = limit_payload
 
             # Step 2: Identify candidate blocks.
@@ -662,77 +769,87 @@ async def _generate_diagram_in_background(
                         elif kind == "smd":
                             smd_to_create.append(result)
 
-                    progress_payload = {
-                        "status": "processing",
-                        "message": f"Generating IBD and SMD... ({done_tasks}/{total_tasks})",
-                        "diagram": positioned_bdd,
-                        "raw_text": text,
-                        "progress": "subdiagrams_generating",
-                        "progress_detail": {"done": done_tasks, "total": total_tasks},
-                        "ibd_data": ibd_to_create,
-                        "smd_data": smd_to_create,
-                        "validation_report": validation_report or {},
-                        "quality_score": quality_score,
-                        "domain": domain,
-                        "command_mode": command_mode,
-                        "bdd_version": bdd_version,
-                        "events": partial_payload.get("events", []),
-                    }
-                    _append_event(
-                        progress_payload,
-                        "SUBDIAGRAM_PROGRESS",
-                        f"{done_tasks}/{total_tasks} subdiagrams completed",
-                        done=done_tasks,
-                        total=total_tasks,
-                    )
-                    redis_client.store_diagram(progress_payload, diagram_id=diagram_id)
+                        progress_payload = {
+                            "status": "processing",
+                            "stage": "SUBDIAGRAMS",
+                            "message": f"Generating IBD and SMD... ({done_tasks}/{total_tasks})",
+                            "diagram": positioned_bdd,
+                            "raw_text": text,
+                            "progress": "subdiagrams_generating",
+                            "progress_detail": _progress_detail(
+                                stage="SUBDIAGRAMS",
+                                current_step=f"Generating subdiagrams ({done_tasks}/{total_tasks})",
+                                done=done_tasks,
+                                total=total_tasks,
+                            ),
+                            "ibd_data": ibd_to_create,
+                            "smd_data": smd_to_create,
+                            "validation_report": validation_report or {},
+                            "quality_score": quality_score,
+                            "domain": domain,
+                            "command_mode": command_mode,
+                            "bdd_version": bdd_version,
+                            "events": [
+                                _make_event(
+                                    "SUBDIAGRAM_PROGRESS",
+                                    f"{done_tasks}/{total_tasks} subdiagrams completed",
+                                    done=done_tasks,
+                                    total=total_tasks,
+                                )
+                            ],
+                        }
+                        _store_diagram_merged(diagram_id, progress_payload)
             else:
                 print("Background: No generation tasks to execute")
 
-            print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
-
-            if domain == "sar":
-                final_report = validate_sar_unified_payload(
-                    text=text,
-                    bdd_diagram=raw_bdd,
-                    ibd_data=ibd_to_create if generate_ibd else None,
-                    smd_data=smd_to_create if generate_smd else None,
-                    mode=command_mode,
-                    stage="UNIFIED",
-                )
-                validation_report = final_report.model_dump()
-                quality_score = final_report.quality_score
-
-            # Step 4: Store final payload in Redis.
-            redis_payload = {
-                "diagram": positioned_bdd,
-                "raw_text": text,
-                "model_used": bdd_result.get("model_used"),
-                "saved_to_rag": False,
-                "used_rag": use_rag and bool(bdd_examples),
-                "examples_count": len(bdd_examples),
-                "ibd_data": ibd_to_create,
-                "smd_data": smd_to_create,
-                "status": "completed",
-                "validation_report": validation_report or {},
-                "quality_score": quality_score,
-                "domain": domain,
-                "command_mode": command_mode,
-                "bdd_version": bdd_version,
-                "events": partial_payload.get("events", []),
-            }
-            _append_event(redis_payload, "COMPLETED", "Generation completed")
-            redis_client.store_diagram(redis_payload, diagram_id=diagram_id)
-
-            print(f"Background: Stored completed result under ID {diagram_id}")
-
+                print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
+    
+                if domain == "sar":
+                    final_report = validate_sar_unified_payload(
+                        text=text,
+                        bdd_diagram=raw_bdd,
+                        ibd_data=ibd_to_create if generate_ibd else None,
+                        smd_data=smd_to_create if generate_smd else None,
+                        mode=command_mode,
+                        stage="UNIFIED",
+                    )
+                    validation_report = final_report.model_dump()
+                    quality_score = final_report.quality_score
+    
+                # Step 4: Store final payload in Redis.
+                redis_payload = {
+                    "diagram": positioned_bdd,
+                    "raw_text": text,
+                    "model_used": bdd_result.get("model_used"),
+                    "saved_to_rag": False,
+                    "used_rag": use_rag and bool(bdd_examples),
+                    "examples_count": len(bdd_examples),
+                    "ibd_data": ibd_to_create,
+                    "smd_data": smd_to_create,
+                    "status": "completed",
+                    "stage": "COMPLETED",
+                    "validation_report": validation_report or {},
+                    "quality_score": quality_score,
+                    "domain": domain,
+                    "command_mode": command_mode,
+                    "bdd_version": bdd_version,
+                    "progress_detail": _progress_detail(stage="COMPLETED", current_step="Generation completed"),
+                    "events": [_make_event("COMPLETED", "Generation completed")],
+                }
+                _store_diagram_merged(diagram_id, redis_payload)
+    
+                print(f"Background: Stored completed result under ID {diagram_id}")
+    
     except Exception as e:
         print(f"Background: Fatal error for {diagram_id}: {e}")
         error_payload = {
             "status": "error",
-            "error": f"Background generation failed: {str(e)}"
+            "stage": "ERROR",
+            "error": f"Background generation failed: {str(e)}",
+            "progress_detail": _progress_detail(stage="ERROR", current_step="Background generation failed"),
+            "events": [_make_event("ERROR", "Background generation failed", error=str(e))],
         }
-        redis_client.store_diagram(error_payload, diagram_id=diagram_id)
+        _store_diagram_merged(diagram_id, error_payload)
 
 
 @router.post("/generate-diagram-unified/", status_code=202)
@@ -761,14 +878,17 @@ async def generate_diagram_unified(
     if not domain:
         domain = "generic"
 
-    # Store initial "processing" status in Redis
-    initial_payload = {
-        "status": "processing",
-        "message": "Diagram generation started",
-        "domain": domain,
-        "command_mode": command_mode,
-    }
-    redis_client.store_diagram(initial_payload, diagram_id=diagram_id)
+        # Store initial "processing" status in Redis
+        initial_payload = {
+            "status": "processing",
+            "stage": "STARTED",
+            "message": "Diagram generation started",
+            "domain": domain,
+            "command_mode": command_mode,
+            "progress_detail": _progress_detail(stage="STARTED", current_step="Diagram generation started"),
+            "events": [_make_event("STARTED", "Diagram generation started")],
+        }
+        _store_diagram_merged(diagram_id, initial_payload)
 
     print(f"\n==== UNIFIED ASYNC: Created {diagram_id}, starting background task ====")
 

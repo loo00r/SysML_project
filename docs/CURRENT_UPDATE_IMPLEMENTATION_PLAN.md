@@ -583,9 +583,8 @@ Acceptance criteria:
 1. **Frontend не показує validation/progress/timeline** — UX неповний
 2. **Validator-in-the-loop не інтегрований “на кожен крок” для IBD/SMD** (зараз: BDD + фінальний UNIFIED)
 3. **Progress payload не повністю структурований** (немає стабільного `{done,total,current_step}` для всіх кроків)
-4. **Events timeline може бути нестабільним** (ризик втрати подій через overwrite payload у Redis)
-5. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
-6. **Smoke/CI тести** для unified flow
+4. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
+5. **Smoke/CI тести** для unified flow
 
 ---
 
@@ -822,7 +821,7 @@ eventSource.onmessage = (e) => {
 - [x] Redis payload містить `validation_report` (об’єкт) + `quality_score` ✅ **(DONE v1.2.37)**
 - [x] Redis payload має `events` + `bdd_version` (мінімально) ✅ **(DONE v1.2.36)**
 - [x] `OPENAI_DETECTOR_MODEL` в .env ✅ **(DONE v1.2.37)**
-- [ ] Гарантована акумуляція `events` між апдейтами (без втрат) ❌ **(TODO)**
+- [x] Гарантована акумуляція `events` між апдейтами (без втрат) ✅ **(DONE v1.2.39)**
 - [ ] Per-step validation для IBD/SMD (per block) + (optional) refine ❌ **(TODO)**
 - [ ] Frontend показує progress + timeline + quality score + issues ❌ **(TODO)**
 

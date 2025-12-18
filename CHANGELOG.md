@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Unified async generation now preserves and accumulates Redis `events` across incremental payload updates (prevents timeline loss).
+
 ### Changed
 - Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align with client research requirements and document remaining gaps (LLM3 validator, per-step IBD/SMD validation, frontend timeline/quality/issues, unified-flow smoke tests).
+- Unified async generation now includes `stage` and structured `progress_detail` in Redis payload updates for consistent client progress UI.
+
+## [1.2.39] - 2025-12-18
+### Fixed
+- Unified async generation now preserves and accumulates Redis `events` across incremental payload updates (prevents timeline loss).
+
+### Changed
+- Unified async generation now includes `stage` and structured `progress_detail` in Redis payload updates for consistent client progress UI.
 
 ## [1.2.38] - 2025-12-18
 ### Changed
