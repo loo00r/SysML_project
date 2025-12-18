@@ -263,17 +263,9 @@ const pollDiagramResult = async (
       }
 
       if (result.status === 'completed') {
-        // Final progress boost to 95% when data is received
-        if (onProgress) {
-          onProgress(95);
-        }
         return result;
       } else if (result.status === 'processing' && result.diagram) {
         // Partial result available (BDD complete, IBD/SMD still generating)
-        // Return partial result to show BDD immediately
-        if (onProgress) {
-          onProgress(Math.min(75 + (attempt / maxAttempts) * 15, 90));
-        }
         // Check if this is good enough or continue polling
         if (result.progress === 'bdd_complete') {
           // Continue polling for complete result with IBD/SMD

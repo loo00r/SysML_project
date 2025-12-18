@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.41] - 2025-12-18
+### Fixed
+- Frontend unified generation progress no longer regresses on completion (removed redundant 95% override during polling).
+
 ## [1.2.40] - 2025-12-18
 ### Added
 - Added frontend generation progress panel (timeline, score, issues) driven by unified async Redis payload fields.
