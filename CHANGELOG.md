@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.45] - 2025-12-18
+### Fixed
+- Added fail-fast termination during IBD/SMD generation when a subdiagram validation returns `fail_fast` (cancels pending tasks and stores `FAILED_FAST` payload).
+
+## [1.2.44] - 2025-12-18
+### Changed
+- Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align client-facing status messaging with the actual implementation and remaining work.
+
+## [1.2.43] - 2025-12-18
+### Fixed
+- Fixed unified async generation to always write the initial Redis payload (prevents early polling 404s).
+
 ## [1.2.42] - 2025-12-18
 ### Added
 - Added feature-flagged LLM3 semantic validator (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) and exposed results in unified payload as `llm_validation`.

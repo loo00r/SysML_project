@@ -560,34 +560,37 @@ Acceptance criteria:
 #### Фаза 5: Self-Refinement — ✅ **~90% (BDD тільки)**
 - ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
 - ✅ Додано per-block deterministic validation reporting для IBD/SMD (ключі `subdiagram_validation["ibd:<block_id>"]`, `subdiagram_validation["smd:<block_id>"]`).
+- ✅ Fail-fast під час subdiagram generation: якщо конкретна IBD/SMD має `recommendation="fail_fast"`, pipeline зупиняється, pending задачі скасовуються, і в Redis пишеться `stage="FAILED_FAST"`.
 - ⚠️ TODO: refinement loop для IBD/SMD (опціонально; після smoke tests).
 
 ### Що не завершено ⚠️
 
-#### Фаза 4: LLM3 Validator — 🔴 **0%**
+#### Фаза 4: LLM3 Validator — 🟡 **~30% (evaluation-only)**
 - ✅ Додано фічефлаг `VALIDATION_ENABLE_LLM` + `OPENAI_VALIDATOR_MODEL` у `settings` (default off).
-- ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з категоріями при увімкненому фічефлагу).
-- ⚠️ LLM3 зараз використовується як **evaluation-only** (додається в payload як `llm_validation`), без впливу на fail-fast/refine (без оверінженірингу).
+- ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з 5 категоріями при увімкненому фічефлагу).
+- ✅ Результат LLM3 додається в unified payload як `llm_validation` + `llm_quality_score`.
+- ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
+- ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 
-#### Фаза 6: Frontend Integration — 🟡 **~50%**
+#### Фаза 6: Frontend Integration — ✅ **~80%**
 - ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, `stage`, `progress_detail`.
 - ✅ Frontend показує **timeline + quality score + issues** під час генерації (overlay), та summary badge після завершення.
-- ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + version tracking per diagram.
+- ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + “open issues” link на конкретні діаграми/блоки.
 
-#### Фаза 7: Тести — 🟡 **40%**
+#### Фаза 7: Тести — 🟡 **~50%**
 - ✅ Unit-тести для детермінованої SAR валідації
 - ✅ Unit-тести для `merge_payload()` (events accumulation + `subdiagram_validation` merge)
 - ❌ Немає smoke-tests для unified flow (fail-fast/refine paths)
 - ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
-### Загальний прогрес: **~75%**
+### Загальний прогрес (реалістично): **~80% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
 
 ### Критичні проблеми для вирішення
-1. **Frontend не показує validation/progress/timeline** — UX неповний
-2. **Validator-in-the-loop не інтегрований “на кожен крок” для IBD/SMD** (зараз: BDD + per-block reporting; refine ще не додано)
-3. **Progress payload не повністю структурований** (немає стабільного `{done,total,current_step}` для всіх кроків)
-4. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
-5. **Smoke/CI тести** для unified flow
+1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: evaluation-only у фінальному payload; не впливає на пайплайн).
+2. **Self-refinement для IBD/SMD відсутній** (є тільки BDD refine; для IBD/SMD — лише per-block deterministic reports).
+3. **Smoke/contract тести unified flow відсутні** (fail-fast path, refine path, partial updates).
+4. **UI traceability**: issue → конкретний блок/діаграма (потрібні `diagram_ref/location` та UX для переходу).
+5. **Progress consistency**: не всюди є стабільний `{done,total}` (зараз це гарантовано для subdiagram progress; для решти — best-effort через `stage`/`current_step`).
 
 ---
 
@@ -669,10 +672,11 @@ Acceptance criteria:
 - **Payload оновлюється після кожного кроку**: generate → validate → refine → validate
 
 **Backend implementation checklist**:
-- [ ] Додати helper `update_redis_progress(job_id, stage, step, diagrams, validation, event)`
-- [ ] Викликати після кожного: generate_bdd → validate_bdd → refine_bdd → generate_ibd → validate_ibd
-- [ ] Додати `version` tracking для BDD/IBD/SMD
-- [ ] Генерувати structured events
+- [x] Payload merge з акумуляцією `events` (через `merge_payload()` + `_store_diagram_merged()`)
+- [x] Генерувати structured `events` для BDD refine + subdiagram progress
+- [x] `bdd_version` tracking (BDD)
+- [ ] Додати стабільний `{done,total}` для всіх major кроків (не тільки subdiagrams)
+- [ ] Додати version tracking для IBD/SMD per block (якщо додамо refine)
 
 #### Frontend зміни
 
@@ -825,7 +829,9 @@ eventSource.onmessage = (e) => {
 - [x] Redis payload має `events` + `bdd_version` (мінімально) ✅ **(DONE v1.2.36)**
 - [x] `OPENAI_DETECTOR_MODEL` в .env ✅ **(DONE v1.2.37)**
 - [x] Гарантована акумуляція `events` між апдейтами (без втрат) ✅ **(DONE v1.2.39)**
-- [ ] Per-step validation для IBD/SMD (per block) + (optional) refine ❌ **(TODO)**
+- [x] Пер-блок deterministic validation для IBD/SMD репортується в payload ✅ **(DONE v1.2.42)**
+- [x] Initial Redis payload створюється одразу після старту (polling не ловить 404) ✅ **(DONE v1.2.43)**
+- [ ] Per-step semantic validation (LLM3) для IBD/SMD + (optional) refine ❌ **(TODO)**
 - [x] Frontend показує progress + timeline + quality score + issues ✅ **(DONE v1.2.40)**
 
 ### Production-ready

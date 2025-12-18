@@ -729,6 +729,9 @@ async def _generate_diagram_in_background(
 
                     done_tasks += 1
                     if isinstance(result, dict):
+                        fail_fast_triggered = False
+                        fail_fast_reason = None
+                        fail_fast_report: Optional[Dict[str, Any]] = None
                         subdiagram_validation_update: Dict[str, Any] = {}
                         if kind == "ibd":
                             ibd_to_create.append(result)
@@ -743,7 +746,12 @@ async def _generate_diagram_in_background(
                                         mode=command_mode,
                                         stage="IBD",
                                     )
-                                    subdiagram_validation_update[f"ibd:{parent_block_id}"] = report.model_dump()
+                                    report_payload = report.model_dump()
+                                    subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
+                                    if report_payload.get("recommendation") == "fail_fast":
+                                        fail_fast_triggered = True
+                                        fail_fast_reason = f"IBD validation failed for block '{parent_block_id}'"
+                                        fail_fast_report = report_payload
                         elif kind == "smd":
                             smd_to_create.append(result)
                             if domain == "sar":
@@ -757,7 +765,12 @@ async def _generate_diagram_in_background(
                                         mode=command_mode,
                                         stage="SMD",
                                     )
-                                    subdiagram_validation_update[f"smd:{parent_block_id}"] = report.model_dump()
+                                    report_payload = report.model_dump()
+                                    subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
+                                    if report_payload.get("recommendation") == "fail_fast":
+                                        fail_fast_triggered = True
+                                        fail_fast_reason = f"SMD validation failed for block '{parent_block_id}'"
+                                        fail_fast_report = report_payload
 
                         progress_payload = {
                             "status": "processing",
@@ -790,6 +803,63 @@ async def _generate_diagram_in_background(
                             ],
                         }
                         _store_diagram_merged(diagram_id, progress_payload)
+
+                        if fail_fast_triggered:
+                            for pending in tasks:
+                                if not pending.done():
+                                    pending.cancel()
+                            await asyncio.gather(*tasks, return_exceptions=True)
+
+                            final_validation_report = validation_report or {}
+                            final_quality_score = quality_score
+                            if domain == "sar":
+                                final_report = validate_sar_unified_payload(
+                                    text=text,
+                                    bdd_diagram=raw_bdd,
+                                    ibd_data=ibd_to_create if generate_ibd else None,
+                                    smd_data=smd_to_create if generate_smd else None,
+                                    mode=command_mode,
+                                    stage="UNIFIED",
+                                )
+                                final_validation_report = final_report.model_dump()
+                                final_quality_score = final_report.quality_score
+
+                            fail_fast_payload = {
+                                "status": "completed",
+                                "stage": "FAILED_FAST",
+                                "message": fail_fast_reason or "Fail-fast validation triggered; stopping downstream generation.",
+                                "diagram": positioned_bdd,
+                                "raw_text": text,
+                                "model_used": bdd_result.get("model_used"),
+                                "saved_to_rag": False,
+                                "used_rag": use_rag and bool(bdd_examples),
+                                "examples_count": len(bdd_examples),
+                                "ibd_data": ibd_to_create,
+                                "smd_data": smd_to_create,
+                                "validation_report": final_validation_report or {},
+                                "quality_score": final_quality_score,
+                                "domain": domain,
+                                "command_mode": command_mode,
+                                "bdd_version": bdd_version,
+                                "progress_detail": _progress_detail(
+                                    stage="FAILED_FAST",
+                                    current_step="Fail-fast: invalid subdiagram detected; stopping",
+                                    done=done_tasks,
+                                    total=total_tasks,
+                                ),
+                                "subdiagram_validation": subdiagram_validation_update,
+                                "events": [
+                                    _make_event(
+                                        "FAIL_FAST",
+                                        "Fail-fast validation triggered during subdiagram generation; stopping.",
+                                        reason=fail_fast_reason,
+                                        report=fail_fast_report,
+                                    )
+                                ],
+                            }
+                            _store_diagram_merged(diagram_id, fail_fast_payload)
+                            print(f"Background: Fail-fast triggered during subdiagram generation for {diagram_id}")
+                            return
             else:
                 print("Background: No generation tasks to execute")
 
@@ -886,17 +956,17 @@ async def generate_diagram_unified(
     if not domain:
         domain = "generic"
 
-        # Store initial "processing" status in Redis
-        initial_payload = {
-            "status": "processing",
-            "stage": "STARTED",
-            "message": "Diagram generation started",
-            "domain": domain,
-            "command_mode": command_mode,
-            "progress_detail": _progress_detail(stage="STARTED", current_step="Diagram generation started"),
-            "events": [_make_event("STARTED", "Diagram generation started")],
-        }
-        _store_diagram_merged(diagram_id, initial_payload)
+    # Store initial "processing" status in Redis immediately to avoid early 404s during polling.
+    initial_payload = {
+        "status": "processing",
+        "stage": "STARTED",
+        "message": "Diagram generation started",
+        "domain": domain,
+        "command_mode": command_mode,
+        "progress_detail": _progress_detail(stage="STARTED", current_step="Diagram generation started"),
+        "events": [_make_event("STARTED", "Diagram generation started")],
+    }
+    _store_diagram_merged(diagram_id, initial_payload)
 
     print(f"\n==== UNIFIED ASYNC: Created {diagram_id}, starting background task ====")
 
