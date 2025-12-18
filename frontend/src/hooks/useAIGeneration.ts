@@ -4,6 +4,10 @@ import useDiagramStore, { type DiagramType, type NodeData } from '../store/diagr
 import { applyDagreLayout } from '../utils/dagreLayout';
 import { parseSmdTestModeInput } from '../utils/smdTestMode';
 import {
+  type UnifiedGenerationPayload,
+  computeProgressPercent,
+} from '../utils/unifiedGeneration';
+import {
   composeSmdTransitionLabel,
   ensureSmdTransitionData,
   parseSmdTransitionLabel,
@@ -227,16 +231,15 @@ const transformSmdEdgesFromApi = (rawEdges: unknown[], validNodeIds: Set<string>
 const pollDiagramResult = async (
   diagramId: string,
   maxAttempts: number = 120,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  onUpdate?: (payload: UnifiedGenerationPayload) => void
 ): Promise<any> => {
+  let lastEventsLength = -1;
+  let unchangedEventsStreak = 0;
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      // Update progress based on polling attempt
-      // Progress calculation: 0-90% during polling, 90-100% during data processing
       const pollingProgress = (attempt / maxAttempts) * 90;
-      if (onProgress) {
-        onProgress(pollingProgress);
-      }
 
       const response = await fetch(`/api/v1/rag/diagram-result/${diagramId}`);
 
@@ -249,7 +252,15 @@ const pollDiagramResult = async (
         throw new Error(`Failed to retrieve diagram result: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = (await response.json()) as UnifiedGenerationPayload;
+      if (onUpdate) {
+        onUpdate(result);
+      }
+
+      const computed = computeProgressPercent(result, pollingProgress);
+      if (onProgress) {
+        onProgress(computed);
+      }
 
       if (result.status === 'completed') {
         // Final progress boost to 95% when data is received
@@ -273,8 +284,17 @@ const pollDiagramResult = async (
         throw new Error(result.error || 'Diagram generation failed');
       }
 
+      const eventsLength = Array.isArray(result.events) ? result.events.length : 0;
+      if (eventsLength === lastEventsLength) {
+        unchangedEventsStreak += 1;
+      } else {
+        unchangedEventsStreak = 0;
+        lastEventsLength = eventsLength;
+      }
+
       // Still processing, wait and retry
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      const delayMs = unchangedEventsStreak >= 3 ? 2000 : 800;
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     } catch (error) {
       if (attempt === maxAttempts - 1) {
         throw error; // Last attempt, re-throw the error
@@ -290,7 +310,9 @@ const pollDiagramResult = async (
 // Call the backend API to generate a diagram
 const callGenerateDiagramAPI = async (
   options: AIGenerationOptions,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  onJobId?: (diagramId: string) => void,
+  onUpdate?: (payload: UnifiedGenerationPayload) => void
 ): Promise<AIGenerationResult> => {
   try {
     // Step 1: Start generation and get diagram ID
@@ -326,8 +348,12 @@ const callGenerateDiagramAPI = async (
       return { nodes: [], edges: [], error: 'Missing diagram ID from unified generation endpoint' };
     }
 
+    if (onJobId) {
+      onJobId(initResult.diagramId);
+    }
+
     // Step 2: Poll for the actual result with progress callback
-    const data = await pollDiagramResult(initResult.diagramId, 120, onProgress);
+    const data = await pollDiagramResult(initResult.diagramId, 120, onProgress, onUpdate);
     
     if (data.error) {
       return { nodes: [], edges: [], error: data.error };
@@ -399,6 +425,8 @@ export const useAIGeneration = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [generationJobId, setGenerationJobId] = useState<string | null>(null);
+  const [generationPayload, setGenerationPayload] = useState<UnifiedGenerationPayload | null>(null);
   
   // Get all the necessary functions from the diagram store
   const { 
@@ -418,6 +446,8 @@ export const useAIGeneration = () => {
     setIsGenerating(true);
     setError(null);
     setProgress(0);
+    setGenerationJobId(null);
+    setGenerationPayload(null);
 
     try {
       // Save the original prompt text to the store for future reference
@@ -433,10 +463,18 @@ export const useAIGeneration = () => {
         setProgress(progressValue);
       };
 
+      const handleJobId = (diagramId: string) => {
+        setGenerationJobId(diagramId);
+      };
+
+      const handlePayloadUpdate = (payload: UnifiedGenerationPayload) => {
+        setGenerationPayload(payload);
+      };
+
       // Call the backend API service with progress callback
       const result = options.testMode
         ? await generateTestModeSmdDiagram(options.prompt)
-        : await callGenerateDiagramAPI(options, handleProgress);
+        : await callGenerateDiagramAPI(options, handleProgress, handleJobId, handlePayloadUpdate);
       
       if (result.error) {
         setError(result.error);
@@ -640,6 +678,8 @@ export const useAIGeneration = () => {
     isGenerating,
     progress,
     error,
+    generationJobId,
+    generationPayload,
   };
 };
 

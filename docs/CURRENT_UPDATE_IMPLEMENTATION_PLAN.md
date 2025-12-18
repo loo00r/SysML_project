@@ -568,9 +568,10 @@ Acceptance criteria:
 - ❌ Немає `llm_validator.py` та фічефлагів (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) у `settings`.
 - ❌ Немає категорійного scoring (5 категорій ModRE/Ferrari), лише heuristic `quality_score`.
 
-#### Фаза 6: Frontend Integration — 🟡 **~10%**
-- ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, і progress counters для subdiagrams.
-- ❌ UI компоненти (timeline/quality/issues/polling UX) ще не додані.
+#### Фаза 6: Frontend Integration — 🟡 **~50%**
+- ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, `stage`, `progress_detail`.
+- ✅ Frontend показує **timeline + quality score + issues** під час генерації (overlay), та summary badge після завершення.
+- ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + version tracking per diagram.
 
 #### Фаза 7: Тести — 🟡 **40%**
 - ✅ Unit-тести для детермінованої SAR валідації
@@ -823,7 +824,7 @@ eventSource.onmessage = (e) => {
 - [x] `OPENAI_DETECTOR_MODEL` в .env ✅ **(DONE v1.2.37)**
 - [x] Гарантована акумуляція `events` між апдейтами (без втрат) ✅ **(DONE v1.2.39)**
 - [ ] Per-step validation для IBD/SMD (per block) + (optional) refine ❌ **(TODO)**
-- [ ] Frontend показує progress + timeline + quality score + issues ❌ **(TODO)**
+- [x] Frontend показує progress + timeline + quality score + issues ✅ **(DONE v1.2.40)**
 
 ### Production-ready
 - [ ] Всі пункти MVP ✅

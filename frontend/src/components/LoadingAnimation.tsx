@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, keyframes } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import GenerationStatusPanel from './shared/GenerationStatusPanel';
+import { type UnifiedGenerationPayload, getCurrentStepLabel } from '../utils/unifiedGeneration';
 
 interface LoadingAnimationProps {
   progress: number;
   isVisible: boolean;
+  generationPayload?: UnifiedGenerationPayload | null;
 }
 
 // Keyframes for various animations
@@ -209,11 +212,12 @@ const phrases = [
   "ASSEMBLING VISUALIZATION MATRIX"
 ];
 
-const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ progress, isVisible }) => {
+const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ progress, isVisible, generationPayload }) => {
   const [phrase, setPhrase] = useState(phrases[0]);
+  const currentStep = getCurrentStepLabel(generationPayload ?? null);
   
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || currentStep) return;
     
     const interval = setInterval(() => {
       const randomIndex = Math.floor(Math.random() * phrases.length);
@@ -221,7 +225,7 @@ const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ progress, isVisible
     }, 2000);
     
     return () => clearInterval(interval);
-  }, [isVisible]);
+  }, [isVisible, currentStep]);
   
   return (
     <AnimationContainer isVisible={isVisible}>
@@ -256,8 +260,10 @@ const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ progress, isVisible
       </ProgressBar>
       
       <StatusText variant="body1">
-        {phrase}... {Math.round(progress)}%
+        {(currentStep || phrase)}... {Math.round(progress)}%
       </StatusText>
+
+      <GenerationStatusPanel payload={generationPayload ?? null} />
       
       {/* Small rotating symbols that resemble the Love, Death + Robots logo */}
       <Box sx={{ 

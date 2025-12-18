@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Box,
+  Chip,
   Paper,
   TextField,
   Button,
@@ -18,6 +19,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import useAIGeneration from '../hooks/useAIGeneration';
 import LoadingAnimation from './LoadingAnimation';
+import { normalizeIssues, normalizeRecommendation } from '../utils/unifiedGeneration';
 
 // Styled components using Material UI
 const GeneratorContainer = styled(Paper, {
@@ -91,7 +93,16 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const [testMode, setTestMode] = useState(false);
   
   // Use our custom AI generation hook
-  const { generateDiagram, isGenerating, progress, error } = useAIGeneration();
+  const { generateDiagram, isGenerating, progress, error, generationPayload } = useAIGeneration();
+
+  const lastRun = generationPayload?.status === 'completed' ? generationPayload : null;
+  const lastScore =
+    typeof lastRun?.quality_score === 'number' && Number.isFinite(lastRun.quality_score)
+      ? lastRun.quality_score
+      : null;
+  const lastIssues = normalizeIssues(lastRun?.validation_report);
+  const lastRecommendation = normalizeRecommendation(lastRun?.validation_report);
+  const lastCriticalCount = lastIssues.filter((issue) => issue.severity === 'critical').length;
   
   // We don't need to explicitly track steps anymore as our animation handles this
 
@@ -149,7 +160,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   return (
     <>
       {/* Full screen loading animation */}
-      <LoadingAnimation isVisible={isGenerating} progress={progress} />
+      <LoadingAnimation isVisible={isGenerating} progress={progress} generationPayload={generationPayload} />
 
       <GeneratorContainer isExpanded={isExpanded}>
         <Box sx={{ position: 'relative', width: '100%' }}>
@@ -165,6 +176,21 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
               <PlayArrowIcon color="primary" />
               AI Diagram Generator
             </Typography>
+            {lastRun ? (
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 2, flexWrap: 'wrap' }}>
+                <Chip
+                  size="small"
+                  color={lastScore !== null && lastScore >= 80 ? 'success' : lastScore !== null && lastScore >= 60 ? 'warning' : 'default'}
+                  label={lastScore !== null ? `Score: ${lastScore}/100` : 'Score: —'}
+                />
+                <Chip
+                  size="small"
+                  color={lastCriticalCount > 0 ? 'error' : lastIssues.length > 0 ? 'warning' : 'success'}
+                  label={`Issues: ${lastIssues.length}`}
+                />
+                {lastRecommendation ? <Chip size="small" label={lastRecommendation} variant="outlined" /> : null}
+              </Stack>
+            ) : null}
             {!isExpanded && (
               <Button
                 variant="contained"
