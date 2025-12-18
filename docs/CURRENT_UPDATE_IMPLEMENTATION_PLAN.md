@@ -559,14 +559,15 @@ Acceptance criteria:
 
 #### Фаза 5: Self-Refinement — ✅ **~90% (BDD тільки)**
 - ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
-- ⚠️ НЕ ЗРОБЛЕНО: per-block refinement/validation для IBD/SMD (клієнтське очікування “validator at every step”).
-- ⚠️ TODO: винести refinement loop у reusable helper і (за потреби) розширити на IBD/SMD.
+- ✅ Додано per-block deterministic validation reporting для IBD/SMD (ключі `subdiagram_validation["ibd:<block_id>"]`, `subdiagram_validation["smd:<block_id>"]`).
+- ⚠️ TODO: refinement loop для IBD/SMD (опціонально; після smoke tests).
 
 ### Що не завершено ⚠️
 
 #### Фаза 4: LLM3 Validator — 🔴 **0%**
-- ❌ Немає `llm_validator.py` та фічефлагів (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) у `settings`.
-- ❌ Немає категорійного scoring (5 категорій ModRE/Ferrari), лише heuristic `quality_score`.
+- ✅ Додано фічефлаг `VALIDATION_ENABLE_LLM` + `OPENAI_VALIDATOR_MODEL` у `settings` (default off).
+- ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з категоріями при увімкненому фічефлагу).
+- ⚠️ LLM3 зараз використовується як **evaluation-only** (додається в payload як `llm_validation`), без впливу на fail-fast/refine (без оверінженірингу).
 
 #### Фаза 6: Frontend Integration — 🟡 **~50%**
 - ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, `stage`, `progress_detail`.
@@ -575,6 +576,7 @@ Acceptance criteria:
 
 #### Фаза 7: Тести — 🟡 **40%**
 - ✅ Unit-тести для детермінованої SAR валідації
+- ✅ Unit-тести для `merge_payload()` (events accumulation + `subdiagram_validation` merge)
 - ❌ Немає smoke-tests для unified flow (fail-fast/refine paths)
 - ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
@@ -582,7 +584,7 @@ Acceptance criteria:
 
 ### Критичні проблеми для вирішення
 1. **Frontend не показує validation/progress/timeline** — UX неповний
-2. **Validator-in-the-loop не інтегрований “на кожен крок” для IBD/SMD** (зараз: BDD + фінальний UNIFIED)
+2. **Validator-in-the-loop не інтегрований “на кожен крок” для IBD/SMD** (зараз: BDD + per-block reporting; refine ще не додано)
 3. **Progress payload не повністю структурований** (немає стабільного `{done,total,current_step}` для всіх кроків)
 4. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
 5. **Smoke/CI тести** для unified flow

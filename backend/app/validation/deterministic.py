@@ -153,19 +153,22 @@ def validate_sar_unified_payload(
             )
 
     # 3) BDD required blocks (fail-fast)
+    # Run only for BDD/UNIFIED stages; otherwise per-subdiagram validation would
+    # repeat foundation checks for every IBD/SMD block.
     required_blocks = bdd_rules.get("required_blocks") or []
-    bdd_nodes = _get_nodes(bdd_diagram)
-    element_names = [str(el.get("name") or "") for el in bdd_nodes if isinstance(el, dict)]
-    for block in required_blocks:
-        if not _contains_normalized(element_names, block):
-            issues.append(
-                ValidationIssue(
-                    code="MISSING_REQUIRED_BDD_BLOCK",
-                    severity=_issue_severity("MISSING_REQUIRED_BDD_BLOCK", constraints),
-                    message=f"BDD is missing required block '{block}'.",
-                    details={"missing_block": block},
+    if stage in {"BDD", "UNIFIED"} and required_blocks:
+        bdd_nodes = _get_nodes(bdd_diagram)
+        element_names = [str(el.get("name") or "") for el in bdd_nodes if isinstance(el, dict)]
+        for block in required_blocks:
+            if not _contains_normalized(element_names, block):
+                issues.append(
+                    ValidationIssue(
+                        code="MISSING_REQUIRED_BDD_BLOCK",
+                        severity=_issue_severity("MISSING_REQUIRED_BDD_BLOCK", constraints),
+                        message=f"BDD is missing required block '{block}'.",
+                        details={"missing_block": block},
+                    )
                 )
-            )
 
     # 4) IBD comms redundancy (minimal PACE)
     ibd_rules = constraints.get("ibd") or {}

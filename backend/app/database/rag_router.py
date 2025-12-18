@@ -729,10 +729,35 @@ async def _generate_diagram_in_background(
 
                     done_tasks += 1
                     if isinstance(result, dict):
+                        subdiagram_validation_update: Dict[str, Any] = {}
                         if kind == "ibd":
                             ibd_to_create.append(result)
+                            if domain == "sar":
+                                parent_block_id = str(result.get("parent_block_id") or "")
+                                if parent_block_id:
+                                    report = validate_sar_unified_payload(
+                                        text=text,
+                                        bdd_diagram=raw_bdd,
+                                        ibd_data=[result],
+                                        smd_data=None,
+                                        mode=command_mode,
+                                        stage="IBD",
+                                    )
+                                    subdiagram_validation_update[f"ibd:{parent_block_id}"] = report.model_dump()
                         elif kind == "smd":
                             smd_to_create.append(result)
+                            if domain == "sar":
+                                parent_block_id = str(result.get("parent_block_id") or "")
+                                if parent_block_id:
+                                    report = validate_sar_unified_payload(
+                                        text=text,
+                                        bdd_diagram=raw_bdd,
+                                        ibd_data=None,
+                                        smd_data=[result],
+                                        mode=command_mode,
+                                        stage="SMD",
+                                    )
+                                    subdiagram_validation_update[f"smd:{parent_block_id}"] = report.model_dump()
 
                         progress_payload = {
                             "status": "processing",
@@ -754,6 +779,7 @@ async def _generate_diagram_in_background(
                             "domain": domain,
                             "command_mode": command_mode,
                             "bdd_version": bdd_version,
+                            "subdiagram_validation": subdiagram_validation_update,
                             "events": [
                                 _make_event(
                                     "SUBDIAGRAM_PROGRESS",
@@ -767,43 +793,60 @@ async def _generate_diagram_in_background(
             else:
                 print("Background: No generation tasks to execute")
 
-                print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
-    
-                if domain == "sar":
-                    final_report = validate_sar_unified_payload(
+            print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
+
+            llm_validation = None
+            if domain == "sar":
+                final_report = validate_sar_unified_payload(
+                    text=text,
+                    bdd_diagram=raw_bdd,
+                    ibd_data=ibd_to_create if generate_ibd else None,
+                    smd_data=smd_to_create if generate_smd else None,
+                    mode=command_mode,
+                    stage="UNIFIED",
+                )
+                validation_report = final_report.model_dump()
+                quality_score = final_report.quality_score
+
+                if settings.VALIDATION_ENABLE_LLM:
+                    domain_context = build_domain_context(domain, command_mode)
+                    llm_validation = llm_validate_sysml(
                         text=text,
-                        bdd_diagram=raw_bdd,
-                        ibd_data=ibd_to_create if generate_ibd else None,
-                        smd_data=smd_to_create if generate_smd else None,
-                        mode=command_mode,
-                        stage="UNIFIED",
+                        domain_context=domain_context,
+                        diagram={
+                            "bdd": raw_bdd,
+                            "ibd_data": ibd_to_create if generate_ibd else [],
+                            "smd_data": smd_to_create if generate_smd else [],
+                        },
+                        deterministic_report=validation_report,
+                        model=settings.OPENAI_VALIDATOR_MODEL,
                     )
-                    validation_report = final_report.model_dump()
-                    quality_score = final_report.quality_score
-    
-                # Step 4: Store final payload in Redis.
-                redis_payload = {
-                    "diagram": positioned_bdd,
-                    "raw_text": text,
-                    "model_used": bdd_result.get("model_used"),
-                    "saved_to_rag": False,
-                    "used_rag": use_rag and bool(bdd_examples),
-                    "examples_count": len(bdd_examples),
-                    "ibd_data": ibd_to_create,
-                    "smd_data": smd_to_create,
-                    "status": "completed",
-                    "stage": "COMPLETED",
-                    "validation_report": validation_report or {},
-                    "quality_score": quality_score,
-                    "domain": domain,
-                    "command_mode": command_mode,
-                    "bdd_version": bdd_version,
-                    "progress_detail": _progress_detail(stage="COMPLETED", current_step="Generation completed"),
-                    "events": [_make_event("COMPLETED", "Generation completed")],
-                }
-                _store_diagram_merged(diagram_id, redis_payload)
-    
-                print(f"Background: Stored completed result under ID {diagram_id}")
+
+            # Step 4: Store final payload in Redis.
+            redis_payload = {
+                "diagram": positioned_bdd,
+                "raw_text": text,
+                "model_used": bdd_result.get("model_used"),
+                "saved_to_rag": False,
+                "used_rag": use_rag and bool(bdd_examples),
+                "examples_count": len(bdd_examples),
+                "ibd_data": ibd_to_create,
+                "smd_data": smd_to_create,
+                "status": "completed",
+                "stage": "COMPLETED",
+                "validation_report": validation_report or {},
+                "quality_score": quality_score,
+                "llm_validation": llm_validation,
+                "llm_quality_score": (llm_validation or {}).get("score_total") if isinstance(llm_validation, dict) else None,
+                "domain": domain,
+                "command_mode": command_mode,
+                "bdd_version": bdd_version,
+                "progress_detail": _progress_detail(stage="COMPLETED", current_step="Generation completed"),
+                "events": [_make_event("COMPLETED", "Generation completed")],
+            }
+            _store_diagram_merged(diagram_id, redis_payload)
+
+            print(f"Background: Stored completed result under ID {diagram_id}")
     
     except Exception as e:
         print(f"Background: Fatal error for {diagram_id}: {e}")

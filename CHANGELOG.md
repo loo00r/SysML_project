@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.42] - 2025-12-18
+### Added
+- Added feature-flagged LLM3 semantic validator (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) and exposed results in unified payload as `llm_validation`.
+- Added per-block deterministic validation reporting for unified subdiagram generation via `subdiagram_validation`.
+
+### Fixed
+- Fixed unified async generation finalization to store completed payload even when subdiagram tasks are present.
+
+### Changed
+- Extracted Redis payload merging into `backend/app/core/payload_merge.py` and added unit tests.
+
 ## [1.2.41] - 2025-12-18
 ### Fixed
 - Frontend unified generation progress no longer regresses on completion (removed redundant 95% override during polling).
