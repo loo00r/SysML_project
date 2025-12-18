@@ -1196,6 +1196,12 @@ async def save_diagram_to_database(
         
         if cached_diagram.get("status") != "completed":
             raise HTTPException(status_code=400, detail="Diagram generation not completed")
+
+        if cached_diagram.get("stage") == "FAILED_FAST":
+            raise HTTPException(
+                status_code=400,
+                detail="Diagram generation finished with fail-fast validation; cannot be saved.",
+            )
         
         # Save the main diagram to database
         db_diagram = await store_diagram_with_embedding(

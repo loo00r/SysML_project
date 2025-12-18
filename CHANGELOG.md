@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.50] - 2025-12-18
+### Added
+- Added pytest smoke tests for unified flow covering initial Redis payload creation, BDD fail-fast/refinement, plus IBD/SMD fail-fast with mocked Redis/DB.
+
+### Fixed
+- Prevented saving diagrams when unified generation ended with `stage="FAILED_FAST"`.
+
 ## [1.2.45] - 2025-12-18
 ### Fixed
 - Added fail-fast termination during IBD/SMD generation when a subdiagram validation returns `fail_fast` (cancels pending tasks and stores `FAILED_FAST` payload).

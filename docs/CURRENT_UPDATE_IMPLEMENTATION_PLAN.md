@@ -580,7 +580,9 @@ Acceptance criteria:
 #### Фаза 7: Тести — 🟡 **~50%**
 - ✅ Unit-тести для детермінованої SAR валідації
 - ✅ Unit-тести для `merge_payload()` (events accumulation + `subdiagram_validation` merge)
-- ❌ Немає smoke-tests для unified flow (fail-fast/refine paths)
+- ✅ Pytest smoke coverage: fail-fast на BDD, refine-loop для BDD, і fail-fast під час IBD validation у unified flow (моки Redis/DB)
+- ✅ Pytest smoke coverage: fail-fast на SMD rules у unified flow (моки Redis/DB)
+- ✅ Pytest coverage: `generate-diagram-unified` завжди пише initial Redis payload (polling не ловить early 404)
 - ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
 ### Загальний прогрес (реалістично): **~80% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
