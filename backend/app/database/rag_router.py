@@ -6,7 +6,9 @@ from typing import Any, Callable, List, Dict, Tuple, Optional
 import json
 
 from app.db.dependencies import get_db
+from app.core.config import settings
 from app.core.redis_client import redis_client
+from app.core.payload_merge import merge_payload
 from app.database.models import (
     DiagramEmbeddingCreate,
     DiagramEmbeddingResponse,
@@ -32,36 +34,13 @@ from app.AI.diagram_generation import (
     DiagramPositioning
 )
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
+from app.domain.constraints import build_domain_context
 from app.domain.detector import detect_domain_and_mode
 from app.validation.deterministic import validate_sar_unified_payload
+from app.validation.llm_validator import llm_validate_sysml
 from app.validation.refinement import build_refinement_prompt
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
-
-
-def _safe_event_list(value: Any) -> List[Dict[str, Any]]:
-    if isinstance(value, list):
-        return [item for item in value if isinstance(item, dict)]
-    return []
-
-
-def _dedupe_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Keep a stable timeline even when the Redis payload is overwritten frequently.
-    """
-    seen: set[str] = set()
-    deduped: List[Dict[str, Any]] = []
-    for event in events:
-        try:
-            key = json.dumps(event, sort_keys=True, default=str)
-        except TypeError:
-            key = str(event)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(event)
-    return deduped
-
 
 def _make_event(event_type: str, msg: str, **extra: Any) -> Dict[str, Any]:
     event: Dict[str, Any] = {"ts": time.time(), "type": event_type, "msg": msg}
@@ -85,22 +64,8 @@ def _progress_detail(
 
 
 def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
-    """
-    Store a payload to Redis while preserving and accumulating `events`.
-    """
     existing = redis_client.get_diagram(diagram_id) or {}
-
-    existing_events = _safe_event_list(existing.get("events"))
-    payload_events = _safe_event_list(payload.get("events"))
-    merged_events = _dedupe_events(existing_events + payload_events)
-
-    merged_payload = {**existing, **payload, "events": merged_events}
-    validation_report = merged_payload.get("validation_report")
-    if validation_report is None:
-        merged_payload["validation_report"] = {}
-    elif not isinstance(validation_report, dict):
-        merged_payload["validation_report"] = {}
-
+    merged_payload = merge_payload(existing, payload)
     redis_client.store_diagram(merged_payload, diagram_id=diagram_id)
 
 

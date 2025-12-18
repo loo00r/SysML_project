@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_GENERATIVE_MODEL: str
     OPENAI_DETECTOR_MODEL: str = "gpt-4o-mini"
+    OPENAI_VALIDATOR_MODEL: str = "gpt-4o-mini"
+    VALIDATION_ENABLE_LLM: bool = False
     
     # Application version
     APP_VERSION: str = "1.0"
