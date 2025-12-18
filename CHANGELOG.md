@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align with client research requirements and document remaining gaps (LLM3 validator, per-step IBD/SMD validation, frontend timeline/quality/issues, unified-flow smoke tests).
+
+## [1.2.38] - 2025-12-18
+### Changed
+- Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align with client research requirements and document remaining gaps (LLM3 validator, per-step IBD/SMD validation, frontend timeline/quality/issues, unified-flow smoke tests).
+
 ## [1.2.37] - 2025-12-16
 ### Fixed
 - Unified async Redis payload now always stores `validation_report` as an object (empty `{}` when not validated) for simpler client handling.

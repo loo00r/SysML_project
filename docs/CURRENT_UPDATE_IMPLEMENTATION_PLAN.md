@@ -17,6 +17,22 @@
 - `POST /api/v1/rag/save-diagram/`,
 - `POST /api/v1/create-diagram/` (імедіат-персіст).
 
+## 0.1) Вимоги клієнта (з Research → Implementation) — MUST HAVE
+
+Research фаза є критичною, бо задає:
+- **Domain constraints** для Flood Rescue / SAR (fallback/стійкість, протоколи фаз, термінологія).
+- **Semantic expectations** (що вважати “правильно/повно/стандартно”).
+- **Evaluation rules** (0–100, та issues list), які далі використовує Validator-in-the-Loop (LLM3).
+
+Цільова якість (ModRE 2024 / Ferrari et al.) вимірюється 5 категоріями:
+1) **Completeness** (пропущені елементи/фази/зв’язки)
+2) **Correctness** (логічний порядок, суперечності)
+3) **Adherence to Standards** (коректність SysML/структури JSON)
+4) **Terminology Alignment** (канонічні терміни, без hallucinated naming)
+5) **Understandability** (читабельність/шум/traceability)
+
+Поточна реалізація покриває ці категорії **частково детерміновано** (rules-driven) і **не повністю семантично** (це відповідальність Phase 4: LLM3 validator).
+
 ## 1) Ключові патерни та наукове обґрунтування
 
 З посилань у `Current_update.docx`:
@@ -40,14 +56,15 @@
 ### 2.1. Модульна структура бекенду
 
 1) `backend/app/domain/` (нове)
-   - `sar_constraints.md|json` — доменні правила/терміни/шаблони.
-   - `domain_injection.py` — збирання “Domain Context” рядка для промптів.
+   - `sar_constraints.json` — машинозчитувані доменні правила/терміни/шаблони.
+   - `constraints.py` — `build_domain_context()` для інжекції у промпти.
+   - `detector.py` — auto-detection `domain`/`command_mode` (fallback, коли клієнт не передав параметри).
 
 2) `backend/app/validation/` (нове)
    - `schemas.py` — Pydantic моделі звіту (issues, score, category scores).
    - `deterministic.py` — швидкі перевірки без LLM (структура JSON, SAR-фази, наявність fallback, термінологія).
-   - `llm_validator.py` — LLM3-перевірка (опціонально/по фічефлагу).
-   - `refinement.py` — цикл “validate → refine prompt → regenerate” з лімітом ітерацій.
+   - `llm_validator.py` — LLM3-перевірка (опціонально/по фічефлагу, **планується у Phase 4**).
+   - `refinement.py` — збірка refinement prompt (loop зараз inline у `rag_router.py`, план: винести в helper).
 
 3) Мінімальні зміни в існуючих пайплайнах:
    - `backend/app/database/rag_router.py` (уніфікований async chain):
@@ -59,15 +76,24 @@
 
 ### 2.2. Контракти даних
 
-**ValidationReport** (зберігаємо у Redis-пейлоаді, і віддаємо фронту):
+**ValidationReport** (зберігаємо у Redis-пейлоаді, і віддаємо фронту).
 
-- `score_total: int (0..100)`
-- `score_by_category: {completeness, correctness, standards, terminology, understandability}`
-- `issues: [{code, severity, message, location?}]`
+#### Поточний контракт (вже реалізовано)
+- `validation_report: object` (завжди об’єкт; `{}` якщо не валідовано)
+- `quality_score: int (0..100)` (heuristic score на базі issues)
+- `issues: [{code, severity, message, suggestion?, details?}]`
 - `recommendation: "pass"|"refine"|"fail_fast"`
-- `refinement_iterations_used: int`
+- `stage: "BDD"|"UNIFIED"|...`, `mode: Optional["ICS"|"GSB"]`, `counts: {critical, warning, total}`
 
-Мінімум для першого релізу: `score_total`, `issues`, `recommendation`.
+Примітка: `quality_score` зараз **не є категорійним scoring** (completeness/correctness/…), а “best-effort” метрика для MVP.
+
+#### Цільовий контракт (Phase 4: LLM3 validator)
+- `score_by_category: {completeness, correctness, standards, terminology, understandability}`
+- `score_total` (або keep `quality_score` як alias)
+- стабільні `issue.location`/`diagram_ref` для traceability у UI
+- `validator_model`, `validator_confidence` (опціонально)
+
+Мінімум для першого релізу: `quality_score`, `issues`, `recommendation`.
 
 ## 3) Поетапний план імплементації
 
@@ -104,7 +130,7 @@ Acceptance criteria:
 - ✅ API параметр `domain` в ендпоінтах
 - ✅ `detector.py` для auto-detection
 
-**Що потрібно додати**:
+**Реалізовано (ref, вже зроблено)**:
 
 1) **Створити `build_domain_context()` function**:
    ```python
@@ -275,7 +301,7 @@ Acceptance criteria:
 
 **Статус**: ✅ ~90% (BDD refinement loop працює; incremental Redis updates + events + bounded iterations)
 
-**Що потрібно додати**:
+**Реалізовано (ref, вже зроблено)**:
 
 1) **Створити `backend/app/validation/refinement.py`**:
    ```python
@@ -500,7 +526,7 @@ Acceptance criteria:
 - багатодоменність (поки один домен або `generic`/`sar` перемикач),
 - повна “CoVe” з багатьма verification питаннями (достатньо deterministic + 1 LLM оцінки).
 
-## 5) Аналіз поточного стану (станом на 2025-12-16)
+## 5) Аналіз поточного стану (станом на 2025-12-18)
 
 ### Що вже зроблено ✅
 
@@ -527,15 +553,20 @@ Acceptance criteria:
 - ✅ `OPENAI_DETECTOR_MODEL` config (default: gpt-4o-mini)
 - ✅ Auto-detection fallback коли клієнт не передає domain parameter
 
+#### Фаза 2: Domain Injection — ✅ **100% ЗАВЕРШЕНО**
+- ✅ `build_domain_context()` інтегровано в `generate_sysml_diagram()` / `generate_ibd_diagram()` / `generate_state_machine_diagram()`.
+- ✅ `domain`/`command_mode` прокинуті через unified async flow у всі генератори.
+
+#### Фаза 5: Self-Refinement — ✅ **~90% (BDD тільки)**
+- ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
+- ⚠️ НЕ ЗРОБЛЕНО: per-block refinement/validation для IBD/SMD (клієнтське очікування “validator at every step”).
+- ⚠️ TODO: винести refinement loop у reusable helper і (за потреби) розширити на IBD/SMD.
+
 ### Що не завершено ⚠️
 
-#### Фаза 2: Domain Injection — ✅ **100%**
-- ✅ `build_domain_context()` реалізовано і інтегровано в `generate_sysml_diagram()` / `generate_ibd_diagram()` / `generate_state_machine_diagram()`.
-- ✅ `domain`/`command_mode` прокинуті через unified async flow (`rag_router.py`) у всі генератори.
-
-#### Фаза 5: Self-Refinement — ✅ **~90%**
-- ✅ BDD: bounded refinement loop (max 2) з incremental Redis updates, `events` timeline, `bdd_version`, і fail-fast skip IBD/SMD.
-- ⚠️ TODO: винести refinement loop у reusable helper (`refine_with_validation`) і розширити на IBD/SMD (можна лишити на наступну фазу).
+#### Фаза 4: LLM3 Validator — 🔴 **0%**
+- ❌ Немає `llm_validator.py` та фічефлагів (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) у `settings`.
+- ❌ Немає категорійного scoring (5 категорій ModRE/Ferrari), лише heuristic `quality_score`.
 
 #### Фаза 6: Frontend Integration — 🟡 **~10%**
 - ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, і progress counters для subdiagrams.
@@ -550,9 +581,11 @@ Acceptance criteria:
 
 ### Критичні проблеми для вирішення
 1. **Frontend не показує validation/progress/timeline** — UX неповний
-2. **Progress payload не повністю структурований** (`done/total/current_step` для всіх кроків)
-3. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
-4. **Smoke/CI тести** для unified flow
+2. **Validator-in-the-loop не інтегрований “на кожен крок” для IBD/SMD** (зараз: BDD + фінальний UNIFIED)
+3. **Progress payload не повністю структурований** (немає стабільного `{done,total,current_step}` для всіх кроків)
+4. **Events timeline може бути нестабільним** (ризик втрати подій через overwrite payload у Redis)
+5. **Refinement DRY/helper** — зараз BDD loop inline, IBD/SMD без refinement
+6. **Smoke/CI тести** для unified flow
 
 ---
 
@@ -781,13 +814,17 @@ eventSource.onmessage = (e) => {
 ## 7) Definition of Done (DoD) для релізу
 
 ### Мінімальний MVP (для internal testing)
-- [x] Детермінована валідація працює + тести
-- [x] SAR domain spec формалізовано
-- [ ] Domain injection прокинута в генератори (CRITICAL)
-- [ ] Fail-fast зупиняє IBD/SMD генерацію при critical errors
-- [ ] Self-refinement працює з `max_iterations=2`
-- [ ] Redis payload містить incremental updates
-- [ ] Frontend показує progress + timeline + quality score
+- [x] Детермінована валідація працює + тести ✅
+- [x] SAR domain spec формалізовано ✅
+- [x] Domain injection прокинута в генератори ✅ **(DONE v1.2.35)**
+- [x] Fail-fast зупиняє IBD/SMD генерацію при critical errors ✅ **(DONE v1.2.36)**
+- [x] Self-refinement працює з `max_iterations=2` (BDD) ✅ **(DONE v1.2.36)**
+- [x] Redis payload містить `validation_report` (об’єкт) + `quality_score` ✅ **(DONE v1.2.37)**
+- [x] Redis payload має `events` + `bdd_version` (мінімально) ✅ **(DONE v1.2.36)**
+- [x] `OPENAI_DETECTOR_MODEL` в .env ✅ **(DONE v1.2.37)**
+- [ ] Гарантована акумуляція `events` між апдейтами (без втрат) ❌ **(TODO)**
+- [ ] Per-step validation для IBD/SMD (per block) + (optional) refine ❌ **(TODO)**
+- [ ] Frontend показує progress + timeline + quality score + issues ❌ **(TODO)**
 
 ### Production-ready
 - [ ] Всі пункти MVP ✅
