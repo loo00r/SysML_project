@@ -595,16 +595,17 @@ Acceptance criteria:
 - ✅ Додано більше `issue.location` (node/edge) для детермінованих SAR-правил, щоб UI міг підсвічувати конкретні елементи.
 - ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + “open issues” link на конкретні діаграми/блоки (залишились правила без точних `location`).
 
-#### Фаза 7: Тести — 🟡 **~55%**
+#### Фаза 7: Тести — 🟡 **~60%**
 - ✅ Unit-тести для детермінованої SAR валідації
 - ✅ Unit-тести для `merge_payload()` (events accumulation + `subdiagram_validation` merge)
 - ✅ Pytest smoke coverage: fail-fast на BDD, refine-loop для BDD, і fail-fast під час IBD validation у unified flow (моки Redis/DB)
 - ✅ Pytest smoke coverage: fail-fast на SMD rules у unified flow (моки Redis/DB)
 - ✅ Pytest coverage: `generate-diagram-unified` завжди пише initial Redis payload (polling не ловить early 404)
 - ✅ Додані location assertions для детермінованих SAR-issues (SMD forbidden transitions, missing phase, generic naming, mode mix).
+- ✅ Додані правила + unit-тести для PACE, dynamic scaling, volunteer roles, RTH link-loss, buffering, fault taxonomy.
 - ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
-### Загальний прогрес (реалістично): **~93% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
+### Загальний прогрес (реалістично): **~94% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
 
 ### Критичні проблеми для вирішення
 1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: evaluation-only у фінальному payload; не впливає на пайплайн).

@@ -18,9 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added issue click-to-navigate behavior using `location` hints and preserved parent block IDs for IBD diagrams.
 - Expanded deterministic issue locations with node/edge IDs for better traceability.
 - Added location-aware deterministic validation tests for SAR issues.
+- Added deterministic SAR rules for PACE comms, dynamic scaling, volunteer roles, RTH link-loss, buffering, and fault taxonomy.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.62] - 2025-12-18
+### Changed
+- Added deterministic SAR rules for PACE comms, dynamic scaling, volunteer roles, RTH link-loss, buffering, and fault taxonomy.
 
 ## [1.2.61] - 2025-12-18
 ### Changed

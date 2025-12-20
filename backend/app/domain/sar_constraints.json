@@ -1,6 +1,6 @@
 {
   "domain": "Flood_Rescue_SAR",
-  "version": "0.1",
+  "version": "0.2",
   "modes_supported": ["ICS", "GSB"],
   "terminology": {
     "must_use": [
@@ -26,6 +26,11 @@
       "RescueAssets",
       "MedicalTriage"
     ],
+    "scaling_triggers": ["scale", "scaling", "expand", "dynamic"],
+    "scaling_indicators": ["Division", "Group", "Branch", "StagingArea", "ResourceUnit", "ExpansionLogic"],
+    "scaling_anchor_terms": ["CommandAndControl", "Incident Command", "Incident Commander"],
+    "volunteer_triggers": ["volunteer", "volunteers", "shore-based", "shore team"],
+    "volunteer_terms": ["Volunteer", "Volunteers", "ShoreTeam", "Shore Team", "Type_D_First_Responder"],
     "mode_requirements": {
       "ICS": {
         "required_roles": ["Incident Commander", "Operations Section Chief"],
@@ -49,7 +54,11 @@
         "Boat Team Leader"
       ],
       "required_interfaces": ["PrimaryComms", "BackupComms"],
-      "forbidden_single_points_of_failure": ["CellularOnly"]
+      "forbidden_single_points_of_failure": ["CellularOnly"],
+      "pace_triggers": ["pace", "adapt dynamically", "adaptive communications", "fallback", "redundant"],
+      "pace_indicators": ["pace", "redundancy_policy"],
+      "pace_levels": ["Primary", "Alternate", "Contingency", "Emergency"],
+      "pace_interfaces": ["PrimaryComms", "AlternateComms", "ContingencyComms", "EmergencyComms"]
     },
     "ppe_rules": {
       "water_zone_requires": ["PFD"]
@@ -73,7 +82,13 @@
         "to": "Transport",
         "condition": "triage_missing"
       }
-    ]
+    ],
+    "search_assets_terms": ["SearchAssets", "Drone", "UAV"],
+    "rth_link_loss_triggers": ["link_lost", "comms_lost", "command_link_fail", "gnss_lost", "low_battery"],
+    "rth_return_state_terms": ["Returning", "Return", "ReturnHome", "RTH"],
+    "buffering_required_triggers": ["intermittent", "degraded", "comms", "communication"],
+    "buffering_state_terms": ["Buffer", "Store", "Forward", "Retry", "Upload"],
+    "fault_specific_triggers": ["battery", "link", "gnss", "weather", "motor", "propulsion"]
   },
   "assets": {
     "team_types": {
@@ -106,8 +121,13 @@
       "TERMINOLOGY_SYNONYM_USED",
       "SPAN_OF_CONTROL_SUSPECTED",
       "SEARCH_PATTERN_MISMATCH",
-      "EOC_ICP_ROLE_CONFUSION"
+      "EOC_ICP_ROLE_CONFUSION",
+      "PACE_LEVELS_MISSING",
+      "SCALING_NOT_MODELED",
+      "VOLUNTEER_ROLE_MISSING",
+      "RTH_LINK_LOSS_MISSING",
+      "BUFFERING_BEHAVIOR_MISSING",
+      "FAULT_TAXONOMY_MISSING"
     ]
   }
 }
-

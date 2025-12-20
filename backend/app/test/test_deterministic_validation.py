@@ -165,3 +165,71 @@ def test_deterministic_validator_generic_naming_affects_understandability():
     generic_issue = next((issue for issue in report.issues if issue.code == "GENERIC_NAMING"), None)
     assert generic_issue is not None
     assert generic_issue.location == "bdd.elements.g1"
+
+
+def test_deterministic_validator_pace_missing_levels_when_triggered():
+    bdd = _valid_min_bdd()
+    for element in bdd["elements"]:
+        if element["name"] == "CommunicationsSubsystem":
+            element["properties"] = {
+                "primary_comms": "Radio",
+                "backup_comms": "Satellite",
+                "redundancy_policy": "PACE",
+            }
+
+    report = validate_sar_unified_payload(
+        text="Communications should adapt dynamically depending on availability.",
+        bdd_diagram=bdd,
+        constraints=load_sar_constraints(),
+    )
+
+    pace_issue = next((issue for issue in report.issues if issue.code == "PACE_LEVELS_MISSING"), None)
+    assert pace_issue is not None
+    assert pace_issue.location == "bdd.elements.comms"
+
+
+def test_deterministic_validator_scaling_and_volunteers_missing():
+    report = validate_sar_unified_payload(
+        text="Allow the command to scale dynamically. Initial response uses volunteers and shore-based teams.",
+        bdd_diagram=_valid_min_bdd(),
+        constraints=load_sar_constraints(),
+    )
+
+    assert any(issue.code == "SCALING_NOT_MODELED" for issue in report.issues)
+    assert any(issue.code == "VOLUNTEER_ROLE_MISSING" for issue in report.issues)
+
+
+def test_deterministic_validator_rth_and_buffering_missing_in_search_smd():
+    bdd = _valid_min_bdd()
+    for element in bdd["elements"]:
+        if element["name"] == "SearchAssets":
+            element["properties"] = {"drone_capability": "ReturnToHome"}
+
+    smd = {
+        "diagram_type": "smd",
+        "parent_block_id": "search",
+        "nodes": [
+            {"id": "deployed", "type": "state", "name": "Deployed"},
+            {"id": "searching", "type": "state", "name": "Searching"},
+            {"id": "returning", "type": "state", "name": "Returning"},
+            {"id": "fault", "type": "state", "name": "Fault"},
+        ],
+        "edges": [
+            {"id": "e1", "source": "deployed", "target": "searching", "label": "begin_search"},
+            {"id": "e2", "source": "searching", "target": "returning", "label": "complete_search"},
+            {"id": "e3", "source": "searching", "target": "fault", "label": "error_detected"},
+        ],
+    }
+
+    report = validate_sar_unified_payload(
+        text="Intermittent comms and degraded radio coverage during drone search.",
+        bdd_diagram=bdd,
+        smd_data=[smd],
+        constraints=load_sar_constraints(),
+    )
+
+    assert any(issue.code == "RTH_LINK_LOSS_MISSING" for issue in report.issues)
+    assert any(issue.code == "BUFFERING_BEHAVIOR_MISSING" for issue in report.issues)
+    fault_issue = next((issue for issue in report.issues if issue.code == "FAULT_TAXONOMY_MISSING"), None)
+    assert fault_issue is not None
+    assert fault_issue.location == "smd:search.edges.e3"

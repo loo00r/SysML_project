@@ -179,6 +179,49 @@ def _first_location_for_terms(
     return None
 
 
+def _text_has_trigger(text: str, triggers: Sequence[str]) -> bool:
+    if not text or not triggers:
+        return False
+    text_lower = text.lower()
+    return any(trigger.lower() in text_lower for trigger in triggers if trigger)
+
+
+def _extract_property_keys(diagram: Dict[str, Any]) -> Set[str]:
+    keys: Set[str] = set()
+    for node in _get_nodes(diagram):
+        if not isinstance(node, dict):
+            continue
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            for key in properties.keys():
+                if isinstance(key, str) and key:
+                    keys.add(key.lower())
+    return keys
+
+
+def _collect_property_keys(
+    bdd_diagram: Dict[str, Any],
+    ibd_data: Optional[List[Dict[str, Any]]],
+) -> Set[str]:
+    keys = _extract_property_keys(bdd_diagram)
+    for ibd in ibd_data or []:
+        if isinstance(ibd, dict):
+            keys.update(_extract_property_keys(ibd))
+    return keys
+
+
+def _edge_trigger_text(edge: Dict[str, Any]) -> str:
+    parts = [
+        edge.get("label"),
+        edge.get("event"),
+        edge.get("trigger"),
+        edge.get("name"),
+        edge.get("guard"),
+        edge.get("action"),
+    ]
+    return " ".join(str(part) for part in parts if part)
+
+
 def _add_standards_issues(
     *,
     issues: List[ValidationIssue],
@@ -343,6 +386,12 @@ def validate_sar_unified_payload(
     node_locations = list(_iter_nodes_with_location_bdd(bdd_diagram))
     node_locations.extend(_iter_nodes_with_location_sub(ibd_data, "ibd"))
     node_locations.extend(_iter_nodes_with_location_sub(smd_data, "smd"))
+    property_keys = _collect_property_keys(bdd_diagram, ibd_data)
+    bdd_node_name_by_id = {
+        str(node.get("id")): str(node.get("name") or "")
+        for node in _get_nodes(bdd_diagram)
+        if isinstance(node, dict) and node.get("id")
+    }
 
     _add_standards_issues(
         issues=issues,
@@ -434,6 +483,45 @@ def validate_sar_unified_payload(
                 )
             )
 
+    scaling_triggers = bdd_rules.get("scaling_triggers") or []
+    scaling_indicators = bdd_rules.get("scaling_indicators") or []
+    if _text_has_trigger(text, scaling_triggers) and scaling_indicators:
+        if not any(_contains_normalized(diagram_strings, indicator) for indicator in scaling_indicators):
+            location = _first_location_for_terms(
+                terms=bdd_rules.get("scaling_anchor_terms") or ["CommandAndControl", "Incident Command"],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=smd_data,
+                prefer=("bdd", "ibd", "smd"),
+            )
+            if not location:
+                location = "bdd"
+            issues.append(
+                ValidationIssue(
+                    criterion="completeness",
+                    code="SCALING_NOT_MODELED",
+                    severity=_issue_severity("SCALING_NOT_MODELED", constraints),
+                    message="Dynamic scaling was requested but no scaling structure is modeled.",
+                    location=location,
+                    details={"expected_indicators": scaling_indicators},
+                )
+            )
+
+    volunteer_triggers = bdd_rules.get("volunteer_triggers") or []
+    volunteer_terms = bdd_rules.get("volunteer_terms") or []
+    if _text_has_trigger(text, volunteer_triggers) and volunteer_terms:
+        if not any(_contains_normalized(diagram_strings, term) for term in volunteer_terms):
+            issues.append(
+                ValidationIssue(
+                    criterion="completeness",
+                    code="VOLUNTEER_ROLE_MISSING",
+                    severity=_issue_severity("VOLUNTEER_ROLE_MISSING", constraints),
+                    message="Volunteer or shore-based response is mentioned but not modeled.",
+                    location="bdd",
+                    details={"expected_terms": volunteer_terms},
+                )
+            )
+
     # 3) BDD required blocks (fail-fast)
     # Run only for BDD/UNIFIED stages; otherwise per-subdiagram validation would
     # repeat foundation checks for every IBD/SMD block.
@@ -460,6 +548,61 @@ def validate_sar_unified_payload(
     critical_roles = comms_rules.get("critical_roles") or []
     required_interfaces = comms_rules.get("required_interfaces") or []
     cellular_only_tokens = comms_rules.get("forbidden_single_points_of_failure") or []
+
+    pace_triggers = comms_rules.get("pace_triggers") or []
+    pace_indicators = comms_rules.get("pace_indicators") or []
+    pace_levels = comms_rules.get("pace_levels") or []
+    pace_interfaces = comms_rules.get("pace_interfaces") or []
+    pace_triggered = _text_has_trigger(text, pace_triggers)
+    if not pace_triggered and pace_indicators:
+        pace_triggered = any(indicator.lower() in " ".join(sorted(property_keys)) for indicator in pace_indicators)
+    if not pace_triggered and pace_indicators:
+        pace_triggered = any(_contains_normalized(diagram_strings, indicator) for indicator in pace_indicators)
+
+    if pace_triggered and pace_levels:
+        found_levels: Set[str] = set()
+        for key in property_keys:
+            if "primary" in key:
+                found_levels.add("primary")
+            if "alternate" in key:
+                found_levels.add("alternate")
+            if "contingency" in key:
+                found_levels.add("contingency")
+            if "emergency" in key:
+                found_levels.add("emergency")
+        for interface in pace_interfaces:
+            if _contains_normalized(diagram_strings, interface):
+                normalized = _normalize_token(interface)
+                if "primary" in normalized:
+                    found_levels.add("primary")
+                if "alternate" in normalized:
+                    found_levels.add("alternate")
+                if "contingency" in normalized:
+                    found_levels.add("contingency")
+                if "emergency" in normalized:
+                    found_levels.add("emergency")
+
+        missing_levels = [level for level in pace_levels if level.lower() not in found_levels]
+        if missing_levels:
+            location = _first_location_for_terms(
+                terms=["CommunicationsSubsystem", "Communications", "Comms"],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=smd_data,
+                prefer=("bdd", "ibd"),
+            )
+            if not location:
+                location = "bdd"
+            issues.append(
+                ValidationIssue(
+                    criterion="correctness",
+                    code="PACE_LEVELS_MISSING",
+                    severity=_issue_severity("PACE_LEVELS_MISSING", constraints),
+                    message="PACE communications require Primary/Alternate/Contingency/Emergency levels.",
+                    location=location,
+                    details={"missing_levels": missing_levels},
+                )
+            )
 
     if ibd_data is not None:
         critical_roles_present = [role for role in critical_roles if _contains_term(all_strings, role)]
@@ -507,6 +650,12 @@ def validate_sar_unified_payload(
     smd_rules = constraints.get("smd") or {}
     required_phases = smd_rules.get("required_phases") or []
     forbidden_transitions = smd_rules.get("forbidden_transitions") or []
+    search_assets_terms = smd_rules.get("search_assets_terms") or []
+    rth_link_loss_triggers = smd_rules.get("rth_link_loss_triggers") or []
+    rth_return_state_terms = smd_rules.get("rth_return_state_terms") or []
+    buffering_triggers = smd_rules.get("buffering_required_triggers") or []
+    buffering_state_terms = smd_rules.get("buffering_state_terms") or []
+    fault_specific_triggers = smd_rules.get("fault_specific_triggers") or []
 
     smd_data = smd_data or []
     if smd_data:
@@ -515,6 +664,7 @@ def validate_sar_unified_payload(
             if not isinstance(smd, dict):
                 continue
             parent_block_id = str(smd.get("parent_block_id") or "")
+            parent_block_name = str(smd.get("parent_block_name") or bdd_node_name_by_id.get(parent_block_id) or "")
             smd_prefix = f"smd:{parent_block_id}" if parent_block_id else "smd"
             nodes = _get_nodes(smd)
             edges = _get_edges(smd)
@@ -575,6 +725,97 @@ def validate_sar_unified_payload(
                             details={"from": from_phase, "to": to_phase, "condition": condition},
                         )
                     )
+
+            is_search_assets = False
+            if search_assets_terms:
+                is_search_assets = _name_matches_terms(parent_block_name, search_assets_terms)
+                if not is_search_assets:
+                    is_search_assets = any(
+                        _name_matches_terms(node_name, search_assets_terms) for node_name in node_name_by_id.values()
+                    )
+
+            if is_search_assets and rth_link_loss_triggers:
+                rth_required = _contains_normalized(diagram_strings, "ReturnToHome") or _contains_normalized(
+                    diagram_strings, "RTH"
+                )
+                if rth_required:
+                    return_state_ids = {
+                        node_id
+                        for node_id, node_name in node_name_by_id.items()
+                        if _name_matches_terms(node_name, rth_return_state_terms)
+                    }
+                    link_loss_triggered = False
+                    for edge in edges:
+                        if not isinstance(edge, dict):
+                            continue
+                        if str(edge.get("target")) not in return_state_ids:
+                            continue
+                        trigger_text = _edge_trigger_text(edge)
+                        if _text_has_trigger(trigger_text, rth_link_loss_triggers):
+                            link_loss_triggered = True
+                            break
+
+                    if return_state_ids and not link_loss_triggered:
+                        issues.append(
+                            ValidationIssue(
+                                criterion="correctness",
+                                code="RTH_LINK_LOSS_MISSING",
+                                severity=_issue_severity("RTH_LINK_LOSS_MISSING", constraints),
+                                message="Return-to-home capability requires a link-loss trigger to Returning state.",
+                                location=smd_prefix,
+                                details={"required_triggers": rth_link_loss_triggers},
+                            )
+                        )
+
+            if is_search_assets and buffering_triggers and _text_has_trigger(text, buffering_triggers):
+                buffering_present = any(
+                    _name_matches_terms(node_name, buffering_state_terms)
+                    for node_name in node_name_by_id.values()
+                )
+                if not buffering_present:
+                    issues.append(
+                        ValidationIssue(
+                            criterion="understandability",
+                            code="BUFFERING_BEHAVIOR_MISSING",
+                            severity=_issue_severity("BUFFERING_BEHAVIOR_MISSING", constraints),
+                            message="Intermittent comms require buffering/store-and-forward behavior in the SMD.",
+                            location=smd_prefix,
+                            details={"expected_terms": buffering_state_terms},
+                        )
+                    )
+
+            if fault_specific_triggers:
+                fault_state_ids = {
+                    node_id
+                    for node_id, node_name in node_name_by_id.items()
+                    if _name_matches_terms(node_name, ["Fault", "Error"])
+                }
+                if fault_state_ids:
+                    edges_to_fault = [
+                        edge
+                        for edge in edges
+                        if isinstance(edge, dict) and str(edge.get("target")) in fault_state_ids
+                    ]
+                    has_specific_fault = False
+                    for edge in edges_to_fault:
+                        trigger_text = _edge_trigger_text(edge)
+                        if _text_has_trigger(trigger_text, fault_specific_triggers):
+                            has_specific_fault = True
+                            break
+                    if edges_to_fault and not has_specific_fault:
+                        first_edge = edges_to_fault[0]
+                        edge_id = first_edge.get("id")
+                        location = f"{smd_prefix}.edges.{edge_id}" if edge_id else smd_prefix
+                        issues.append(
+                            ValidationIssue(
+                                criterion="understandability",
+                                code="FAULT_TAXONOMY_MISSING",
+                                severity=_issue_severity("FAULT_TAXONOMY_MISSING", constraints),
+                                message="Fault state should include specific fault triggers (e.g., battery_low, link_lost).",
+                                location=location,
+                                details={"observed_triggers": [_edge_trigger_text(edge) for edge in edges_to_fault]},
+                            )
+                        )
 
         missing_phases = [phase for phase in required_phases if phase not in phase_found]
         if missing_phases:
