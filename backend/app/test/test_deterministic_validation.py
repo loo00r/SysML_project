@@ -70,18 +70,26 @@ def test_deterministic_validator_missing_triage_phase_fails_fast():
     )
 
     assert report.recommendation == "fail_fast"
-    assert any(issue.code == "MISSING_MISSION_PHASE" for issue in report.issues)
+    missing_phase_issue = next((issue for issue in report.issues if issue.code == "MISSING_MISSION_PHASE"), None)
+    assert missing_phase_issue is not None
+    assert missing_phase_issue.location == "smd:mission"
 
 
 def test_deterministic_validator_mixed_ics_and_gsb_roles_fails_fast():
+    bdd = _valid_min_bdd()
+    bdd["elements"].append({"id": "ic", "type": "block", "name": "Incident Commander"})
+    bdd["elements"].append({"id": "gc", "type": "block", "name": "Gold Commander"})
+
     report = validate_sar_unified_payload(
         text="Incident Commander coordinates with Gold Commander.",
-        bdd_diagram=_valid_min_bdd(),
+        bdd_diagram=bdd,
         constraints=load_sar_constraints(),
     )
 
     assert report.recommendation == "refine"
-    assert any(issue.code == "MODE_MIXED_ICS_GSB" for issue in report.issues)
+    mode_issue = next((issue for issue in report.issues if issue.code == "MODE_MIXED_ICS_GSB"), None)
+    assert mode_issue is not None
+    assert mode_issue.location == "bdd.elements.ic"
 
 
 def test_deterministic_validator_mixed_ics_and_gsb_roles_fail_fast_when_mode_set():
@@ -123,7 +131,9 @@ def test_deterministic_validator_forbidden_transition_affects_correctness():
     )
 
     assert report.recommendation == "fail_fast"
-    assert any(issue.code == "FORBIDDEN_TRANSITION" for issue in report.issues)
+    transition_issue = next((issue for issue in report.issues if issue.code == "FORBIDDEN_TRANSITION"), None)
+    assert transition_issue is not None
+    assert transition_issue.location == "smd:mission.edges.e4"
     assert report.scores_1to5["correctness"] <= 3
 
 
@@ -152,3 +162,6 @@ def test_deterministic_validator_generic_naming_affects_understandability():
     )
 
     assert report.scores_1to5["understandability"] == 4
+    generic_issue = next((issue for issue in report.issues if issue.code == "GENERIC_NAMING"), None)
+    assert generic_issue is not None
+    assert generic_issue.location == "bdd.elements.g1"

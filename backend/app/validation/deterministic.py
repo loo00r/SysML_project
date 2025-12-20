@@ -389,6 +389,15 @@ def validate_sar_unified_payload(
             severity = "warning"
         else:
             severity = _issue_severity("MODE_MIXED_ICS_GSB", constraints)
+        location = _first_location_for_terms(
+            terms=sorted(found_ics_roles | found_gsb_roles),
+            bdd_diagram=bdd_diagram,
+            ibd_data=ibd_data,
+            smd_data=smd_data,
+            prefer=("bdd", "ibd", "smd"),
+        )
+        if not location:
+            location = "bdd"
         issues.append(
             ValidationIssue(
                 criterion="correctness",
@@ -396,6 +405,7 @@ def validate_sar_unified_payload(
                 severity=severity,
                 message="ICS and GSB roles appear together; choose exactly one command mode.",
                 suggestion="Set command_mode to 'ICS' or 'GSB'.",
+                location=location,
                 details={"ics_roles": sorted(found_ics_roles), "gsb_roles": sorted(found_gsb_roles)},
             )
         )
@@ -404,12 +414,22 @@ def validate_sar_unified_payload(
         forbidden = mode_requirements.get(mode, {}).get("forbidden_roles", []) or []
         forbidden_found = [role for role in forbidden if _contains_term(all_strings, role)]
         if forbidden_found:
+            location = _first_location_for_terms(
+                terms=forbidden_found,
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=smd_data,
+                prefer=("bdd", "ibd", "smd"),
+            )
+            if not location:
+                location = "bdd"
             issues.append(
                 ValidationIssue(
                     criterion="correctness",
                     code="MODE_MIXED_ICS_GSB",
                     severity=_issue_severity("MODE_MIXED_ICS_GSB", constraints),
                     message=f"Mode '{mode}' forbids roles present in the model.",
+                    location=location,
                     details={"mode": mode, "forbidden_roles_present": forbidden_found},
                 )
             )
