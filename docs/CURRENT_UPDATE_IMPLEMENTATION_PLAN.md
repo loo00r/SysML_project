@@ -571,10 +571,10 @@ Acceptance criteria:
 - ✅ `domain`/`command_mode` прокинуті через unified async flow у всі генератори.
 
 #### Фаза 5: Self-Refinement — ✅ **~95% (BDD + мінімальний IBD/SMD)**
-- ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
+- ✅ BDD: bounded refinement loop (max 3) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
 - ✅ Додано per-block deterministic validation reporting для IBD/SMD (ключі `subdiagram_validation["ibd:<block_id>"]`, `subdiagram_validation["smd:<block_id>"]`).
 - ✅ Fail-fast під час subdiagram generation: якщо конкретна IBD/SMD має `recommendation="fail_fast"`, pipeline зупиняється, pending задачі скасовуються, і в Redis пишеться `stage="FAILED_FAST"`.
-- ✅ Мінімальний refinement loop для IBD/SMD (1 спроба при `recommendation="refine"`).
+- ✅ Мінімальний refinement loop для IBD/SMD (до 2 спроб при `recommendation="refine"`).
 
 ### Що не завершено ⚠️
 

@@ -174,6 +174,44 @@ def identify_diagram_candidates(
     return ibd_candidates, smd_candidates
 
 
+def _filter_smd_candidates(
+    *,
+    elements: List[Dict[str, Any]],
+    text: str,
+    domain: str,
+) -> List[Dict[str, Any]]:
+    candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
+    if domain != "sar":
+        return candidates
+
+    constraints = load_sar_constraints()
+    required_phases = [str(phase).lower() for phase in constraints.get("smd", {}).get("required_phases", [])]
+    text_lower = text.lower()
+    wants_mission_smd = "smd" in text_lower or "state machine" in text_lower or any(
+        phase in text_lower for phase in required_phases
+    )
+
+    def name_for(element: Dict[str, Any]) -> str:
+        return str(element.get("name") or "").lower()
+
+    def select_by_keywords(keywords: List[str]) -> List[Dict[str, Any]]:
+        return [element for element in candidates if any(keyword in name_for(element) for keyword in keywords)]
+
+    mission_blocks = select_by_keywords(["mission", "workflow", "phase"])
+    if wants_mission_smd and mission_blocks:
+        return mission_blocks[:1]
+
+    search_blocks = select_by_keywords(["search", "drone", "uav"])
+    if search_blocks and any(keyword in text_lower for keyword in ["search", "drone", "uav"]):
+        return search_blocks[:1]
+
+    triage_blocks = select_by_keywords(["triage"])
+    if triage_blocks and "triage" in text_lower:
+        return triage_blocks[:1]
+
+    return candidates[:1]
+
+
 async def generate_smd_for_block_async(
     block: Dict[str, Any],
     system_context: str,
@@ -450,8 +488,8 @@ async def _generate_diagram_in_background(
                     )
 
             bdd_version = 1
-            max_bdd_iterations = 2
-            max_subdiagram_iterations = 1
+            max_bdd_iterations = 3
+            max_subdiagram_iterations = 2
 
             # Step 1: Generate BDD with optional RAG support.
             bdd_examples: List[Dict[str, Any]] = []
@@ -518,6 +556,8 @@ async def _generate_diagram_in_background(
                 )
                 validation_report = report.model_dump()
                 quality_score = report.quality_score
+                if validation_report.get("recommendation") == "fail_fast" and settings.VALIDATION_ENABLE_LLM:
+                    validation_report["recommendation"] = "refine"
                 llm_bdd_validation = None
                 llm_bdd_quality_score = None
                 if _should_run_llm_gate(deterministic_report=validation_report):
@@ -668,6 +708,8 @@ async def _generate_diagram_in_background(
                     )
                     validation_report = report.model_dump()
                     quality_score = report.quality_score
+                    if validation_report.get("recommendation") == "fail_fast" and settings.VALIDATION_ENABLE_LLM:
+                        validation_report["recommendation"] = "refine"
                     llm_bdd_validation = None
                     llm_bdd_quality_score = None
                     if _should_run_llm_gate(deterministic_report=validation_report):
@@ -782,6 +824,7 @@ async def _generate_diagram_in_background(
             smd_candidates: List[Dict[str, Any]] = []
             if elements:
                 ibd_candidates, smd_candidates = identify_diagram_candidates(elements)
+                smd_candidates = _filter_smd_candidates(elements=smd_candidates, text=text, domain=domain)
             print(f"Background: Identified {len(ibd_candidates)} IBD candidates and {len(smd_candidates)} SMD candidates")
 
             # Respect caller toggles.
