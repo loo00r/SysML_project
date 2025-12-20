@@ -587,12 +587,13 @@ Acceptance criteria:
 - ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
 - ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 
-#### Фаза 6: Frontend Integration — ✅ **~90%**
+#### Фаза 6: Frontend Integration — ✅ **~92%**
 - ✅ Backend віддає `events`, `validation_report`, `quality_score`, `bdd_version`, `stage`, `progress_detail`.
 - ✅ Frontend показує **timeline + quality score + issues** під час генерації (overlay), та summary badge після завершення.
 - ✅ Підтримка hybrid score (70/30) у UI, якщо `quality_score_weighted` доступний.
 - ✅ Клік по issue виконує навігацію на відповідну діаграму (BDD/IBD/SMD) якщо `location` відома, з виділенням вузла коли ID доступний.
-- ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + “open issues” link на конкретні діаграми/блоки (для повної traceability потрібні стабільні `location` для всіх правил).
+- ✅ Додано більше `issue.location` (node/edge) для детермінованих SAR-правил, щоб UI міг підсвічувати конкретні елементи.
+- ⚠️ TODO: винести у dedicated sidebar panel (не тільки overlay), + grouping/filtering issues, + “open issues” link на конкретні діаграми/блоки (залишились правила без точних `location`).
 
 #### Фаза 7: Тести — 🟡 **~50%**
 - ✅ Unit-тести для детермінованої SAR валідації
@@ -602,13 +603,13 @@ Acceptance criteria:
 - ✅ Pytest coverage: `generate-diagram-unified` завжди пише initial Redis payload (polling не ловить early 404)
 - ⚠️ Немає простого CI runner (Poetry/Docker) для автозапуску тестів
 
-### Загальний прогрес (реалістично): **~90% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
+### Загальний прогрес (реалістично): **~92% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
 
 ### Критичні проблеми для вирішення
 1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: evaluation-only у фінальному payload; не впливає на пайплайн).
 2. **IBD/SMD refinement мінімальний** (1 спроба, без version tracking).
 3. **LLM validator contract tests відсутні** (schema stability, fallback на deterministic при parse errors).
-4. **UI traceability**: issue → конкретний блок/діаграма (є базова навігація за `location`, але не для всіх правил).
+4. **UI traceability**: issue → конкретний блок/діаграма (частково покрито через `location`, але не для всіх правил).
 5. **Progress consistency**: не всюди є стабільний `{done,total}` (зараз це гарантовано для subdiagram progress; для решти — best-effort через `stage`/`current_step`).
 
 ---

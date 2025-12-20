@@ -113,6 +113,72 @@ def _diagram_type_from_stage(stage: str, bdd_diagram: Dict[str, Any]) -> Optiona
     return None
 
 
+def _node_display_name(node: Dict[str, Any]) -> str:
+    name = node.get("name") or node.get("label") or ""
+    return str(name)
+
+
+def _node_id(node: Dict[str, Any]) -> str:
+    return str(node.get("id") or "")
+
+
+def _iter_nodes_with_location_bdd(bdd_diagram: Dict[str, Any]) -> Iterable[Tuple[str, str]]:
+    for node in _get_nodes(bdd_diagram):
+        if not isinstance(node, dict):
+            continue
+        node_id = _node_id(node)
+        node_name = _node_display_name(node).strip()
+        if node_id and node_name:
+            yield f"bdd.elements.{node_id}", node_name
+
+
+def _iter_nodes_with_location_sub(
+    diagrams: Optional[List[Dict[str, Any]]],
+    prefix: str,
+) -> Iterable[Tuple[str, str]]:
+    for diagram in diagrams or []:
+        if not isinstance(diagram, dict):
+            continue
+        parent_block_id = str(diagram.get("parent_block_id") or "")
+        location_prefix = f"{prefix}:{parent_block_id}" if parent_block_id else prefix
+        for node in _get_nodes(diagram):
+            if not isinstance(node, dict):
+                continue
+            node_id = _node_id(node)
+            node_name = _node_display_name(node).strip()
+            if node_id and node_name:
+                yield f"{location_prefix}.nodes.{node_id}", node_name
+
+
+def _name_matches_terms(name: str, terms: Sequence[str]) -> bool:
+    if not name:
+        return False
+    for term in terms:
+        if _contains_normalized([name], term) or _contains_term([name], term):
+            return True
+    return False
+
+
+def _first_location_for_terms(
+    *,
+    terms: Sequence[str],
+    bdd_diagram: Dict[str, Any],
+    ibd_data: Optional[List[Dict[str, Any]]],
+    smd_data: Optional[List[Dict[str, Any]]],
+    prefer: Sequence[str] = ("bdd", "ibd", "smd"),
+) -> Optional[str]:
+    sources = {
+        "bdd": _iter_nodes_with_location_bdd(bdd_diagram),
+        "ibd": _iter_nodes_with_location_sub(ibd_data, "ibd"),
+        "smd": _iter_nodes_with_location_sub(smd_data, "smd"),
+    }
+    for kind in prefer:
+        for location, name in sources.get(kind, []):
+            if _name_matches_terms(name, terms):
+                return location
+    return None
+
+
 def _add_standards_issues(
     *,
     issues: List[ValidationIssue],
@@ -235,14 +301,14 @@ def _add_standards_issues(
 def _add_understandability_issues(
     *,
     issues: List[ValidationIssue],
-    diagram_strings: Sequence[str],
+    node_locations: Sequence[Tuple[str, str]],
 ) -> None:
     generic_hits = []
-    for value in diagram_strings:
-        if not isinstance(value, str):
-            continue
-        if GENERIC_NAME_PATTERN.match(value.strip()):
-            generic_hits.append(value.strip())
+    locations = []
+    for location, name in node_locations:
+        if GENERIC_NAME_PATTERN.match(name.strip()):
+            generic_hits.append(name.strip())
+            locations.append(location)
     if generic_hits:
         issues.append(
             ValidationIssue(
@@ -250,6 +316,7 @@ def _add_understandability_issues(
                 code="GENERIC_NAMING",
                 severity="warning",
                 message="Generic naming reduces diagram clarity.",
+                location=locations[0] if locations else None,
                 details={"examples": sorted(set(generic_hits))[:5]},
             )
         )
@@ -273,6 +340,9 @@ def validate_sar_unified_payload(
 
     all_strings = list(_walk_strings({"text": text, "bdd": bdd_diagram, "ibd": ibd_data, "smd": smd_data}))
     diagram_strings = list(_walk_strings({"bdd": bdd_diagram, "ibd": ibd_data, "smd": smd_data}))
+    node_locations = list(_iter_nodes_with_location_bdd(bdd_diagram))
+    node_locations.extend(_iter_nodes_with_location_sub(ibd_data, "ibd"))
+    node_locations.extend(_iter_nodes_with_location_sub(smd_data, "smd"))
 
     _add_standards_issues(
         issues=issues,
@@ -281,13 +351,20 @@ def validate_sar_unified_payload(
         ibd_data=ibd_data,
         smd_data=smd_data,
     )
-    _add_understandability_issues(issues=issues, diagram_strings=diagram_strings)
+    _add_understandability_issues(issues=issues, node_locations=node_locations)
 
     # 1) Terminology: synonyms warnings
     terminology = constraints.get("terminology") or {}
     synonyms = terminology.get("synonyms") or {}
     for synonym, canonical in synonyms.items():
         if _contains_term(all_strings, synonym):
+            location = _first_location_for_terms(
+                terms=[synonym],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=smd_data,
+                prefer=("bdd", "ibd", "smd"),
+            )
             issues.append(
                 ValidationIssue(
                     criterion="terminology",
@@ -295,6 +372,7 @@ def validate_sar_unified_payload(
                     severity=_issue_severity("TERMINOLOGY_SYNONYM_USED", constraints),
                     message=f"Synonym '{synonym}' used; prefer canonical term '{canonical}'.",
                     suggestion=canonical,
+                    location=location,
                 )
             )
 
@@ -351,6 +429,7 @@ def validate_sar_unified_payload(
                         code="MISSING_REQUIRED_BDD_BLOCK",
                         severity=_issue_severity("MISSING_REQUIRED_BDD_BLOCK", constraints),
                         message=f"BDD is missing required block '{block}'.",
+                        location="bdd",
                         details={"missing_block": block},
                     )
                 )
@@ -367,23 +446,39 @@ def validate_sar_unified_payload(
         if critical_roles_present:
             missing_interfaces = [iface for iface in required_interfaces if not _contains_normalized(diagram_strings, iface)]
             if missing_interfaces:
+                location = _first_location_for_terms(
+                    terms=critical_roles_present,
+                    bdd_diagram=bdd_diagram,
+                    ibd_data=ibd_data,
+                    smd_data=None,
+                    prefer=("ibd", "bdd"),
+                )
                 issues.append(
                     ValidationIssue(
                         criterion="correctness",
                         code="COMMS_NO_BACKUP_FOR_CRITICAL_ROLE",
                         severity=_issue_severity("COMMS_NO_BACKUP_FOR_CRITICAL_ROLE", constraints),
                         message="Critical SAR roles require redundant communications (PrimaryComms + BackupComms).",
+                        location=location,
                         details={"critical_roles_present": critical_roles_present, "missing_interfaces": missing_interfaces},
                     )
                 )
 
             if any(_contains_normalized(diagram_strings, token) for token in cellular_only_tokens) and missing_interfaces:
+                location = _first_location_for_terms(
+                    terms=critical_roles_present,
+                    bdd_diagram=bdd_diagram,
+                    ibd_data=ibd_data,
+                    smd_data=None,
+                    prefer=("ibd", "bdd"),
+                )
                 issues.append(
                     ValidationIssue(
                         criterion="correctness",
                         code="COMMS_NO_BACKUP_FOR_CRITICAL_ROLE",
                         severity=_issue_severity("COMMS_NO_BACKUP_FOR_CRITICAL_ROLE", constraints),
                         message="Cellular-only comms detected for critical roles without a backup channel.",
+                        location=location,
                         details={"critical_roles_present": critical_roles_present},
                     )
                 )
@@ -399,6 +494,8 @@ def validate_sar_unified_payload(
         for smd in smd_data:
             if not isinstance(smd, dict):
                 continue
+            parent_block_id = str(smd.get("parent_block_id") or "")
+            smd_prefix = f"smd:{parent_block_id}" if parent_block_id else "smd"
             nodes = _get_nodes(smd)
             edges = _get_edges(smd)
             node_name_by_id = {
@@ -432,30 +529,46 @@ def validate_sar_unified_payload(
                 if condition == "triage_missing" and not triage_missing:
                     continue
 
-                if any(
-                    isinstance(edge, dict)
-                    and str(edge.get("source")) in from_ids
-                    and str(edge.get("target")) in to_ids
-                    for edge in edges
-                ):
+                matched_edge = None
+                for edge in edges:
+                    if not isinstance(edge, dict):
+                        continue
+                    if str(edge.get("source")) in from_ids and str(edge.get("target")) in to_ids:
+                        matched_edge = edge
+                        break
+
+                if matched_edge:
+                    edge_id = matched_edge.get("id")
+                    if edge_id:
+                        location = f"{smd_prefix}.edges.{edge_id}"
+                    else:
+                        source = matched_edge.get("source")
+                        target = matched_edge.get("target")
+                        location = f"{smd_prefix}.edges.{source}->{target}" if source and target else smd_prefix
                     issues.append(
                         ValidationIssue(
                             criterion="correctness",
                             code="FORBIDDEN_TRANSITION",
                             severity=_issue_severity("FORBIDDEN_TRANSITION", constraints),
                             message=f"Forbidden SMD transition detected: {from_phase} → {to_phase}.",
+                            location=location,
                             details={"from": from_phase, "to": to_phase, "condition": condition},
                         )
                     )
 
         missing_phases = [phase for phase in required_phases if phase not in phase_found]
         if missing_phases:
+            location = None
+            if smd_data:
+                parent_block_id = str(smd_data[0].get("parent_block_id") or "")
+                location = f"smd:{parent_block_id}" if parent_block_id else "smd"
             issues.append(
                 ValidationIssue(
                     criterion="completeness",
                     code="MISSING_MISSION_PHASE",
                     severity=_issue_severity("MISSING_MISSION_PHASE", constraints),
                     message="SMD is missing required SAR mission phases.",
+                    location=location,
                     details={"missing_phases": missing_phases},
                 )
             )
@@ -476,12 +589,20 @@ def validate_sar_unified_payload(
         motor_required = nested_required.get(motorized_boat, ["Motor"])
         motor_present = any(_contains_normalized(diagram_strings, component) for component in motor_required)
         if not motorized_present or not motor_present:
+            location = _first_location_for_terms(
+                terms=["Type_B_Boat_Team", motorized_boat],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=None,
+                prefer=("ibd", "bdd"),
+            )
             issues.append(
                 ValidationIssue(
                     criterion="completeness",
                     code="TYPE_B_NO_MOTOR",
                     severity=_issue_severity("TYPE_B_NO_MOTOR", constraints),
                     message="Type B Boat Team requires a MotorizedRescueBoat with a Motor.",
+                    location=location,
                 )
             )
 
@@ -490,12 +611,20 @@ def validate_sar_unified_payload(
         prohibited_actions = type_d.get("prohibited_actions") or []
         prohibited_found = [action for action in prohibited_actions if _contains_normalized(all_strings, action)]
         if prohibited_found:
+            location = _first_location_for_terms(
+                terms=["Type_D_First_Responder", "First Responder"],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=None,
+                prefer=("ibd", "bdd"),
+            )
             issues.append(
                 ValidationIssue(
                     criterion="correctness",
                     code="TYPE_D_IN_WATER_RESCUE",
                     severity=_issue_severity("TYPE_D_IN_WATER_RESCUE", constraints),
                     message="Type D First Responder must not perform in-water rescue actions.",
+                    location=location,
                     details={"prohibited_actions_present": prohibited_found},
                 )
             )
@@ -507,12 +636,20 @@ def validate_sar_unified_payload(
         required_behaviors = drone_rules.get("if_present_requires_behavior") or ["ReturnToHome"]
         missing_behaviors = [b for b in required_behaviors if not _contains_normalized(diagram_strings, b)]
         if missing_behaviors:
+            location = _first_location_for_terms(
+                terms=["Drone", "UAV"],
+                bdd_diagram=bdd_diagram,
+                ibd_data=ibd_data,
+                smd_data=None,
+                prefer=("ibd", "bdd", "smd"),
+            )
             issues.append(
                 ValidationIssue(
                     criterion="correctness",
                     code="DRONE_NO_RTH",
                     severity=_issue_severity("DRONE_NO_RTH", constraints),
                     message="Drone present without required ReturnToHome (RTH) behavior.",
+                    location=location,
                     details={"missing_behaviors": missing_behaviors},
                 )
             )

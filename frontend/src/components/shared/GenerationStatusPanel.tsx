@@ -48,6 +48,16 @@ type IssueTarget = {
   diagramType: 'bdd' | 'ibd' | 'smd';
   blockId?: string;
   nodeId?: string;
+  edgeId?: string;
+  edgeMatch?: { source: string; target: string };
+};
+
+const parseEdgeToken = (token: string): Pick<IssueTarget, 'edgeId' | 'edgeMatch'> => {
+  const parts = token.split('->');
+  if (parts.length === 2) {
+    return { edgeMatch: { source: parts[0], target: parts[1] } };
+  }
+  return { edgeId: token };
 };
 
 const parseIssueLocation = (location?: string): IssueTarget | null => {
@@ -64,6 +74,10 @@ const parseIssueLocation = (location?: string): IssueTarget | null => {
     if (elementMatch) {
       return { diagramType: 'bdd', nodeId: elementMatch[1] };
     }
+    const edgeMatch = trimmed.match(/^bdd\.relationships\.(.+)$/);
+    if (edgeMatch) {
+      return { diagramType: 'bdd', ...parseEdgeToken(edgeMatch[1]) };
+    }
     return { diagramType: 'bdd' };
   }
 
@@ -74,6 +88,9 @@ const parseIssueLocation = (location?: string): IssueTarget | null => {
     if (detail && detail.startsWith('nodes.')) {
       return { diagramType: 'ibd', blockId, nodeId: detail.replace('nodes.', '') };
     }
+    if (detail && detail.startsWith('edges.')) {
+      return { diagramType: 'ibd', blockId, ...parseEdgeToken(detail.replace('edges.', '')) };
+    }
     return { diagramType: 'ibd', blockId };
   }
 
@@ -83,6 +100,9 @@ const parseIssueLocation = (location?: string): IssueTarget | null => {
     const detail = smdMatch[2];
     if (detail && detail.startsWith('nodes.')) {
       return { diagramType: 'smd', blockId, nodeId: detail.replace('nodes.', '') };
+    }
+    if (detail && detail.startsWith('edges.')) {
+      return { diagramType: 'smd', blockId, ...parseEdgeToken(detail.replace('edges.', '')) };
     }
     return { diagramType: 'smd', blockId };
   }
@@ -132,14 +152,14 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
   const criticalCount = typeof counts?.critical === 'number' ? counts?.critical : undefined;
   const warningCount = typeof counts?.warning === 'number' ? counts?.warning : undefined;
 
-  const resolveDiagramId = (target: IssueTarget): string | null => {
+  const resolveDiagram = (target: IssueTarget) => {
     const activeDiagram = openDiagrams.find((diagram) => diagram.id === activeDiagramId);
     if (target.diagramType === 'bdd') {
       if (activeDiagram && (activeDiagram.type === 'bdd' || activeDiagram.type === 'bdd_enhanced')) {
-        return activeDiagram.id;
+        return activeDiagram;
       }
       const candidate = openDiagrams.find((diagram) => diagram.type === 'bdd' || diagram.type === 'bdd_enhanced');
-      return candidate?.id ?? null;
+      return candidate ?? null;
     }
 
     const diagramType = target.diagramType;
@@ -147,14 +167,14 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
     if (target.blockId) {
       const byParent = candidates.find((diagram) => diagram.parentBlockId === target.blockId);
       if (byParent) {
-        return byParent.id;
+        return byParent;
       }
       const byId = candidates.find((diagram) => diagram.id.includes(`-${target.blockId}`));
       if (byId) {
-        return byId.id;
+        return byId;
       }
     }
-    return candidates[0]?.id ?? null;
+    return candidates[0] ?? null;
   };
 
   const handleIssueClick = (issue: ValidationIssue) => {
@@ -162,17 +182,32 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
     if (!target) {
       return;
     }
-    const diagramId = resolveDiagramId(target);
+    const diagram = resolveDiagram(target);
+    const diagramId = diagram?.id ?? null;
     if (diagramId && diagramId !== activeDiagramId) {
       setActiveDiagram(diagramId);
     }
     if (target.nodeId) {
       setSelectedNodes([target.nodeId]);
       setSelectedEdges([]);
-    } else {
-      setSelectedNodes([]);
-      setSelectedEdges([]);
+      return;
     }
+
+    if (diagram && (target.edgeId || target.edgeMatch)) {
+      const matchedEdge = target.edgeId
+        ? diagram.edges?.find((edge) => edge.id === target.edgeId)
+        : diagram.edges?.find(
+            (edge) => edge.source === target.edgeMatch?.source && edge.target === target.edgeMatch?.target
+          );
+      if (matchedEdge) {
+        setSelectedEdges([matchedEdge.id]);
+        setSelectedNodes([]);
+        return;
+      }
+    }
+
+    setSelectedNodes([]);
+    setSelectedEdges([]);
   };
 
   return (
