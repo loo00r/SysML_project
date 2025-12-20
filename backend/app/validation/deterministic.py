@@ -173,6 +173,8 @@ def _add_standards_issues(
         for ibd in ibd_data:
             if not isinstance(ibd, dict):
                 continue
+            parent_block_id = str(ibd.get("parent_block_id") or "")
+            ibd_prefix = f"ibd:{parent_block_id}" if parent_block_id else "ibd"
             nodes = ibd.get("nodes")
             if not isinstance(nodes, list) or not nodes:
                 issues.append(
@@ -181,7 +183,7 @@ def _add_standards_issues(
                         code="INVALID_IBD_STRUCTURE",
                         severity="critical",
                         message="IBD nodes are missing or not a list.",
-                        location="ibd.nodes",
+                        location=f"{ibd_prefix}.nodes",
                     )
                 )
                 break
@@ -193,7 +195,7 @@ def _add_standards_issues(
                             code="INVALID_IBD_NODE",
                             severity="critical",
                             message="IBD nodes must include id.",
-                            location="ibd.nodes",
+                            location=f"{ibd_prefix}.nodes",
                         )
                     )
                     break
@@ -202,6 +204,8 @@ def _add_standards_issues(
         for smd in smd_data:
             if not isinstance(smd, dict):
                 continue
+            parent_block_id = str(smd.get("parent_block_id") or "")
+            smd_prefix = f"smd:{parent_block_id}" if parent_block_id else "smd"
             nodes = smd.get("nodes")
             edges = smd.get("edges")
             if not isinstance(nodes, list) or not nodes:
@@ -211,7 +215,7 @@ def _add_standards_issues(
                         code="INVALID_SMD_STRUCTURE",
                         severity="critical",
                         message="SMD nodes are missing or not a list.",
-                        location="smd.nodes",
+                        location=f"{smd_prefix}.nodes",
                     )
                 )
                 break
@@ -222,7 +226,7 @@ def _add_standards_issues(
                         code="INVALID_SMD_EDGES",
                         severity="critical",
                         message="SMD edges must be a list.",
-                        location="smd.edges",
+                        location=f"{smd_prefix}.edges",
                     )
                 )
                 break
@@ -512,6 +516,31 @@ def validate_sar_unified_payload(
                     details={"missing_behaviors": missing_behaviors},
                 )
             )
+
+    if stage == "IBD" and ibd_data:
+        parent_block_id = ""
+        first_ibd = ibd_data[0] if isinstance(ibd_data, list) and ibd_data else None
+        if isinstance(first_ibd, dict):
+            parent_block_id = str(first_ibd.get("parent_block_id") or "")
+        ibd_location = f"ibd:{parent_block_id}" if parent_block_id else "ibd"
+        for issue in issues:
+            if not issue.location:
+                issue.location = ibd_location
+
+    if stage == "SMD" and smd_data:
+        parent_block_id = ""
+        first_smd = smd_data[0] if isinstance(smd_data, list) and smd_data else None
+        if isinstance(first_smd, dict):
+            parent_block_id = str(first_smd.get("parent_block_id") or "")
+        smd_location = f"smd:{parent_block_id}" if parent_block_id else "smd"
+        for issue in issues:
+            if not issue.location:
+                issue.location = smd_location
+
+    if stage == "BDD":
+        for issue in issues:
+            if not issue.location:
+                issue.location = "bdd"
 
     counts = {
         "critical": sum(1 for issue in issues if issue.severity == "critical"),

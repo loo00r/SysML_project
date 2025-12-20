@@ -15,9 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated frontend status panels to surface hybrid scores when available.
 - Updated implementation plan status for hybrid score UI completion.
 - Displayed issue criterion/location in the frontend issues list.
+- Added issue click-to-navigate behavior using `location` hints and preserved parent block IDs for IBD diagrams.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.59] - 2025-12-18
+### Changed
+- Added issue click-to-navigate behavior using `location` hints and preserved parent block IDs for IBD diagrams.
 
 ## [1.2.58] - 2025-12-18
 ### Changed

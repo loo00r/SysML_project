@@ -13,11 +13,13 @@ import {
 
 import {
   type UnifiedGenerationPayload,
+  type ValidationIssue,
   getCurrentStepLabel,
   normalizeEvents,
   normalizeIssues,
   normalizeRecommendation,
 } from '../../utils/unifiedGeneration';
+import useDiagramStore from '../../store/diagramStore';
 
 interface GenerationStatusPanelProps {
   payload: UnifiedGenerationPayload | null;
@@ -42,11 +44,66 @@ const formatTime = (seconds: number) => {
   return date.toLocaleTimeString();
 };
 
+type IssueTarget = {
+  diagramType: 'bdd' | 'ibd' | 'smd';
+  blockId?: string;
+  nodeId?: string;
+};
+
+const parseIssueLocation = (location?: string): IssueTarget | null => {
+  if (!location) {
+    return null;
+  }
+  const trimmed = location.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('bdd')) {
+    const elementMatch = trimmed.match(/^bdd\.elements\.(.+)$/);
+    if (elementMatch) {
+      return { diagramType: 'bdd', nodeId: elementMatch[1] };
+    }
+    return { diagramType: 'bdd' };
+  }
+
+  const ibdMatch = trimmed.match(/^ibd:([^\.]+)(?:\.(.+))?$/);
+  if (ibdMatch) {
+    const blockId = ibdMatch[1];
+    const detail = ibdMatch[2];
+    if (detail && detail.startsWith('nodes.')) {
+      return { diagramType: 'ibd', blockId, nodeId: detail.replace('nodes.', '') };
+    }
+    return { diagramType: 'ibd', blockId };
+  }
+
+  const smdMatch = trimmed.match(/^smd:([^\.]+)(?:\.(.+))?$/);
+  if (smdMatch) {
+    const blockId = smdMatch[1];
+    const detail = smdMatch[2];
+    if (detail && detail.startsWith('nodes.')) {
+      return { diagramType: 'smd', blockId, nodeId: detail.replace('nodes.', '') };
+    }
+    return { diagramType: 'smd', blockId };
+  }
+
+  if (trimmed.startsWith('ibd')) {
+    return { diagramType: 'ibd' };
+  }
+
+  if (trimmed.startsWith('smd')) {
+    return { diagramType: 'smd' };
+  }
+
+  return null;
+};
+
 const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }) => {
   if (!payload) {
     return null;
   }
 
+  const { openDiagrams, activeDiagramId, setActiveDiagram, setSelectedNodes, setSelectedEdges } = useDiagramStore();
   const stage = payload.progress_detail?.stage || payload.stage || '';
   const currentStep = getCurrentStepLabel(payload);
   const events = normalizeEvents(payload.events).slice(-12).reverse();
@@ -74,6 +131,49 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
     : undefined;
   const criticalCount = typeof counts?.critical === 'number' ? counts?.critical : undefined;
   const warningCount = typeof counts?.warning === 'number' ? counts?.warning : undefined;
+
+  const resolveDiagramId = (target: IssueTarget): string | null => {
+    const activeDiagram = openDiagrams.find((diagram) => diagram.id === activeDiagramId);
+    if (target.diagramType === 'bdd') {
+      if (activeDiagram && (activeDiagram.type === 'bdd' || activeDiagram.type === 'bdd_enhanced')) {
+        return activeDiagram.id;
+      }
+      const candidate = openDiagrams.find((diagram) => diagram.type === 'bdd' || diagram.type === 'bdd_enhanced');
+      return candidate?.id ?? null;
+    }
+
+    const diagramType = target.diagramType;
+    const candidates = openDiagrams.filter((diagram) => diagram.type === diagramType);
+    if (target.blockId) {
+      const byParent = candidates.find((diagram) => diagram.parentBlockId === target.blockId);
+      if (byParent) {
+        return byParent.id;
+      }
+      const byId = candidates.find((diagram) => diagram.id.includes(`-${target.blockId}`));
+      if (byId) {
+        return byId.id;
+      }
+    }
+    return candidates[0]?.id ?? null;
+  };
+
+  const handleIssueClick = (issue: ValidationIssue) => {
+    const target = parseIssueLocation(issue.location);
+    if (!target) {
+      return;
+    }
+    const diagramId = resolveDiagramId(target);
+    if (diagramId && diagramId !== activeDiagramId) {
+      setActiveDiagram(diagramId);
+    }
+    if (target.nodeId) {
+      setSelectedNodes([target.nodeId]);
+      setSelectedEdges([]);
+    } else {
+      setSelectedNodes([]);
+      setSelectedEdges([]);
+    }
+  };
 
   return (
     <Paper
@@ -143,7 +243,12 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
             </Typography>
             <List dense disablePadding>
               {issues.slice(0, 8).map((issue, index) => (
-                <ListItem key={`${issue.code}-${index}`} disableGutters sx={{ py: 0.25 }}>
+                <ListItem
+                  key={`${issue.code}-${index}`}
+                  disableGutters
+                  sx={{ py: 0.25, cursor: issue.location ? 'pointer' : 'default' }}
+                  onClick={() => handleIssueClick(issue)}
+                >
                   <ListItemText
                     primary={
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>

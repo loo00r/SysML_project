@@ -583,6 +583,8 @@ export const useAIGeneration = () => {
               edges: layoutedEdges,
               description: `Internal Block Diagram for ${ibdData.parent_block_id}`,
               customId: ibdId,
+              parentBlockId: toTrimmedString(ibdData?.parent_block_id),
+              parentDiagramId: currentDiagramId || undefined,
               needsCentering: true
             });
           });
