@@ -421,6 +421,7 @@ async def _generate_diagram_in_background(
 
             bdd_version = 1
             max_bdd_iterations = 2
+            max_subdiagram_iterations = 1
 
             # Step 1: Generate BDD with optional RAG support.
             bdd_examples: List[Dict[str, Any]] = []
@@ -741,6 +742,12 @@ async def _generate_diagram_in_background(
             if not generate_smd:
                 smd_candidates = []
 
+            block_lookup: Dict[str, Dict[str, Any]] = {
+                str(block.get("id")): block
+                for block in (ibd_candidates + smd_candidates)
+                if block.get("id")
+            }
+
             # Step 3: Parallel generation for IBD and SMD
             ibd_to_create: List[Dict[str, Any]] = []
             smd_to_create: List[Dict[str, Any]] = []
@@ -797,7 +804,6 @@ async def _generate_diagram_in_background(
                         subdiagram_validation_update: Dict[str, Any] = {}
                         llm_subdiagram_validation_update: Dict[str, Any] = {}
                         if kind == "ibd":
-                            ibd_to_create.append(result)
                             if domain == "sar":
                                 parent_block_id = str(result.get("parent_block_id") or "")
                                 if parent_block_id:
@@ -810,6 +816,36 @@ async def _generate_diagram_in_background(
                                         stage="IBD",
                                     )
                                     report_payload = report.model_dump()
+                                    if report_payload.get("recommendation") == "refine" and max_subdiagram_iterations > 0:
+                                        refinement_prompt = build_refinement_prompt(
+                                            original_text=text,
+                                            diagram_json={"nodes": result.get("nodes", []), "edges": result.get("edges", [])},
+                                            validation_report=report,
+                                            diagram_kind="ibd",
+                                        )
+                                        block = block_lookup.get(parent_block_id)
+                                        if block:
+                                            refined_result = await generate_ibd_for_block_async(
+                                                block=block,
+                                                system_context=f"{text}\n\n{refinement_prompt}",
+                                                relationships=relationships,
+                                                db=None,
+                                                use_rag=use_rag,
+                                                db_session_factory=AsyncSessionLocal,
+                                                domain=domain,
+                                                command_mode=command_mode,
+                                            )
+                                            if isinstance(refined_result, dict):
+                                                result = refined_result
+                                                report = validate_sar_unified_payload(
+                                                    text=text,
+                                                    bdd_diagram=raw_bdd,
+                                                    ibd_data=[result],
+                                                    smd_data=None,
+                                                    mode=command_mode,
+                                                    stage="IBD",
+                                                )
+                                                report_payload = report.model_dump()
                                     subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
                                     llm_report, _ = _maybe_llm_validate(
                                         text=text,
@@ -824,8 +860,8 @@ async def _generate_diagram_in_background(
                                         fail_fast_triggered = True
                                         fail_fast_reason = f"IBD validation failed for block '{parent_block_id}'"
                                         fail_fast_report = report_payload
+                            ibd_to_create.append(result)
                         elif kind == "smd":
-                            smd_to_create.append(result)
                             if domain == "sar":
                                 parent_block_id = str(result.get("parent_block_id") or "")
                                 if parent_block_id:
@@ -838,6 +874,34 @@ async def _generate_diagram_in_background(
                                         stage="SMD",
                                     )
                                     report_payload = report.model_dump()
+                                    if report_payload.get("recommendation") == "refine" and max_subdiagram_iterations > 0:
+                                        refinement_prompt = build_refinement_prompt(
+                                            original_text=text,
+                                            diagram_json={"nodes": result.get("nodes", []), "edges": result.get("edges", [])},
+                                            validation_report=report,
+                                            diagram_kind="smd",
+                                        )
+                                        block = block_lookup.get(parent_block_id)
+                                        if block:
+                                            refined_result = await generate_smd_for_block_async(
+                                                block=block,
+                                                system_context=f"{text}\n\n{refinement_prompt}",
+                                                db=None,
+                                                use_rag=use_rag,
+                                                domain=domain,
+                                                command_mode=command_mode,
+                                            )
+                                            if isinstance(refined_result, dict):
+                                                result = refined_result
+                                                report = validate_sar_unified_payload(
+                                                    text=text,
+                                                    bdd_diagram=raw_bdd,
+                                                    ibd_data=None,
+                                                    smd_data=[result],
+                                                    mode=command_mode,
+                                                    stage="SMD",
+                                                )
+                                                report_payload = report.model_dump()
                                     subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
                                     llm_report, _ = _maybe_llm_validate(
                                         text=text,
@@ -852,6 +916,7 @@ async def _generate_diagram_in_background(
                                         fail_fast_triggered = True
                                         fail_fast_reason = f"SMD validation failed for block '{parent_block_id}'"
                                         fail_fast_report = report_payload
+                            smd_to_create.append(result)
 
                         progress_payload = {
                             "status": "processing",

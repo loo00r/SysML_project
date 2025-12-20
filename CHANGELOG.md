@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Criterion-level (1–5) scoring with justifications in deterministic validation reports.
 - Added per-diagram LLM validation payloads for BDD and each IBD/SMD, plus weighted score support in unified flow.
+### Changed
+- Added a minimal 1-pass refinement loop for IBD/SMD when deterministic recommendation is `refine`.
 - Added weighted `quality_score_weighted` (70% deterministic / 30% LLM) to the unified payload when LLM validation is enabled.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.55] - 2025-12-18
+### Changed
+- Added a minimal 1-pass refinement loop for IBD/SMD when deterministic recommendation is `refine`.
 
 ## [1.2.54] - 2025-12-18
 ### Added

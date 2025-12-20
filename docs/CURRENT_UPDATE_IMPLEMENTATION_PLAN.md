@@ -49,7 +49,7 @@ Research фаза є критичною, бо задає:
 - **Діаграми**: BDD/IBD/SMD (поточний scope)
 - **Domain switching**: `domain="sar"|"generic"` параметр (generic за замовчуванням)
 - **Fail-fast політика**: critical errors → зупинка pipeline, warnings → refine
-- **Self-refinement limits**: `max_iterations=2` для кожного етапу (BDD/IBD/SMD)
+- **Self-refinement limits**: BDD `max_iterations=2`, IBD/SMD `max_iterations=1` (мінімально)
 - **Frontend UX**: Real-time progress + quality score + issues list + timeline events
 - **Infrastructure**: Redis для incremental updates + polling (SSE в майбутньому)
 
@@ -570,11 +570,11 @@ Acceptance criteria:
 - ✅ `build_domain_context()` інтегровано в `generate_sysml_diagram()` / `generate_ibd_diagram()` / `generate_state_machine_diagram()`.
 - ✅ `domain`/`command_mode` прокинуті через unified async flow у всі генератори.
 
-#### Фаза 5: Self-Refinement — ✅ **~90% (BDD тільки)**
+#### Фаза 5: Self-Refinement — ✅ **~95% (BDD + мінімальний IBD/SMD)**
 - ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
 - ✅ Додано per-block deterministic validation reporting для IBD/SMD (ключі `subdiagram_validation["ibd:<block_id>"]`, `subdiagram_validation["smd:<block_id>"]`).
 - ✅ Fail-fast під час subdiagram generation: якщо конкретна IBD/SMD має `recommendation="fail_fast"`, pipeline зупиняється, pending задачі скасовуються, і в Redis пишеться `stage="FAILED_FAST"`.
-- ⚠️ TODO: refinement loop для IBD/SMD (опціонально; після smoke tests).
+- ✅ Мінімальний refinement loop для IBD/SMD (1 спроба при `recommendation="refine"`).
 
 ### Що не завершено ⚠️
 
@@ -604,7 +604,7 @@ Acceptance criteria:
 
 ### Критичні проблеми для вирішення
 1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: evaluation-only у фінальному payload; не впливає на пайплайн).
-2. **Self-refinement для IBD/SMD відсутній** (є тільки BDD refine; для IBD/SMD — лише per-block deterministic reports).
+2. **IBD/SMD refinement мінімальний** (1 спроба, без version tracking).
 3. **Smoke/contract тести unified flow відсутні** (fail-fast path, refine path, partial updates).
 4. **UI traceability**: issue → конкретний блок/діаграма (потрібні `diagram_ref/location` та UX для переходу).
 5. **Progress consistency**: не всюди є стабільний `{done,total}` (зараз це гарантовано для subdiagram progress; для решти — best-effort через `stage`/`current_step`).
@@ -848,7 +848,8 @@ eventSource.onmessage = (e) => {
 - [x] Гарантована акумуляція `events` між апдейтами (без втрат) ✅ **(DONE v1.2.39)**
 - [x] Пер-блок deterministic validation для IBD/SMD репортується в payload ✅ **(DONE v1.2.42)**
 - [x] Initial Redis payload створюється одразу після старту (polling не ловить 404) ✅ **(DONE v1.2.43)**
-- [ ] Per-step semantic validation (LLM3) для IBD/SMD + (optional) refine ❌ **(TODO)**
+- [x] Per-diagram semantic evaluation (LLM3) для BDD/IBD/SMD (evaluation-only) ✅ **(DONE v1.2.54)**
+- [x] Мінімальний refinement для IBD/SMD (1 спроба) ✅ **(DONE v1.2.55)**
 - [x] Frontend показує progress + timeline + quality score + issues ✅ **(DONE v1.2.40)**
 
 ### Production-ready
