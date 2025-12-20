@@ -907,7 +907,11 @@ async def _generate_diagram_in_background(
                 "validation_report": validation_report or {},
                 "quality_score": quality_score,
                 "llm_validation": llm_validation,
-                "llm_quality_score": (llm_validation or {}).get("score_total") if isinstance(llm_validation, dict) else None,
+                "llm_quality_score": (
+                    (llm_validation or {}).get("quality_score_0to100")
+                    if isinstance(llm_validation, dict)
+                    else None
+                ),
                 "domain": domain,
                 "command_mode": command_mode,
                 "bdd_version": bdd_version,

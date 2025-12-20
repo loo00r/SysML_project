@@ -106,3 +106,250 @@ Match recent history with imperative commit titles and, when helpful, Convention
 
 ### Notes
 - `CLAUDE.md` contains a longer-form architecture + endpoint overview; keep `AGENTS.md` concise and “how to work in the repo” focused.
+
+### TASK
+Task: Extend Diagram Validator & Quality Scoring (Ferrari/ModRE 2024-aligned)
+Goal
+
+Extend our validation phase so that the validator evaluates generated diagrams using the same 5 quality criteria as Ferrari et al. (ModRE 2024) and produces:
+
+scores per criterion on a 1–5 ordinal scale,
+
+a quality_score 0–100,
+
+a text justification per criterion,
+
+a structured issues list (with severity + type),
+
+a validation log object similar to the paper’s evaluation log fields (minimal form).
+
+This must work for our SysML outputs (BDD / IBD / SMD), even if the “diagram type” differs from sequence diagrams in the paper — критерії переносимо як generic model-quality dimensions.
+
+Scope
+Must-have (baseline form)
+
+Criteria (1–5 scale) for each diagram:
+
+Completeness
+
+Correctness
+
+Adherence to standard
+
+Understandability
+
+Terminological alignment
+
+Output must contain:
+
+scores: {completeness:1..5, correctness:1..5, standards:1..5, understandability:1..5, terminology:1..5}
+
+quality_score: 0..100 (derived deterministically from the 1–5 scores)
+
+justifications: {criterion: short text}
+
+issues: [{criterion, code, severity, message, location?}]
+
+recommendation: "pass" | "refine" | "fail_fast"
+
+Optional / next iteration
+
+Cross-evaluation agreement (kappa) — not required now.
+
+Thematic analysis taxonomy — not required now (but keep issue codes structured so we can extend later).
+
+Implementation Plan
+1) Data model (Pydantic)
+
+Create / extend ValidationReport in backend/app/validation/schemas.py:
+
+{
+  "diagram_type": "BDD|IBD|SMD",
+  "diagram_id": "...",
+  "domain": "generic|sar",
+  "scores_1to5": {
+    "completeness": 1,
+    "correctness": 1,
+    "standards": 1,
+    "understandability": 1,
+    "terminology": 1
+  },
+  "quality_score_0to100": 0,
+  "justifications": {
+    "completeness": "...",
+    "correctness": "...",
+    "standards": "...",
+    "understandability": "...",
+    "terminology": "..."
+  },
+  "issues": [
+    {"criterion":"completeness","code":"MISSING_ELEMENT","severity":"warning|critical","message":"...","location":"node:id/edge:id/element:id"}
+  ],
+  "recommendation": "pass|refine|fail_fast",
+  "evidence": {
+    "deterministic_checks": ["..."],
+    "llm_checks": ["..."] 
+  }
+}
+
+2) Deterministic scoring rules (baseline form)
+
+In backend/app/validation/deterministic.py:
+
+Implement rule checks per diagram type that map into the 5 criteria.
+
+Examples of checks by criterion (baseline version):
+
+Completeness
+
+Missing required elements/modules/actors (domain spec if SAR).
+
+For SMD: missing mandatory phases/states (e.g., SAR mission phases).
+
+For IBD: missing key subsystems from parent BDD.
+
+Correctness
+
+Contradictory relations (e.g., invalid direction, impossible flow).
+
+For SMD: invalid order transitions (e.g., Rescue→Conclusion without Triage/Transport).
+
+For IBD: connections violating declared interfaces (if available).
+
+Adherence to standard
+
+JSON schema validity (elements/nodes/edges required fields).
+
+No orphan nodes (nodes without edges) where not allowed.
+
+Relationship types conform to allowed set (SysML mapping used in project).
+
+Understandability
+
+Excessive redundancy (duplicate nodes names/types).
+
+Generic naming: “Module1”, “ComponentA” (penalize).
+
+Too many edges crossing same nodes (proxy heuristic).
+
+Terminological alignment
+
+Domain term mismatch (SAR vocabulary mapping).
+
+Generic role names when must-use names exist (Incident Commander vs Manager).
+
+Inconsistent naming across diagrams (same concept different labels).
+
+3) Convert 1–5 → 0–100
+
+Define a deterministic mapping:
+
+simplest: average of 5 criteria on 1–5 → scale to 0–100
+quality = round(((avg - 1) / 4) * 100)
+
+Add weights only if needed later (keep simple now).
+
+Define thresholds:
+
+fail_fast if any critical issue OR correctness <=2 OR standards <=2
+
+refine if quality_score < X (e.g., 70) OR there are warnings above N
+
+else pass
+
+4) LLM3 validator prompt (extend based on ModRE 2024)
+
+Update the LLM3 prompt template to:
+
+explicitly implement the 5 criteria and the 1–5 scale definitions
+
+require output in strict JSON matching ValidationReport fields
+
+require justification per criterion (1–3 sentences each max)
+
+instruct LLM3 to use deterministic findings as “evidence” and not hallucinate missing checks
+
+Prompt skeleton (high level):
+
+Input:
+
+user_request
+
+diagram_type (BDD/IBD/SMD)
+
+diagram_json
+
+domain_context (optional SAR)
+
+deterministic_issues (list)
+
+Output: strict JSON with:
+
+scores_1to5 (all 5 criteria)
+
+justifications
+
+issues (merge deterministic + semantic)
+
+recommendation
+
+Scale guidance (from Ferrari):
+1 = Not fulfilled at all
+2 = Minimal extent
+3 = Partially fulfilled
+4 = Mainly fulfilled
+5 = Completely fulfilled
+
+5) Minimal evaluation log object (paper-inspired)
+
+Add an object stored/returned alongside validation (optional in Redis payload):
+
+evaluation_log:
+
+prompt_variant_id (if multiple)
+
+diagram_link_or_id
+
+scores
+
+justifications
+
+notes (free text)
+
+conversation_ref (optional)
+
+(У нас це буде “machine log”, не людський annotator log.)
+
+Acceptance Criteria
+
+For any generated diagram (BDD/IBD/SMD), the API returns validation_report with:
+
+all five criteria scored 1–5
+
+quality_score_0to100
+
+at least 1 justification string per criterion
+
+structured issues with severity
+
+a recommendation (pass/refine/fail_fast)
+
+Reports are stable JSON (parsable, no free-form).
+
+At least 5 unit tests:
+
+missing elements → completeness drops
+
+invalid ordering in SMD → correctness drops + critical issue
+
+invalid JSON structure → standards drops + fail_fast
+
+generic naming → understandability penalty
+
+terminology mismatch → terminology penalty
+
+Notes / Positioning (for thesis)
+
+We adopt Ferrari et al.’s quality dimensions (completeness, correctness, standards, understandability, terminology) and operationalize them into an automated scoring procedure for MBSE diagrams.
+
+Unlike the paper’s manual annotation, our implementation produces consistent evaluation signals for iterative refinement.

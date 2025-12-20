@@ -28,7 +28,7 @@ def llm_validate_sysml(
     Minimal feature-flagged semantic validator (LLM3).
 
     - Returns None when disabled.
-    - Returns a dict with `score_total`, `score_by_category`, and `issues` when enabled.
+    - Returns a dict with 1-5 scores, justifications, issues, and recommendation when enabled.
     """
     if not settings.VALIDATION_ENABLE_LLM:
         return None
@@ -54,23 +54,31 @@ def llm_validate_sysml(
     )
 
     user_prompt = (
-        "Evaluate the diagram quality (0-100) using these categories:\n"
+        "Evaluate the diagram quality using the 5 ModRE criteria on a 1-5 ordinal scale:\n"
         "- completeness\n"
         "- correctness\n"
         "- standards\n"
-        "- terminology\n"
-        "- understandability\n\n"
+        "- understandability\n"
+        "- terminology\n\n"
         "Output JSON schema:\n"
         "{\n"
-        '  "score_total": 0-100,\n'
-        '  "score_by_category": {\n'
-        '    "completeness":0-100,\n'
-        '    "correctness":0-100,\n'
-        '    "standards":0-100,\n'
-        '    "terminology":0-100,\n'
-        '    "understandability":0-100\n'
+        '  "scores_1to5": {\n'
+        '    "completeness": 1-5,\n'
+        '    "correctness": 1-5,\n'
+        '    "standards": 1-5,\n'
+        '    "understandability": 1-5,\n'
+        '    "terminology": 1-5\n'
         "  },\n"
-        '  "issues": [ {"code": "...", "severity": "critical|warning", "message": "..."} ]\n'
+        '  "quality_score_0to100": 0-100,\n'
+        '  "justifications": {\n'
+        '    "completeness": "...",\n'
+        '    "correctness": "...",\n'
+        '    "standards": "...",\n'
+        '    "understandability": "...",\n'
+        '    "terminology": "..."\n'
+        "  },\n"
+        '  "issues": [ {"criterion":"...", "code": "...", "severity": "critical|warning", "message": "..."} ],\n'
+        '  "recommendation": "pass|refine|fail_fast"\n'
         "}\n\n"
         f"DOMAIN CONTEXT:\n{domain_context}\n\n"
         f"USER REQUEST:\n{text[:1500]}\n\n"
@@ -96,4 +104,3 @@ def llm_validate_sysml(
         return parsed
     except Exception:
         return None
-

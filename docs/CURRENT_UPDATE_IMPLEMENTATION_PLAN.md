@@ -80,16 +80,21 @@ Research фаза є критичною, бо задає:
 
 #### Поточний контракт (вже реалізовано)
 - `validation_report: object` (завжди об’єкт; `{}` якщо не валідовано)
-- `quality_score: int (0..100)` (heuristic score на базі issues)
-- `issues: [{code, severity, message, suggestion?, details?}]`
+- `scores_1to5: {completeness, correctness, standards, understandability, terminology}` (1..5)
+- `quality_score: int (0..100)` (детермінований score на базі `scores_1to5`)
+- `quality_score_0to100: int (0..100)` (alias, для прозорості інтеграцій)
+- `justifications: {criterion: short text}`
+- `issues: [{criterion, code, severity, message, location?, suggestion?, details?}]`
 - `recommendation: "pass"|"refine"|"fail_fast"`
 - `stage: "BDD"|"UNIFIED"|...`, `mode: Optional["ICS"|"GSB"]`, `counts: {critical, warning, total}`
 
-Примітка: `quality_score` зараз **не є категорійним scoring** (completeness/correctness/…), а “best-effort” метрика для MVP.
+Примітка: `quality_score` зараз **детермінований** (rule-based) і не є категорійним scoring (completeness/correctness/…), це “best-effort” метрика для MVP.
+План: коли увімкнений LLM-валідатор, додати **hybrid score** з вагами **70% deterministic / 30% LLM**; pass/fail лишається детермінованим.
 
 #### Цільовий контракт (Phase 4: LLM3 validator)
-- `score_by_category: {completeness, correctness, standards, terminology, understandability}`
-- `score_total` (або keep `quality_score` як alias)
+- `scores_1to5` (LLM-based)
+- `quality_score_0to100` (LLM-based)
+- `quality_score_weighted` (optional: 70% deterministic + 30% LLM when enabled)
 - стабільні `issue.location`/`diagram_ref` для traceability у UI
 - `validator_model`, `validator_confidence` (опціонально)
 
@@ -286,14 +291,19 @@ Acceptance criteria:
 
 2) Промпт валідатора:
    - інпут: (a) user prompt, (b) domain_context, (c) diagram JSON, (d) deterministic issues.
-   - аутпут: **строго JSON**: category scores + issues + recommendation.
+   - аутпут: **строго JSON**: scores (1–5), quality_score_0to100, justifications, issues, recommendation.
 
 3) Зробити LLM-валідатор “після” детермінованого:
    - якщо детермінований уже `fail_fast` — LLM валідатор не викликаємо (економія).
 
+4) Додати hybrid score:
+   - `quality_score_weighted = round(0.7 * quality_score + 0.3 * llm_quality_score)`
+   - якщо LLM вимкнений — hybrid score не рахуємо (або дорівнює deterministic).
+   - pass/fail залишається детермінованим.
+
 Acceptance criteria:
 - Валідатор повертає стабільно парсабельний JSON.
-- `score_total` у межах 0–100 і корелює з кількістю/issues severity (на smoke tests).
+- `quality_score_0to100` у межах 0–100 і корелює з кількістю/issues severity (на smoke tests).
 
 ### Фаза 5 — Self-Refinement loop (обмежений) ⚠️ КРИТИЧНО
 
@@ -569,6 +579,7 @@ Acceptance criteria:
 - ✅ Додано фічефлаг `VALIDATION_ENABLE_LLM` + `OPENAI_VALIDATOR_MODEL` у `settings` (default off).
 - ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з 5 категоріями при увімкненому фічефлагу).
 - ✅ Результат LLM3 додається в unified payload як `llm_validation` + `llm_quality_score`.
+- ⚠️ TODO: додати hybrid score (70% deterministic / 30% LLM) як окреме поле і відобразити на UI.
 - ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
 - ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 

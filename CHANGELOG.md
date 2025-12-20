@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Criterion-level (1–5) scoring with justifications in deterministic validation reports.
+
+### Changed
+- LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.52] - 2025-12-18
+### Added
+- Added 1–5 criterion scoring, justifications, and evidence fields to deterministic validation reports.
+- Added deterministic standards/understandability checks plus pytest coverage for new criteria scoring.
+
+### Changed
+- Updated LLM validator prompt schema to emit 1–5 criterion scores with justifications and 0–100 score.
+- Updated validation plan to reflect the ModRE-style scoring contract.
 
 ## [1.2.50] - 2025-12-18
 ### Added
