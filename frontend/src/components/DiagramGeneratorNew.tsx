@@ -19,7 +19,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import useAIGeneration from '../hooks/useAIGeneration';
 import LoadingAnimation from './LoadingAnimation';
-import { normalizeIssues, normalizeRecommendation } from '../utils/unifiedGeneration';
+import useDiagramStore from '../store/diagramStore';
+import {
+  type ValidationIssue,
+  type IssueTarget,
+  normalizeIssues,
+  normalizeRecommendation,
+  parseIssueLocation,
+} from '../utils/unifiedGeneration';
 
 // Styled components using Material UI
 const GeneratorContainer = styled(Paper, {
@@ -91,9 +98,12 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const [includeRelationships, setIncludeRelationships] = useState(true);
   const [generateEnhanced, setGenerateEnhanced] = useState(true);
   const [testMode, setTestMode] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
   
   // Use our custom AI generation hook
   const { generateDiagram, isGenerating, progress, error, generationPayload } = useAIGeneration();
+
+  const { openDiagrams, activeDiagramId, setActiveDiagram, setSelectedNodes, setSelectedEdges } = useDiagramStore();
 
   const lastRun = generationPayload?.status === 'completed' ? generationPayload : null;
   const lastWeightedScore =
@@ -126,6 +136,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
       // Reset the form after successful generation
       setText('');
       setIsExpanded(false);
+      setShowIssues(false);
       
       // Call the parent component's onGenerate if provided
       if (onGenerate) {
@@ -147,7 +158,13 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
     setText(event.target.value);
   };
   const toggleExpanded = () => {
-    setIsExpanded((prev) => !prev);
+    setIsExpanded((prev) => {
+      const next = !prev;
+      if (!next) {
+        setShowIssues(false);
+      }
+      return next;
+    });
   };
 
   const handleTestModeToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,6 +173,56 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
     if (next) {
       setGenerateEnhanced(false);
     }
+  };
+
+  const resolveDiagram = (target: IssueTarget) => {
+    const activeDiagram = openDiagrams.find((diagram) => diagram.id === activeDiagramId);
+    if (target.diagramType === 'bdd') {
+      if (activeDiagram && (activeDiagram.type === 'bdd' || activeDiagram.type === 'bdd_enhanced')) {
+        return activeDiagram;
+      }
+      return openDiagrams.find((diagram) => diagram.type === 'bdd' || diagram.type === 'bdd_enhanced') || null;
+    }
+
+    const candidates = openDiagrams.filter((diagram) => diagram.type === target.diagramType);
+    if (target.blockId) {
+      return (
+        candidates.find((diagram) => diagram.parentBlockId === target.blockId) ||
+        candidates.find((diagram) => diagram.id.includes(`-${target.blockId}`)) ||
+        null
+      );
+    }
+    return candidates[0] || null;
+  };
+
+  const handleIssueClick = (issue: ValidationIssue) => {
+    const target = parseIssueLocation(issue.location);
+    if (!target) {
+      return;
+    }
+    const diagram = resolveDiagram(target);
+    if (diagram && diagram.id !== activeDiagramId) {
+      setActiveDiagram(diagram.id);
+    }
+    if (target.nodeId) {
+      setSelectedNodes([target.nodeId]);
+      setSelectedEdges([]);
+      return;
+    }
+    if (diagram && (target.edgeId || target.edgeMatch)) {
+      const matchedEdge = target.edgeId
+        ? diagram.edges.find((edge) => edge.id === target.edgeId)
+        : diagram.edges.find(
+            (edge) => edge.source === target.edgeMatch?.source && edge.target === target.edgeMatch?.target
+          );
+      if (matchedEdge) {
+        setSelectedEdges([matchedEdge.id]);
+        setSelectedNodes([]);
+        return;
+      }
+    }
+    setSelectedNodes([]);
+    setSelectedEdges([]);
   };
 
   const textPlaceholder = testMode
@@ -192,6 +259,13 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                   size="small"
                   color={lastCriticalCount > 0 ? 'error' : lastIssues.length > 0 ? 'warning' : 'success'}
                   label={`Issues: ${lastIssues.length}`}
+                  onClick={() => {
+                    if (lastIssues.length > 0) {
+                      setIsExpanded(true);
+                      setShowIssues(true);
+                    }
+                  }}
+                  sx={{ cursor: lastIssues.length > 0 ? 'pointer' : 'default' }}
                 />
                 {lastRecommendation ? <Chip size="small" label={lastRecommendation} variant="outlined" /> : null}
               </Stack>
@@ -279,6 +353,35 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                 {error}
               </Typography>
             )}
+            {lastRun && showIssues && lastIssues.length > 0 ? (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Issues
+                </Typography>
+                <Stack spacing={0.5}>
+                  {lastIssues.slice(0, 6).map((issue, index) => (
+                    <Paper
+                      key={`${issue.code}-${index}`}
+                      variant="outlined"
+                      sx={{
+                        p: 1,
+                        cursor: issue.location ? 'pointer' : 'default',
+                        borderColor: issue.severity === 'critical' ? 'error.main' : 'warning.main',
+                      }}
+                      onClick={() => handleIssueClick(issue)}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {issue.code}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {issue.message}
+                        {issue.location ? ` • ${issue.location}` : ''}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            ) : null}
             <Stack direction="row" spacing={2}>
               <Button
                 variant="contained"

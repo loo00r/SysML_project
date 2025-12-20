@@ -578,13 +578,13 @@ Acceptance criteria:
 
 ### Що не завершено ⚠️
 
-#### Фаза 4: LLM3 Validator — 🟡 **~30% (evaluation-only)**
+#### Фаза 4: LLM3 Validator — 🟡 **~40% (secondary gate)**
 - ✅ Додано фічефлаг `VALIDATION_ENABLE_LLM` + `OPENAI_VALIDATOR_MODEL` у `settings` (default off).
 - ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з 5 категоріями при увімкненому фічефлагу).
 - ✅ Результат LLM3 додається в unified payload як `llm_validation` + `llm_quality_score`.
 - ✅ Додано hybrid score (70% deterministic / 30% LLM) як окреме поле в payload.
-- ✅ LLM оцінює кожну діаграму: BDD + кожна IBD/SMD (пейлоад `llm_validation_bdd` + `llm_subdiagram_validation`).
-- ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
+- ✅ LLM оцінює діаграми **лише коли deterministic дає `refine`** (secondary gate), може підняти рекомендацію до `fail_fast`.
+- ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine` без детермінованого тригера).
 - ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 
 #### Фаза 6: Frontend Integration — ✅ **~93%**
@@ -608,7 +608,7 @@ Acceptance criteria:
 ### Загальний прогрес (реалістично): **~94% для MVP / ~60% для “validator-in-the-loop на кожен крок”**
 
 ### Критичні проблеми для вирішення
-1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: evaluation-only у фінальному payload; не впливає на пайплайн).
+1. **LLM3 не є validator-in-the-loop “на кожен крок”** (зараз: secondary gate тільки коли deterministic дає `refine`).
 2. **IBD/SMD refinement мінімальний** (1 спроба, без version tracking).
 3. **LLM validator contract tests відсутні** (schema stability, fallback на deterministic при parse errors).
 4. **UI traceability**: issue → конкретний блок/діаграма (частково покрито через `location`, але не для всіх правил).

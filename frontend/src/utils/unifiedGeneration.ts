@@ -12,6 +12,14 @@ export interface ValidationIssue {
   details?: unknown;
 }
 
+export type IssueTarget = {
+  diagramType: 'bdd' | 'ibd' | 'smd';
+  blockId?: string;
+  nodeId?: string;
+  edgeId?: string;
+  edgeMatch?: { source: string; target: string };
+};
+
 export interface ValidationCounts {
   critical?: number;
   warning?: number;
@@ -75,6 +83,72 @@ export interface UnifiedGenerationPayload {
   ibd_data?: unknown[];
   smd_data?: unknown[];
 }
+
+const parseEdgeToken = (token: string): Pick<IssueTarget, 'edgeId' | 'edgeMatch'> => {
+  const parts = token.split('->');
+  if (parts.length === 2) {
+    return { edgeMatch: { source: parts[0], target: parts[1] } };
+  }
+  return { edgeId: token };
+};
+
+export const parseIssueLocation = (location?: string): IssueTarget | null => {
+  if (!location) {
+    return null;
+  }
+  const trimmed = location.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('bdd')) {
+    const elementMatch = trimmed.match(/^bdd\.elements\.(.+)$/);
+    if (elementMatch) {
+      return { diagramType: 'bdd', nodeId: elementMatch[1] };
+    }
+    const edgeMatch = trimmed.match(/^bdd\.relationships\.(.+)$/);
+    if (edgeMatch) {
+      return { diagramType: 'bdd', ...parseEdgeToken(edgeMatch[1]) };
+    }
+    return { diagramType: 'bdd' };
+  }
+
+  const ibdMatch = trimmed.match(/^ibd:([^\.]+)(?:\.(.+))?$/);
+  if (ibdMatch) {
+    const blockId = ibdMatch[1];
+    const detail = ibdMatch[2];
+    if (detail && detail.startsWith('nodes.')) {
+      return { diagramType: 'ibd', blockId, nodeId: detail.replace('nodes.', '') };
+    }
+    if (detail && detail.startsWith('edges.')) {
+      return { diagramType: 'ibd', blockId, ...parseEdgeToken(detail.replace('edges.', '')) };
+    }
+    return { diagramType: 'ibd', blockId };
+  }
+
+  const smdMatch = trimmed.match(/^smd:([^\.]+)(?:\.(.+))?$/);
+  if (smdMatch) {
+    const blockId = smdMatch[1];
+    const detail = smdMatch[2];
+    if (detail && detail.startsWith('nodes.')) {
+      return { diagramType: 'smd', blockId, nodeId: detail.replace('nodes.', '') };
+    }
+    if (detail && detail.startsWith('edges.')) {
+      return { diagramType: 'smd', blockId, ...parseEdgeToken(detail.replace('edges.', '')) };
+    }
+    return { diagramType: 'smd', blockId };
+  }
+
+  if (trimmed.startsWith('ibd')) {
+    return { diagramType: 'ibd' };
+  }
+
+  if (trimmed.startsWith('smd')) {
+    return { diagramType: 'smd' };
+  }
+
+  return null;
+};
 
 export const normalizeEvents = (value: unknown): GenerationEvent[] => {
   if (!Array.isArray(value)) {

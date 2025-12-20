@@ -103,6 +103,36 @@ def _maybe_llm_validate(
     return llm_validation, _coerce_llm_quality_score(llm_validation)
 
 
+def _should_run_llm_gate(
+    *,
+    deterministic_report: Optional[Dict[str, Any]],
+) -> bool:
+    if not settings.VALIDATION_ENABLE_LLM:
+        return False
+    if not deterministic_report:
+        return False
+    return deterministic_report.get("recommendation") == "refine"
+
+
+def _apply_llm_gate(
+    *,
+    deterministic_report: Optional[Dict[str, Any]],
+    llm_validation: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    if not deterministic_report:
+        return None
+    det_rec = deterministic_report.get("recommendation")
+    if not isinstance(det_rec, str):
+        return None
+    llm_rec = llm_validation.get("recommendation") if isinstance(llm_validation, dict) else None
+    if not isinstance(llm_rec, str):
+        return det_rec
+    rank = {"pass": 0, "refine": 1, "fail_fast": 2}
+    if rank.get(llm_rec, -1) > rank.get(det_rec, -1):
+        return llm_rec
+    return det_rec
+
+
 def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
     existing = redis_client.get_diagram(diagram_id) or {}
     merged_payload = merge_payload(existing, payload)
@@ -488,13 +518,22 @@ async def _generate_diagram_in_background(
                 )
                 validation_report = report.model_dump()
                 quality_score = report.quality_score
-                llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
-                    text=text,
-                    domain=domain,
-                    command_mode=command_mode,
-                    diagram={"bdd": raw_bdd},
-                    deterministic_report=validation_report,
-                )
+                llm_bdd_validation = None
+                llm_bdd_quality_score = None
+                if _should_run_llm_gate(deterministic_report=validation_report):
+                    llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
+                        text=text,
+                        domain=domain,
+                        command_mode=command_mode,
+                        diagram={"bdd": raw_bdd},
+                        deterministic_report=validation_report,
+                    )
+                    gated_rec = _apply_llm_gate(
+                        deterministic_report=validation_report,
+                        llm_validation=llm_bdd_validation,
+                    )
+                    if gated_rec and validation_report.get("recommendation") != gated_rec:
+                        validation_report["recommendation"] = gated_rec
 
                 # Update Redis with BDD result immediately (partial result)
                 validation_report_payload = validation_report or {}
@@ -629,13 +668,22 @@ async def _generate_diagram_in_background(
                     )
                     validation_report = report.model_dump()
                     quality_score = report.quality_score
-                    llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
-                        text=text,
-                        domain=domain,
-                        command_mode=command_mode,
-                        diagram={"bdd": raw_bdd},
-                        deterministic_report=validation_report,
-                    )
+                    llm_bdd_validation = None
+                    llm_bdd_quality_score = None
+                    if _should_run_llm_gate(deterministic_report=validation_report):
+                        llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
+                            text=text,
+                            domain=domain,
+                            command_mode=command_mode,
+                            diagram={"bdd": raw_bdd},
+                            deterministic_report=validation_report,
+                        )
+                        gated_rec = _apply_llm_gate(
+                            deterministic_report=validation_report,
+                            llm_validation=llm_bdd_validation,
+                        )
+                        if gated_rec and validation_report.get("recommendation") != gated_rec:
+                            validation_report["recommendation"] = gated_rec
 
                     partial_payload = {
                         "status": "processing",
@@ -847,13 +895,21 @@ async def _generate_diagram_in_background(
                                                 )
                                                 report_payload = report.model_dump()
                                     subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
-                                    llm_report, _ = _maybe_llm_validate(
-                                        text=text,
-                                        domain=domain,
-                                        command_mode=command_mode,
-                                        diagram={"ibd_data": [result]},
-                                        deterministic_report=report_payload,
-                                    )
+                                    llm_report = None
+                                    if _should_run_llm_gate(deterministic_report=report_payload):
+                                        llm_report, _ = _maybe_llm_validate(
+                                            text=text,
+                                            domain=domain,
+                                            command_mode=command_mode,
+                                            diagram={"ibd_data": [result]},
+                                            deterministic_report=report_payload,
+                                        )
+                                        gated_rec = _apply_llm_gate(
+                                            deterministic_report=report_payload,
+                                            llm_validation=llm_report,
+                                        )
+                                        if gated_rec and report_payload.get("recommendation") != gated_rec:
+                                            report_payload["recommendation"] = gated_rec
                                     if llm_report is not None:
                                         llm_subdiagram_validation_update[f"ibd:{parent_block_id}"] = llm_report
                                     if report_payload.get("recommendation") == "fail_fast":
@@ -903,13 +959,21 @@ async def _generate_diagram_in_background(
                                                 )
                                                 report_payload = report.model_dump()
                                     subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
-                                    llm_report, _ = _maybe_llm_validate(
-                                        text=text,
-                                        domain=domain,
-                                        command_mode=command_mode,
-                                        diagram={"smd_data": [result]},
-                                        deterministic_report=report_payload,
-                                    )
+                                    llm_report = None
+                                    if _should_run_llm_gate(deterministic_report=report_payload):
+                                        llm_report, _ = _maybe_llm_validate(
+                                            text=text,
+                                            domain=domain,
+                                            command_mode=command_mode,
+                                            diagram={"smd_data": [result]},
+                                            deterministic_report=report_payload,
+                                        )
+                                        gated_rec = _apply_llm_gate(
+                                            deterministic_report=report_payload,
+                                            llm_validation=llm_report,
+                                        )
+                                        if gated_rec and report_payload.get("recommendation") != gated_rec:
+                                            report_payload["recommendation"] = gated_rec
                                     if llm_report is not None:
                                         llm_subdiagram_validation_update[f"smd:{parent_block_id}"] = llm_report
                                     if report_payload.get("recommendation") == "fail_fast":
@@ -1027,19 +1091,26 @@ async def _generate_diagram_in_background(
                 validation_report = final_report.model_dump()
                 quality_score = final_report.quality_score
 
-                llm_validation, llm_quality_score = _maybe_llm_validate(
-                    text=text,
-                    domain=domain,
-                    command_mode=command_mode,
-                    diagram={
-                        "bdd": raw_bdd,
-                        "ibd_data": ibd_to_create if generate_ibd else [],
-                        "smd_data": smd_to_create if generate_smd else [],
-                    },
-                    deterministic_report=validation_report,
-                )
-                if quality_score is not None and llm_quality_score is not None:
-                    quality_score_weighted = int(round(0.7 * quality_score + 0.3 * llm_quality_score))
+                if _should_run_llm_gate(deterministic_report=validation_report):
+                    llm_validation, llm_quality_score = _maybe_llm_validate(
+                        text=text,
+                        domain=domain,
+                        command_mode=command_mode,
+                        diagram={
+                            "bdd": raw_bdd,
+                            "ibd_data": ibd_to_create if generate_ibd else [],
+                            "smd_data": smd_to_create if generate_smd else [],
+                        },
+                        deterministic_report=validation_report,
+                    )
+                    gated_rec = _apply_llm_gate(
+                        deterministic_report=validation_report,
+                        llm_validation=llm_validation,
+                    )
+                    if gated_rec and validation_report.get("recommendation") != gated_rec:
+                        validation_report["recommendation"] = gated_rec
+                    if quality_score is not None and llm_quality_score is not None:
+                        quality_score_weighted = int(round(0.7 * quality_score + 0.3 * llm_quality_score))
 
             # Step 4: Store final payload in Redis.
             redis_payload = {
