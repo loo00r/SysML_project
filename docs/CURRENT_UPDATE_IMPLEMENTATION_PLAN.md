@@ -579,7 +579,7 @@ Acceptance criteria:
 - ✅ Додано фічефлаг `VALIDATION_ENABLE_LLM` + `OPENAI_VALIDATOR_MODEL` у `settings` (default off).
 - ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з 5 категоріями при увімкненому фічефлагу).
 - ✅ Результат LLM3 додається в unified payload як `llm_validation` + `llm_quality_score`.
-- ⚠️ TODO: додати hybrid score (70% deterministic / 30% LLM) як окреме поле і відобразити на UI.
+- ✅ Додано hybrid score (70% deterministic / 30% LLM) як окреме поле в payload.
 - ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
 - ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 

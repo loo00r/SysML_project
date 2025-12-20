@@ -63,6 +63,25 @@ def _progress_detail(
     return detail
 
 
+def _coerce_llm_quality_score(llm_validation: Optional[Dict[str, Any]]) -> Optional[int]:
+    if not isinstance(llm_validation, dict):
+        return None
+    raw_score = llm_validation.get("quality_score_0to100")
+    if isinstance(raw_score, (int, float)):
+        return max(0, min(100, int(round(raw_score))))
+    scores = llm_validation.get("scores_1to5")
+    if not isinstance(scores, dict):
+        return None
+    values: List[int] = []
+    for value in scores.values():
+        if isinstance(value, (int, float)) and 1 <= value <= 5:
+            values.append(int(value))
+    if len(values) < 5:
+        return None
+    avg = sum(values) / len(values)
+    return max(0, min(100, int(round(((avg - 1) / 4) * 100))))
+
+
 def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
     existing = redis_client.get_diagram(diagram_id) or {}
     merged_payload = merge_payload(existing, payload)
@@ -866,6 +885,8 @@ async def _generate_diagram_in_background(
             print(f"Background: Generated {len(ibd_to_create)} IBD diagrams and {len(smd_to_create)} SMD diagrams")
 
             llm_validation = None
+            llm_quality_score: Optional[int] = None
+            quality_score_weighted: Optional[int] = None
             if domain == "sar":
                 final_report = validate_sar_unified_payload(
                     text=text,
@@ -891,6 +912,9 @@ async def _generate_diagram_in_background(
                         deterministic_report=validation_report,
                         model=settings.OPENAI_VALIDATOR_MODEL,
                     )
+                    llm_quality_score = _coerce_llm_quality_score(llm_validation)
+                    if quality_score is not None and llm_quality_score is not None:
+                        quality_score_weighted = int(round(0.7 * quality_score + 0.3 * llm_quality_score))
 
             # Step 4: Store final payload in Redis.
             redis_payload = {
@@ -906,12 +930,9 @@ async def _generate_diagram_in_background(
                 "stage": "COMPLETED",
                 "validation_report": validation_report or {},
                 "quality_score": quality_score,
+                "quality_score_weighted": quality_score_weighted,
                 "llm_validation": llm_validation,
-                "llm_quality_score": (
-                    (llm_validation or {}).get("quality_score_0to100")
-                    if isinstance(llm_validation, dict)
-                    else None
-                ),
+                "llm_quality_score": llm_quality_score,
                 "domain": domain,
                 "command_mode": command_mode,
                 "bdd_version": bdd_version,
