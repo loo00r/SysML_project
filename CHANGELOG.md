@@ -12,9 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Added a minimal 1-pass refinement loop for IBD/SMD when deterministic recommendation is `refine`.
 - Added weighted `quality_score_weighted` (70% deterministic / 30% LLM) to the unified payload when LLM validation is enabled.
+- Updated frontend status panels to surface hybrid scores when available.
+- Updated implementation plan status for hybrid score UI completion.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.57] - 2025-12-18
+### Changed
+- Updated implementation plan status for hybrid score UI completion.
+
+## [1.2.56] - 2025-12-18
+### Changed
+- Updated frontend status panels to surface hybrid scores when available.
 
 ## [1.2.55] - 2025-12-18
 ### Changed

@@ -53,10 +53,21 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
   const recommendation = normalizeRecommendation(payload.validation_report);
   const issues = normalizeIssues(payload.validation_report);
 
-  const score =
+  const weightedScore =
+    typeof payload.quality_score_weighted === 'number' && Number.isFinite(payload.quality_score_weighted)
+      ? payload.quality_score_weighted
+      : null;
+  const deterministicScore =
     typeof payload.quality_score === 'number' && Number.isFinite(payload.quality_score)
       ? payload.quality_score
       : null;
+  const llmScore =
+    typeof payload.llm_quality_score === 'number' && Number.isFinite(payload.llm_quality_score)
+      ? payload.llm_quality_score
+      : typeof payload.llm_quality_score_bdd === 'number' && Number.isFinite(payload.llm_quality_score_bdd)
+      ? payload.llm_quality_score_bdd
+      : null;
+  const primaryScore = weightedScore ?? deterministicScore;
 
   const counts = payload.validation_report && typeof payload.validation_report === 'object'
     ? (payload.validation_report as Record<string, unknown>).counts as Record<string, unknown> | undefined
@@ -98,11 +109,21 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
         ) : null}
 
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-          {score !== null ? (
-            <Chip size="small" color={scoreColor(score)} label={`Score: ${score}/100`} />
+          {primaryScore !== null ? (
+            <Chip
+              size="small"
+              color={scoreColor(primaryScore)}
+              label={`${weightedScore !== null ? 'Score (hybrid)' : 'Score'}: ${primaryScore}/100`}
+            />
           ) : (
             <Chip size="small" label="Score: —" variant="outlined" />
           )}
+          {weightedScore !== null && deterministicScore !== null ? (
+            <Chip size="small" variant="outlined" label={`Rules: ${deterministicScore}/100`} />
+          ) : null}
+          {weightedScore !== null && llmScore !== null ? (
+            <Chip size="small" variant="outlined" label={`LLM: ${llmScore}/100`} />
+          ) : null}
           {recommendation ? (
             <Chip size="small" label={`Recommendation: ${recommendation}`} />
           ) : null}
@@ -189,4 +210,3 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
 };
 
 export default GenerationStatusPanel;
-

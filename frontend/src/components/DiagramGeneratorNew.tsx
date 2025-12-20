@@ -96,10 +96,15 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
   const { generateDiagram, isGenerating, progress, error, generationPayload } = useAIGeneration();
 
   const lastRun = generationPayload?.status === 'completed' ? generationPayload : null;
-  const lastScore =
+  const lastWeightedScore =
+    typeof lastRun?.quality_score_weighted === 'number' && Number.isFinite(lastRun.quality_score_weighted)
+      ? lastRun.quality_score_weighted
+      : null;
+  const lastDeterministicScore =
     typeof lastRun?.quality_score === 'number' && Number.isFinite(lastRun.quality_score)
       ? lastRun.quality_score
       : null;
+  const lastScore = lastWeightedScore ?? lastDeterministicScore;
   const lastIssues = normalizeIssues(lastRun?.validation_report);
   const lastRecommendation = normalizeRecommendation(lastRun?.validation_report);
   const lastCriticalCount = lastIssues.filter((issue) => issue.severity === 'critical').length;
@@ -181,7 +186,7 @@ const DiagramGeneratorNew: React.FC<DiagramGeneratorProps> = ({ onGenerate, onCl
                 <Chip
                   size="small"
                   color={lastScore !== null && lastScore >= 80 ? 'success' : lastScore !== null && lastScore >= 60 ? 'warning' : 'default'}
-                  label={lastScore !== null ? `Score: ${lastScore}/100` : 'Score: —'}
+                  label={lastScore !== null ? `${lastWeightedScore !== null ? 'Score (hybrid)' : 'Score'}: ${lastScore}/100` : 'Score: —'}
                 />
                 <Chip
                   size="small"

@@ -22,6 +22,18 @@ export interface ValidationReport {
   counts?: ValidationCounts;
   stage?: string;
   mode?: string | null;
+  scores_1to5?: Record<string, number>;
+  justifications?: Record<string, string>;
+  quality_score_0to100?: number;
+}
+
+export interface LlmValidationReport {
+  scores_1to5?: Record<string, number>;
+  quality_score_0to100?: number;
+  justifications?: Record<string, string>;
+  issues?: ValidationIssue[];
+  recommendation?: string;
+  validator_model?: string;
 }
 
 export interface GenerationEvent {
@@ -50,6 +62,13 @@ export interface UnifiedGenerationPayload {
   events?: GenerationEvent[];
   validation_report?: ValidationReport | Record<string, unknown>;
   quality_score?: number | null;
+  quality_score_weighted?: number | null;
+  llm_validation?: LlmValidationReport | Record<string, unknown>;
+  llm_quality_score?: number | null;
+  llm_validation_bdd?: LlmValidationReport | Record<string, unknown>;
+  llm_quality_score_bdd?: number | null;
+  llm_subdiagram_validation?: Record<string, LlmValidationReport | Record<string, unknown>>;
+  subdiagram_validation?: Record<string, ValidationReport | Record<string, unknown>>;
   diagram?: unknown;
   ibd_data?: unknown[];
   smd_data?: unknown[];
@@ -156,4 +175,3 @@ export const computeProgressPercent = (
 
   return clamp(fallback, 0, 99);
 };
-
