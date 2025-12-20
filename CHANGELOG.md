@@ -14,9 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added weighted `quality_score_weighted` (70% deterministic / 30% LLM) to the unified payload when LLM validation is enabled.
 - Updated frontend status panels to surface hybrid scores when available.
 - Updated implementation plan status for hybrid score UI completion.
+- Displayed issue criterion/location in the frontend issues list.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.58] - 2025-12-18
+### Changed
+- Displayed issue criterion/location in the frontend issues list.
 
 ## [1.2.57] - 2025-12-18
 ### Changed

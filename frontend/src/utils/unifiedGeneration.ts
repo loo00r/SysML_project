@@ -3,9 +3,11 @@ export type GenerationStatus = 'processing' | 'completed' | 'error';
 export type ValidationSeverity = 'critical' | 'warning' | 'info' | string;
 
 export interface ValidationIssue {
+  criterion?: string;
   code: string;
   severity: ValidationSeverity;
   message: string;
+  location?: string;
   suggestion?: string;
   details?: unknown;
 }
@@ -95,9 +97,11 @@ export const normalizeIssues = (value: unknown): ValidationIssue[] => {
   return (issues as unknown[])
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
     .map((issue) => ({
+      criterion: typeof issue.criterion === 'string' ? issue.criterion : undefined,
       code: typeof issue.code === 'string' ? issue.code : 'UNKNOWN',
       severity: typeof issue.severity === 'string' ? issue.severity : 'warning',
       message: typeof issue.message === 'string' ? issue.message : '',
+      location: typeof issue.location === 'string' ? issue.location : undefined,
       suggestion: typeof issue.suggestion === 'string' ? issue.suggestion : undefined,
       details: issue.details,
     }))

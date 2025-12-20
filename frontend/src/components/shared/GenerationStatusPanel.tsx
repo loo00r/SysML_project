@@ -157,6 +157,8 @@ const GenerationStatusPanel: React.FC<GenerationStatusPanelProps> = ({ payload }
                       <Typography variant="caption" color="text.secondary">
                         {issue.message}
                         {issue.suggestion ? ` (suggestion: ${issue.suggestion})` : ''}
+                        {issue.criterion ? ` • ${issue.criterion}` : ''}
+                        {issue.location ? ` • ${issue.location}` : ''}
                       </Typography>
                     }
                   />
