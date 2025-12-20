@@ -24,7 +24,12 @@ class TestPayloadMerge(unittest.TestCase):
         merged = merge_payload(existing, payload)
         self.assertEqual(set(merged["subdiagram_validation"].keys()), {"ibd:a", "smd:b"})
 
+    def test_llm_subdiagram_validation_deep_merge(self):
+        existing = {"llm_subdiagram_validation": {"ibd:a": {"quality_score_0to100": 70}}}
+        payload = {"llm_subdiagram_validation": {"smd:b": {"quality_score_0to100": 60}}}
+        merged = merge_payload(existing, payload)
+        self.assertEqual(set(merged["llm_subdiagram_validation"].keys()), {"ibd:a", "smd:b"})
+
 
 if __name__ == "__main__":
     unittest.main()
-

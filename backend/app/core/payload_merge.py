@@ -53,5 +53,14 @@ def merge_payload(existing: Mapping[str, Any], payload: Mapping[str, Any]) -> Di
             merged_sub.update(payload_sub)
         merged_payload["subdiagram_validation"] = merged_sub
 
-    return merged_payload
+    existing_llm_sub = existing_dict.get("llm_subdiagram_validation")
+    payload_llm_sub = payload_dict.get("llm_subdiagram_validation")
+    if isinstance(existing_llm_sub, dict) or isinstance(payload_llm_sub, dict):
+        merged_llm_sub: Dict[str, Any] = {}
+        if isinstance(existing_llm_sub, dict):
+            merged_llm_sub.update(existing_llm_sub)
+        if isinstance(payload_llm_sub, dict):
+            merged_llm_sub.update(payload_llm_sub)
+        merged_payload["llm_subdiagram_validation"] = merged_llm_sub
 
+    return merged_payload

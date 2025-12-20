@@ -87,6 +87,9 @@ Research фаза є критичною, бо задає:
 - `issues: [{criterion, code, severity, message, location?, suggestion?, details?}]`
 - `recommendation: "pass"|"refine"|"fail_fast"`
 - `stage: "BDD"|"UNIFIED"|...`, `mode: Optional["ICS"|"GSB"]`, `counts: {critical, warning, total}`
+- `llm_validation_bdd` (optional, LLM report for BDD)
+- `llm_quality_score_bdd` (optional, 0..100)
+- `llm_subdiagram_validation` (optional map, keys `ibd:<id>` / `smd:<id>`)
 
 Примітка: `quality_score` зараз **детермінований** (rule-based) і не є категорійним scoring (completeness/correctness/…), це “best-effort” метрика для MVP.
 План: коли увімкнений LLM-валідатор, додати **hybrid score** з вагами **70% deterministic / 30% LLM**; pass/fail лишається детермінованим.
@@ -580,6 +583,7 @@ Acceptance criteria:
 - ✅ Додано мінімальний `backend/app/validation/llm_validator.py` (повертає JSON-оцінку з 5 категоріями при увімкненому фічефлагу).
 - ✅ Результат LLM3 додається в unified payload як `llm_validation` + `llm_quality_score`.
 - ✅ Додано hybrid score (70% deterministic / 30% LLM) як окреме поле в payload.
+- ✅ LLM оцінює кожну діаграму: BDD + кожна IBD/SMD (пейлоад `llm_validation_bdd` + `llm_subdiagram_validation`).
 - ⚠️ TODO: зробити LLM3 справжнім **validator-in-the-loop** (перехоплення кожного кроку BDD/IBD/SMD + вплив на `fail_fast/refine`).
 - ⚠️ TODO: контракт/стабільність: гарантувати парсабельність, строгий schema (і тест на це), стабільні `issue.location/diagram_ref` для traceability.
 

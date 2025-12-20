@@ -82,6 +82,27 @@ def _coerce_llm_quality_score(llm_validation: Optional[Dict[str, Any]]) -> Optio
     return max(0, min(100, int(round(((avg - 1) / 4) * 100))))
 
 
+def _maybe_llm_validate(
+    *,
+    text: str,
+    domain: str,
+    command_mode: Optional[str],
+    diagram: Dict[str, Any],
+    deterministic_report: Optional[Dict[str, Any]],
+) -> Tuple[Optional[Dict[str, Any]], Optional[int]]:
+    if domain != "sar" or not settings.VALIDATION_ENABLE_LLM:
+        return None, None
+    domain_context = build_domain_context(domain, command_mode)
+    llm_validation = llm_validate_sysml(
+        text=text,
+        domain_context=domain_context,
+        diagram=diagram,
+        deterministic_report=deterministic_report,
+        model=settings.OPENAI_VALIDATOR_MODEL,
+    )
+    return llm_validation, _coerce_llm_quality_score(llm_validation)
+
+
 def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
     existing = redis_client.get_diagram(diagram_id) or {}
     merged_payload = merge_payload(existing, payload)
@@ -453,6 +474,8 @@ async def _generate_diagram_in_background(
 
             validation_report = None
             quality_score = None
+            llm_bdd_validation: Optional[Dict[str, Any]] = None
+            llm_bdd_quality_score: Optional[int] = None
             if domain == "sar":
                 report = validate_sar_unified_payload(
                     text=text,
@@ -464,6 +487,13 @@ async def _generate_diagram_in_background(
                 )
                 validation_report = report.model_dump()
                 quality_score = report.quality_score
+                llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
+                    text=text,
+                    domain=domain,
+                    command_mode=command_mode,
+                    diagram={"bdd": raw_bdd},
+                    deterministic_report=validation_report,
+                )
 
                 # Update Redis with BDD result immediately (partial result)
                 validation_report_payload = validation_report or {}
@@ -482,6 +512,9 @@ async def _generate_diagram_in_background(
                     "bdd_version": bdd_version,
                     "events": [_make_event("BDD_GENERATED", f"BDD v{bdd_version} generated", version=bdd_version)],
                 }
+                if llm_bdd_validation is not None:
+                    partial_payload["llm_validation_bdd"] = llm_bdd_validation
+                    partial_payload["llm_quality_score_bdd"] = llm_bdd_quality_score
                 if validation_report:
                     partial_payload["events"].append(
                         _make_event(
@@ -595,6 +628,13 @@ async def _generate_diagram_in_background(
                     )
                     validation_report = report.model_dump()
                     quality_score = report.quality_score
+                    llm_bdd_validation, llm_bdd_quality_score = _maybe_llm_validate(
+                        text=text,
+                        domain=domain,
+                        command_mode=command_mode,
+                        diagram={"bdd": raw_bdd},
+                        deterministic_report=validation_report,
+                    )
 
                     partial_payload = {
                         "status": "processing",
@@ -620,6 +660,9 @@ async def _generate_diagram_in_background(
                             ),
                         ],
                     }
+                    if llm_bdd_validation is not None:
+                        partial_payload["llm_validation_bdd"] = llm_bdd_validation
+                        partial_payload["llm_quality_score_bdd"] = llm_bdd_quality_score
                     _store_diagram_merged(diagram_id, partial_payload)
 
                     if validation_report.get("recommendation") == "fail_fast":
@@ -752,6 +795,7 @@ async def _generate_diagram_in_background(
                         fail_fast_reason = None
                         fail_fast_report: Optional[Dict[str, Any]] = None
                         subdiagram_validation_update: Dict[str, Any] = {}
+                        llm_subdiagram_validation_update: Dict[str, Any] = {}
                         if kind == "ibd":
                             ibd_to_create.append(result)
                             if domain == "sar":
@@ -767,6 +811,15 @@ async def _generate_diagram_in_background(
                                     )
                                     report_payload = report.model_dump()
                                     subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
+                                    llm_report, _ = _maybe_llm_validate(
+                                        text=text,
+                                        domain=domain,
+                                        command_mode=command_mode,
+                                        diagram={"ibd_data": [result]},
+                                        deterministic_report=report_payload,
+                                    )
+                                    if llm_report is not None:
+                                        llm_subdiagram_validation_update[f"ibd:{parent_block_id}"] = llm_report
                                     if report_payload.get("recommendation") == "fail_fast":
                                         fail_fast_triggered = True
                                         fail_fast_reason = f"IBD validation failed for block '{parent_block_id}'"
@@ -786,6 +839,15 @@ async def _generate_diagram_in_background(
                                     )
                                     report_payload = report.model_dump()
                                     subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
+                                    llm_report, _ = _maybe_llm_validate(
+                                        text=text,
+                                        domain=domain,
+                                        command_mode=command_mode,
+                                        diagram={"smd_data": [result]},
+                                        deterministic_report=report_payload,
+                                    )
+                                    if llm_report is not None:
+                                        llm_subdiagram_validation_update[f"smd:{parent_block_id}"] = llm_report
                                     if report_payload.get("recommendation") == "fail_fast":
                                         fail_fast_triggered = True
                                         fail_fast_reason = f"SMD validation failed for block '{parent_block_id}'"
@@ -812,6 +874,7 @@ async def _generate_diagram_in_background(
                             "command_mode": command_mode,
                             "bdd_version": bdd_version,
                             "subdiagram_validation": subdiagram_validation_update,
+                            "llm_subdiagram_validation": llm_subdiagram_validation_update,
                             "events": [
                                 _make_event(
                                     "SUBDIAGRAM_PROGRESS",
@@ -899,22 +962,19 @@ async def _generate_diagram_in_background(
                 validation_report = final_report.model_dump()
                 quality_score = final_report.quality_score
 
-                if settings.VALIDATION_ENABLE_LLM:
-                    domain_context = build_domain_context(domain, command_mode)
-                    llm_validation = llm_validate_sysml(
-                        text=text,
-                        domain_context=domain_context,
-                        diagram={
-                            "bdd": raw_bdd,
-                            "ibd_data": ibd_to_create if generate_ibd else [],
-                            "smd_data": smd_to_create if generate_smd else [],
-                        },
-                        deterministic_report=validation_report,
-                        model=settings.OPENAI_VALIDATOR_MODEL,
-                    )
-                    llm_quality_score = _coerce_llm_quality_score(llm_validation)
-                    if quality_score is not None and llm_quality_score is not None:
-                        quality_score_weighted = int(round(0.7 * quality_score + 0.3 * llm_quality_score))
+                llm_validation, llm_quality_score = _maybe_llm_validate(
+                    text=text,
+                    domain=domain,
+                    command_mode=command_mode,
+                    diagram={
+                        "bdd": raw_bdd,
+                        "ibd_data": ibd_to_create if generate_ibd else [],
+                        "smd_data": smd_to_create if generate_smd else [],
+                    },
+                    deterministic_report=validation_report,
+                )
+                if quality_score is not None and llm_quality_score is not None:
+                    quality_score_weighted = int(round(0.7 * quality_score + 0.3 * llm_quality_score))
 
             # Step 4: Store final payload in Redis.
             redis_payload = {
