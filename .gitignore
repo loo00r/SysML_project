@@ -46,3 +46,6 @@ __pycache__/
 
 # Semantic Kernel
 /.semantic-kernel/
+
+AGENTS.md
+CLAUDE.md
