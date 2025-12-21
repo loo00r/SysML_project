@@ -49,7 +49,7 @@ Research фаза є критичною, бо задає:
 - **Діаграми**: BDD/IBD/SMD (поточний scope)
 - **Domain switching**: `domain="sar"|"generic"` параметр (generic за замовчуванням)
 - **Fail-fast політика**: critical errors → зупинка pipeline, warnings → refine
-- **Self-refinement limits**: BDD `max_iterations=2`, IBD/SMD `max_iterations=1` (мінімально)
+- **Self-refinement limits**: BDD `max_iterations=3`, IBD/SMD `max_iterations=2` (мінімально, знижує fail-fast)
 - **Frontend UX**: Real-time progress + quality score + issues list + timeline events
 - **Infrastructure**: Redis для incremental updates + polling (SSE в майбутньому)
 
@@ -68,8 +68,8 @@ Research фаза є критичною, бо задає:
 
 3) Мінімальні зміни в існуючих пайплайнах:
    - `backend/app/database/rag_router.py` (уніфікований async chain):
-     - після BDD: validate (fail-fast) → (optional refine) → тільки тоді IBD/SMD.
-     - під час IBD/SMD для кожного блоку: validate → (optional refine) → save payload.
+   - після BDD: validate → (optional refine) → тільки тоді IBD/SMD (fail-fast даунгрейдиться до refine).
+   - під час IBD/SMD для кожного блоку: validate → (optional refine) → save payload (fail-fast даунгрейдиться до refine).
    - `backend/app/diagrams/create_diagram.py` (імедіат-персіст):
      - або (а) валідувати BDD перед записом,
      - або (б) додати “validate only / dry-run” режим.
@@ -571,10 +571,11 @@ Acceptance criteria:
 - ✅ `domain`/`command_mode` прокинуті через unified async flow у всі генератори.
 
 #### Фаза 5: Self-Refinement — ✅ **~95% (BDD + мінімальний IBD/SMD)**
-- ✅ BDD: bounded refinement loop (max 2) з подіями (`events`), `bdd_version`, і fail-fast skip IBD/SMD.
+- ✅ BDD: bounded refinement loop (max 3) з подіями (`events`), `bdd_version`; fail-fast даунгрейдиться до refine.
 - ✅ Додано per-block deterministic validation reporting для IBD/SMD (ключі `subdiagram_validation["ibd:<block_id>"]`, `subdiagram_validation["smd:<block_id>"]`).
-- ✅ Fail-fast під час subdiagram generation: якщо конкретна IBD/SMD має `recommendation="fail_fast"`, pipeline зупиняється, pending задачі скасовуються, і в Redis пишеться `stage="FAILED_FAST"`.
-- ✅ Мінімальний refinement loop для IBD/SMD (1 спроба при `recommendation="refine"`).
+- ✅ Fail-fast під час subdiagram generation даунгрейдиться до `refine` (pipeline продовжується, best-effort output).
+- ✅ Мінімальний refinement loop для IBD/SMD (до 2 спроб при `recommendation in {"refine","fail_fast"}`).
+- ✅ SAR SMD генерація пріоритезує Mission/Workflow/Phases → SearchAssets → MedicalTriage (щоб не створювати зайві SMD).
 
 ### Що не завершено ⚠️
 
@@ -598,8 +599,7 @@ Acceptance criteria:
 #### Фаза 7: Тести — 🟡 **~60%**
 - ✅ Unit-тести для детермінованої SAR валідації
 - ✅ Unit-тести для `merge_payload()` (events accumulation + `subdiagram_validation` merge)
-- ✅ Pytest smoke coverage: fail-fast на BDD, refine-loop для BDD, і fail-fast під час IBD validation у unified flow (моки Redis/DB)
-- ✅ Pytest smoke coverage: fail-fast на SMD rules у unified flow (моки Redis/DB)
+- ⚠️ Pytest smoke coverage потребує оновлення (fail-fast більше не зупиняє пайплайн).
 - ✅ Pytest coverage: `generate-diagram-unified` завжди пише initial Redis payload (polling не ловить early 404)
 - ✅ Додані location assertions для детермінованих SAR-issues (SMD forbidden transitions, missing phase, generic naming, mode mix).
 - ✅ Додані правила + unit-тести для PACE, dynamic scaling, volunteer roles, RTH link-loss, buffering, fault taxonomy.

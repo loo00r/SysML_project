@@ -34,7 +34,7 @@ from app.AI.diagram_generation import (
     DiagramPositioning
 )
 from app.crud import crud_ibd, crud_smd, crud_bdd_block
-from app.domain.constraints import build_domain_context
+from app.domain.constraints import build_domain_context, load_sar_constraints
 from app.domain.detector import detect_domain_and_mode
 from app.validation.deterministic import validate_sar_unified_payload
 from app.validation.llm_validator import llm_validate_sysml
@@ -172,6 +172,44 @@ def identify_diagram_candidates(
     ibd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     smd_candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
     return ibd_candidates, smd_candidates
+
+
+def _filter_smd_candidates(
+    *,
+    elements: List[Dict[str, Any]],
+    text: str,
+    domain: str,
+) -> List[Dict[str, Any]]:
+    candidates = [element for element in elements if element.get("type") in {"block", "processor"}]
+    if domain != "sar" or not candidates:
+        return candidates
+
+    text_lower = text.lower()
+    constraints = load_sar_constraints()
+    required_phases = [str(phase).lower() for phase in constraints.get("smd", {}).get("required_phases", [])]
+
+    def name_for(element: Dict[str, Any]) -> str:
+        return str(element.get("name") or "").lower()
+
+    def pick_by_keywords(keywords: List[str]) -> List[Dict[str, Any]]:
+        return [element for element in candidates if any(keyword in name_for(element) for keyword in keywords)]
+
+    wants_mission_smd = "smd" in text_lower or "state machine" in text_lower or any(
+        phase in text_lower for phase in required_phases
+    )
+    mission_blocks = pick_by_keywords(["mission", "workflow", "phase"])
+    if wants_mission_smd and mission_blocks:
+        return mission_blocks[:1]
+
+    search_blocks = pick_by_keywords(["search", "drone", "uav"])
+    if search_blocks and any(keyword in text_lower for keyword in ["search", "drone", "uav"]):
+        return search_blocks[:1]
+
+    triage_blocks = pick_by_keywords(["triage"])
+    if triage_blocks and "triage" in text_lower:
+        return triage_blocks[:1]
+
+    return candidates[:1]
 
 
 async def generate_smd_for_block_async(
@@ -450,8 +488,8 @@ async def _generate_diagram_in_background(
                     )
 
             bdd_version = 1
-            max_bdd_iterations = 2
-            max_subdiagram_iterations = 1
+            max_bdd_iterations = 3
+            max_subdiagram_iterations = 2
 
             # Step 1: Generate BDD with optional RAG support.
             bdd_examples: List[Dict[str, Any]] = []
@@ -535,6 +573,11 @@ async def _generate_diagram_in_background(
                     if gated_rec and validation_report.get("recommendation") != gated_rec:
                         validation_report["recommendation"] = gated_rec
 
+                bdd_downgraded = False
+                if validation_report and validation_report.get("recommendation") == "fail_fast":
+                    validation_report["recommendation"] = "refine"
+                    bdd_downgraded = True
+
                 # Update Redis with BDD result immediately (partial result)
                 validation_report_payload = validation_report or {}
                 partial_payload = {
@@ -565,33 +608,16 @@ async def _generate_diagram_in_background(
                             recommendation=validation_report.get("recommendation"),
                         )
                     )
+                if bdd_downgraded:
+                    partial_payload["events"].append(
+                        _make_event(
+                            "BDD_FAILFAST_DOWNGRADED",
+                            "BDD fail-fast downgraded to refine to allow retries.",
+                            version=bdd_version,
+                        )
+                    )
                 _store_diagram_merged(diagram_id, partial_payload)
                 print(f"Background: BDD completed and stored for {diagram_id}")
-
-                if domain == "sar" and validation_report and validation_report.get("recommendation") == "fail_fast":
-                    fail_fast_payload = {
-                        "status": "completed",
-                        "stage": "FAILED_FAST",
-                        "message": "Fail-fast validation triggered; skipping downstream generation.",
-                        "diagram": positioned_bdd,
-                        "raw_text": text,
-                        "model_used": bdd_result.get("model_used"),
-                        "saved_to_rag": False,
-                        "used_rag": use_rag and bool(bdd_examples),
-                        "examples_count": len(bdd_examples),
-                        "ibd_data": [],
-                        "smd_data": [],
-                        "validation_report": validation_report or {},
-                        "quality_score": quality_score,
-                        "domain": domain,
-                        "command_mode": command_mode,
-                        "bdd_version": bdd_version,
-                        "progress_detail": _progress_detail(stage="FAILED_FAST", current_step="Fail-fast: skipping downstream"),
-                        "events": [_make_event("FAIL_FAST", "Fail-fast validation triggered; skipping downstream generation.")],
-                    }
-                    _store_diagram_merged(diagram_id, fail_fast_payload)
-                    print(f"Background: Fail-fast validation stored for {diagram_id}")
-                    return
 
             if domain == "sar" and validation_report and validation_report.get("recommendation") == "refine":
                 iterations_used = 0
@@ -668,6 +694,8 @@ async def _generate_diagram_in_background(
                     )
                     validation_report = report.model_dump()
                     quality_score = report.quality_score
+                    if validation_report.get("recommendation") == "fail_fast":
+                        validation_report["recommendation"] = "refine"
                     llm_bdd_validation = None
                     llm_bdd_quality_score = None
                     if _should_run_llm_gate(deterministic_report=validation_report):
@@ -714,38 +742,6 @@ async def _generate_diagram_in_background(
                         partial_payload["llm_quality_score_bdd"] = llm_bdd_quality_score
                     _store_diagram_merged(diagram_id, partial_payload)
 
-                    if validation_report.get("recommendation") == "fail_fast":
-                        fail_fast_payload = {
-                            "status": "completed",
-                            "stage": "FAILED_FAST",
-                            "message": "Fail-fast validation triggered; skipping downstream generation.",
-                            "diagram": positioned_bdd,
-                            "raw_text": text,
-                            "model_used": bdd_result.get("model_used"),
-                            "saved_to_rag": False,
-                            "used_rag": use_rag and bool(bdd_examples),
-                            "examples_count": len(bdd_examples),
-                            "ibd_data": [],
-                            "smd_data": [],
-                            "validation_report": validation_report or {},
-                            "quality_score": quality_score,
-                            "domain": domain,
-                            "command_mode": command_mode,
-                            "bdd_version": bdd_version,
-                            "progress_detail": _progress_detail(
-                                stage="FAILED_FAST",
-                                current_step="Fail-fast: skipping downstream",
-                            ),
-                            "events": [
-                                _make_event(
-                                    "FAIL_FAST",
-                                    "Fail-fast validation triggered; skipping downstream generation.",
-                                )
-                            ],
-                        }
-                        _store_diagram_merged(diagram_id, fail_fast_payload)
-                        return
-
                     iterations_used += 1
 
                 if iterations_used >= max_bdd_iterations and validation_report.get("recommendation") == "refine":
@@ -782,6 +778,7 @@ async def _generate_diagram_in_background(
             smd_candidates: List[Dict[str, Any]] = []
             if elements:
                 ibd_candidates, smd_candidates = identify_diagram_candidates(elements)
+                smd_candidates = _filter_smd_candidates(elements=smd_candidates, text=text, domain=domain)
             print(f"Background: Identified {len(ibd_candidates)} IBD candidates and {len(smd_candidates)} SMD candidates")
 
             # Respect caller toggles.
@@ -846,9 +843,7 @@ async def _generate_diagram_in_background(
 
                     done_tasks += 1
                     if isinstance(result, dict):
-                        fail_fast_triggered = False
-                        fail_fast_reason = None
-                        fail_fast_report: Optional[Dict[str, Any]] = None
+                        downgraded_reason: Optional[str] = None
                         subdiagram_validation_update: Dict[str, Any] = {}
                         llm_subdiagram_validation_update: Dict[str, Any] = {}
                         if kind == "ibd":
@@ -864,7 +859,11 @@ async def _generate_diagram_in_background(
                                         stage="IBD",
                                     )
                                     report_payload = report.model_dump()
-                                    if report_payload.get("recommendation") == "refine" and max_subdiagram_iterations > 0:
+                                    attempts_used = 0
+                                    while (
+                                        report_payload.get("recommendation") in {"refine", "fail_fast"}
+                                        and attempts_used < max_subdiagram_iterations
+                                    ):
                                         refinement_prompt = build_refinement_prompt(
                                             original_text=text,
                                             diagram_json={"nodes": result.get("nodes", []), "edges": result.get("edges", [])},
@@ -872,28 +871,34 @@ async def _generate_diagram_in_background(
                                             diagram_kind="ibd",
                                         )
                                         block = block_lookup.get(parent_block_id)
-                                        if block:
-                                            refined_result = await generate_ibd_for_block_async(
-                                                block=block,
-                                                system_context=f"{text}\n\n{refinement_prompt}",
-                                                relationships=relationships,
-                                                db=None,
-                                                use_rag=use_rag,
-                                                db_session_factory=AsyncSessionLocal,
-                                                domain=domain,
-                                                command_mode=command_mode,
-                                            )
-                                            if isinstance(refined_result, dict):
-                                                result = refined_result
-                                                report = validate_sar_unified_payload(
-                                                    text=text,
-                                                    bdd_diagram=raw_bdd,
-                                                    ibd_data=[result],
-                                                    smd_data=None,
-                                                    mode=command_mode,
-                                                    stage="IBD",
-                                                )
-                                                report_payload = report.model_dump()
+                                        if not block:
+                                            break
+                                        refined_result = await generate_ibd_for_block_async(
+                                            block=block,
+                                            system_context=f"{text}\n\n{refinement_prompt}",
+                                            relationships=relationships,
+                                            db=None,
+                                            use_rag=use_rag,
+                                            db_session_factory=AsyncSessionLocal,
+                                            domain=domain,
+                                            command_mode=command_mode,
+                                        )
+                                        attempts_used += 1
+                                        if not isinstance(refined_result, dict):
+                                            break
+                                        result = refined_result
+                                        report = validate_sar_unified_payload(
+                                            text=text,
+                                            bdd_diagram=raw_bdd,
+                                            ibd_data=[result],
+                                            smd_data=None,
+                                            mode=command_mode,
+                                            stage="IBD",
+                                        )
+                                        report_payload = report.model_dump()
+                                    if report_payload.get("recommendation") == "fail_fast":
+                                        report_payload["recommendation"] = "refine"
+                                        downgraded_reason = f"IBD fail-fast downgraded for block '{parent_block_id}'"
                                     subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
                                     llm_report = None
                                     if _should_run_llm_gate(deterministic_report=report_payload):
@@ -912,10 +917,6 @@ async def _generate_diagram_in_background(
                                             report_payload["recommendation"] = gated_rec
                                     if llm_report is not None:
                                         llm_subdiagram_validation_update[f"ibd:{parent_block_id}"] = llm_report
-                                    if report_payload.get("recommendation") == "fail_fast":
-                                        fail_fast_triggered = True
-                                        fail_fast_reason = f"IBD validation failed for block '{parent_block_id}'"
-                                        fail_fast_report = report_payload
                             ibd_to_create.append(result)
                         elif kind == "smd":
                             if domain == "sar":
@@ -930,7 +931,11 @@ async def _generate_diagram_in_background(
                                         stage="SMD",
                                     )
                                     report_payload = report.model_dump()
-                                    if report_payload.get("recommendation") == "refine" and max_subdiagram_iterations > 0:
+                                    attempts_used = 0
+                                    while (
+                                        report_payload.get("recommendation") in {"refine", "fail_fast"}
+                                        and attempts_used < max_subdiagram_iterations
+                                    ):
                                         refinement_prompt = build_refinement_prompt(
                                             original_text=text,
                                             diagram_json={"nodes": result.get("nodes", []), "edges": result.get("edges", [])},
@@ -938,26 +943,32 @@ async def _generate_diagram_in_background(
                                             diagram_kind="smd",
                                         )
                                         block = block_lookup.get(parent_block_id)
-                                        if block:
-                                            refined_result = await generate_smd_for_block_async(
-                                                block=block,
-                                                system_context=f"{text}\n\n{refinement_prompt}",
-                                                db=None,
-                                                use_rag=use_rag,
-                                                domain=domain,
-                                                command_mode=command_mode,
-                                            )
-                                            if isinstance(refined_result, dict):
-                                                result = refined_result
-                                                report = validate_sar_unified_payload(
-                                                    text=text,
-                                                    bdd_diagram=raw_bdd,
-                                                    ibd_data=None,
-                                                    smd_data=[result],
-                                                    mode=command_mode,
-                                                    stage="SMD",
-                                                )
-                                                report_payload = report.model_dump()
+                                        if not block:
+                                            break
+                                        refined_result = await generate_smd_for_block_async(
+                                            block=block,
+                                            system_context=f"{text}\n\n{refinement_prompt}",
+                                            db=None,
+                                            use_rag=use_rag,
+                                            domain=domain,
+                                            command_mode=command_mode,
+                                        )
+                                        attempts_used += 1
+                                        if not isinstance(refined_result, dict):
+                                            break
+                                        result = refined_result
+                                        report = validate_sar_unified_payload(
+                                            text=text,
+                                            bdd_diagram=raw_bdd,
+                                            ibd_data=None,
+                                            smd_data=[result],
+                                            mode=command_mode,
+                                            stage="SMD",
+                                        )
+                                        report_payload = report.model_dump()
+                                    if report_payload.get("recommendation") == "fail_fast":
+                                        report_payload["recommendation"] = "refine"
+                                        downgraded_reason = f"SMD fail-fast downgraded for block '{parent_block_id}'"
                                     subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
                                     llm_report = None
                                     if _should_run_llm_gate(deterministic_report=report_payload):
@@ -976,12 +987,23 @@ async def _generate_diagram_in_background(
                                             report_payload["recommendation"] = gated_rec
                                     if llm_report is not None:
                                         llm_subdiagram_validation_update[f"smd:{parent_block_id}"] = llm_report
-                                    if report_payload.get("recommendation") == "fail_fast":
-                                        fail_fast_triggered = True
-                                        fail_fast_reason = f"SMD validation failed for block '{parent_block_id}'"
-                                        fail_fast_report = report_payload
                             smd_to_create.append(result)
 
+                        events_list = [
+                            _make_event(
+                                "SUBDIAGRAM_PROGRESS",
+                                f"{done_tasks}/{total_tasks} subdiagrams completed",
+                                done=done_tasks,
+                                total=total_tasks,
+                            )
+                        ]
+                        if downgraded_reason:
+                            events_list.append(
+                                _make_event(
+                                    "SUBDIAGRAM_FAILFAST_DOWNGRADED",
+                                    downgraded_reason,
+                                )
+                            )
                         progress_payload = {
                             "status": "processing",
                             "stage": "SUBDIAGRAMS",
@@ -1004,73 +1026,9 @@ async def _generate_diagram_in_background(
                             "bdd_version": bdd_version,
                             "subdiagram_validation": subdiagram_validation_update,
                             "llm_subdiagram_validation": llm_subdiagram_validation_update,
-                            "events": [
-                                _make_event(
-                                    "SUBDIAGRAM_PROGRESS",
-                                    f"{done_tasks}/{total_tasks} subdiagrams completed",
-                                    done=done_tasks,
-                                    total=total_tasks,
-                                )
-                            ],
+                            "events": events_list,
                         }
                         _store_diagram_merged(diagram_id, progress_payload)
-
-                        if fail_fast_triggered:
-                            for pending in tasks:
-                                if not pending.done():
-                                    pending.cancel()
-                            await asyncio.gather(*tasks, return_exceptions=True)
-
-                            final_validation_report = validation_report or {}
-                            final_quality_score = quality_score
-                            if domain == "sar":
-                                final_report = validate_sar_unified_payload(
-                                    text=text,
-                                    bdd_diagram=raw_bdd,
-                                    ibd_data=ibd_to_create if generate_ibd else None,
-                                    smd_data=smd_to_create if generate_smd else None,
-                                    mode=command_mode,
-                                    stage="UNIFIED",
-                                )
-                                final_validation_report = final_report.model_dump()
-                                final_quality_score = final_report.quality_score
-
-                            fail_fast_payload = {
-                                "status": "completed",
-                                "stage": "FAILED_FAST",
-                                "message": fail_fast_reason or "Fail-fast validation triggered; stopping downstream generation.",
-                                "diagram": positioned_bdd,
-                                "raw_text": text,
-                                "model_used": bdd_result.get("model_used"),
-                                "saved_to_rag": False,
-                                "used_rag": use_rag and bool(bdd_examples),
-                                "examples_count": len(bdd_examples),
-                                "ibd_data": ibd_to_create,
-                                "smd_data": smd_to_create,
-                                "validation_report": final_validation_report or {},
-                                "quality_score": final_quality_score,
-                                "domain": domain,
-                                "command_mode": command_mode,
-                                "bdd_version": bdd_version,
-                                "progress_detail": _progress_detail(
-                                    stage="FAILED_FAST",
-                                    current_step="Fail-fast: invalid subdiagram detected; stopping",
-                                    done=done_tasks,
-                                    total=total_tasks,
-                                ),
-                                "subdiagram_validation": subdiagram_validation_update,
-                                "events": [
-                                    _make_event(
-                                        "FAIL_FAST",
-                                        "Fail-fast validation triggered during subdiagram generation; stopping.",
-                                        reason=fail_fast_reason,
-                                        report=fail_fast_report,
-                                    )
-                                ],
-                            }
-                            _store_diagram_merged(diagram_id, fail_fast_payload)
-                            print(f"Background: Fail-fast triggered during subdiagram generation for {diagram_id}")
-                            return
             else:
                 print("Background: No generation tasks to execute")
 
@@ -1090,6 +1048,8 @@ async def _generate_diagram_in_background(
                 )
                 validation_report = final_report.model_dump()
                 quality_score = final_report.quality_score
+                if validation_report.get("recommendation") == "fail_fast":
+                    validation_report["recommendation"] = "refine"
 
                 if _should_run_llm_gate(deterministic_report=validation_report):
                     llm_validation, llm_quality_score = _maybe_llm_validate(

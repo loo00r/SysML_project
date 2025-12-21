@@ -21,9 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added deterministic SAR rules for PACE comms, dynamic scaling, volunteer roles, RTH link-loss, buffering, and fault taxonomy.
 - Added hybrid LLM gate: LLM runs only on deterministic refine and can escalate recommendations.
 - Made AI Diagram Generator issues chip expand to a clickable issues list.
+- Increased refinement attempts, downgraded fail-fast to refine in unified flow, and improved SAR SMD selection/communications checks.
 
 ### Changed
 - LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
+
+## [1.2.66] - 2025-12-18
+### Changed
+- Increased refinement attempts, downgraded fail-fast to refine in unified flow, and improved SAR SMD selection/communications checks.
 
 ## [1.2.64] - 2025-12-18
 ### Changed

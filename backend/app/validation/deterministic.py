@@ -554,6 +554,7 @@ def validate_sar_unified_payload(
     pace_levels = comms_rules.get("pace_levels") or []
     pace_interfaces = comms_rules.get("pace_interfaces") or []
     pace_triggered = _text_has_trigger(text, pace_triggers)
+    pace_missing_levels: List[str] = []
     if not pace_triggered and pace_indicators:
         pace_triggered = any(indicator.lower() in " ".join(sorted(property_keys)) for indicator in pace_indicators)
     if not pace_triggered and pace_indicators:
@@ -581,8 +582,12 @@ def validate_sar_unified_payload(
                     found_levels.add("contingency")
                 if "emergency" in normalized:
                     found_levels.add("emergency")
+        for level in pace_levels:
+            if _contains_normalized(diagram_strings, level):
+                found_levels.add(level.lower())
 
         missing_levels = [level for level in pace_levels if level.lower() not in found_levels]
+        pace_missing_levels = missing_levels
         if missing_levels:
             location = _first_location_for_terms(
                 terms=["CommunicationsSubsystem", "Communications", "Comms"],
@@ -607,7 +612,15 @@ def validate_sar_unified_payload(
     if ibd_data is not None:
         critical_roles_present = [role for role in critical_roles if _contains_term(all_strings, role)]
         if critical_roles_present:
-            missing_interfaces = [iface for iface in required_interfaces if not _contains_normalized(diagram_strings, iface)]
+            missing_interfaces = []
+            for iface in required_interfaces:
+                normalized_iface = _normalize_token(iface)
+                in_strings = _contains_normalized(diagram_strings, iface)
+                in_keys = any(normalized_iface in _normalize_token(key) for key in property_keys)
+                if not in_strings and not in_keys:
+                    missing_interfaces.append(iface)
+            if missing_interfaces and pace_triggered and not pace_missing_levels:
+                missing_interfaces = []
             if missing_interfaces:
                 location = _first_location_for_terms(
                     terms=critical_roles_present,
