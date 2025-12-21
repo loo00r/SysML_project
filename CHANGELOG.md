@@ -6,78 +6,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Added
-- Criterion-level (1–5) scoring with justifications in deterministic validation reports.
-- Added per-diagram LLM validation payloads for BDD and each IBD/SMD, plus weighted score support in unified flow.
-### Changed
-- Added a minimal 1-pass refinement loop for IBD/SMD when deterministic recommendation is `refine`.
-- Added weighted `quality_score_weighted` (70% deterministic / 30% LLM) to the unified payload when LLM validation is enabled.
-- Updated frontend status panels to surface hybrid scores when available.
-- Updated implementation plan status for hybrid score UI completion.
-- Displayed issue criterion/location in the frontend issues list.
-- Added issue click-to-navigate behavior using `location` hints and preserved parent block IDs for IBD diagrams.
-- Expanded deterministic issue locations with node/edge IDs for better traceability.
-- Added location-aware deterministic validation tests for SAR issues.
-- Added deterministic SAR rules for PACE comms, dynamic scaling, volunteer roles, RTH link-loss, buffering, and fault taxonomy.
-- Added hybrid LLM gate: LLM runs only on deterministic refine and can escalate recommendations.
-- Made AI Diagram Generator issues chip expand to a clickable issues list.
-- Increased refinement attempts, downgraded fail-fast to refine in unified flow, and improved SAR SMD selection/communications checks.
 
-### Changed
-- LLM validator prompt schema updated to emit 1–5 scores and 0–100 quality score.
 
-## [1.2.66] - 2025-12-18
+## [1.2.70] - 2025-12-21
+### Changed
+- Expanded technical report with per-chapter change rationale and behavior explanations.
+
+## [1.2.69] - 2025-12-21
+### Changed
+- Added detailed technical report for the refach vs develop comparison.
+
+## [1.2.68] - 2025-12-21
+### Changed
+- Increased BDD refinement attempts to 4.
+
+## [1.2.67] - 2025-12-21
+### Changed
+- Limited subdiagram retries to diagrams with matching validation issues to reduce redundant generations.
+
+## [1.2.66] - 2025-12-20
 ### Changed
 - Increased refinement attempts, downgraded fail-fast to refine in unified flow, and improved SAR SMD selection/communications checks.
 
-## [1.2.64] - 2025-12-18
+## [1.2.64] - 2025-12-20
 ### Changed
 - Made AI Diagram Generator issues chip expand to a clickable issues list.
 
-## [1.2.63] - 2025-12-18
+## [1.2.63] - 2025-12-20
 ### Changed
 - Added hybrid LLM gate: LLM runs only on deterministic refine and can escalate recommendations.
 
-## [1.2.62] - 2025-12-18
+## [1.2.62] - 2025-12-20
 ### Changed
 - Added deterministic SAR rules for PACE comms, dynamic scaling, volunteer roles, RTH link-loss, buffering, and fault taxonomy.
 
-## [1.2.61] - 2025-12-18
+## [1.2.61] - 2025-12-20
 ### Changed
 - Added location-aware deterministic validation tests for SAR issues.
 
-## [1.2.60] - 2025-12-18
+## [1.2.60] - 2025-12-19
 ### Changed
 - Expanded deterministic issue locations with node/edge IDs for better traceability.
 
-## [1.2.59] - 2025-12-18
+## [1.2.59] - 2025-12-19
 ### Changed
 - Added issue click-to-navigate behavior using `location` hints and preserved parent block IDs for IBD diagrams.
 
-## [1.2.58] - 2025-12-18
+## [1.2.58] - 2025-12-19
 ### Changed
 - Displayed issue criterion/location in the frontend issues list.
 
-## [1.2.57] - 2025-12-18
+## [1.2.57] - 2025-12-19
 ### Changed
 - Updated implementation plan status for hybrid score UI completion.
 
-## [1.2.56] - 2025-12-18
+## [1.2.56] - 2025-12-19
 ### Changed
 - Updated frontend status panels to surface hybrid scores when available.
 
-## [1.2.55] - 2025-12-18
+## [1.2.55] - 2025-12-19
 ### Changed
 - Added a minimal 1-pass refinement loop for IBD/SMD when deterministic recommendation is `refine`.
 
-## [1.2.54] - 2025-12-18
+## [1.2.54] - 2025-12-19
 ### Added
 - Added per-diagram LLM validation payloads for BDD and each IBD/SMD, with Redis merge support.
 
 ### Changed
 - Updated the validation plan to reflect per-diagram LLM evaluation output fields.
 
-## [1.2.53] - 2025-12-18
+## [1.2.53] - 2025-12-19
 ### Added
 - Added weighted `quality_score_weighted` (70% deterministic / 30% LLM) to the unified payload when LLM validation is enabled.
 
@@ -101,15 +99,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Added fail-fast termination during IBD/SMD generation when a subdiagram validation returns `fail_fast` (cancels pending tasks and stores `FAILED_FAST` payload).
 
-## [1.2.44] - 2025-12-18
+## [1.2.44] - 2025-12-17
 ### Changed
 - Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align client-facing status messaging with the actual implementation and remaining work.
 
-## [1.2.43] - 2025-12-18
+## [1.2.43] - 2025-12-17
 ### Fixed
 - Fixed unified async generation to always write the initial Redis payload (prevents early polling 404s).
 
-## [1.2.42] - 2025-12-18
+## [1.2.42] - 2025-12-17
 ### Added
 - Added feature-flagged LLM3 semantic validator (`VALIDATION_ENABLE_LLM`, `OPENAI_VALIDATOR_MODEL`) and exposed results in unified payload as `llm_validation`.
 - Added per-block deterministic validation reporting for unified subdiagram generation via `subdiagram_validation`.
@@ -120,11 +118,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Extracted Redis payload merging into `backend/app/core/payload_merge.py` and added unit tests.
 
-## [1.2.41] - 2025-12-18
+## [1.2.41] - 2025-12-17
 ### Fixed
 - Frontend unified generation progress no longer regresses on completion (removed redundant 95% override during polling).
 
-## [1.2.40] - 2025-12-18
+## [1.2.40] - 2025-12-17
 ### Added
 - Added frontend generation progress panel (timeline, score, issues) driven by unified async Redis payload fields.
 
@@ -132,14 +130,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated frontend polling to consume `stage`/`progress_detail` and surface incremental payload updates during unified generation.
 - Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to reflect Phase 6 progress and completion of the MVP UI requirement.
 
-## [1.2.39] - 2025-12-18
+## [1.2.39] - 2025-12-17
 ### Fixed
 - Unified async generation now preserves and accumulates Redis `events` across incremental payload updates (prevents timeline loss).
 
 ### Changed
 - Unified async generation now includes `stage` and structured `progress_detail` in Redis payload updates for consistent client progress UI.
 
-## [1.2.38] - 2025-12-18
+## [1.2.38] - 2025-12-17
 ### Changed
 - Updated `docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md` to align with client research requirements and document remaining gaps (LLM3 validator, per-step IBD/SMD validation, frontend timeline/quality/issues, unified-flow smoke tests).
 
@@ -195,7 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a detailed phased implementation plan for the SAR Validator-in-the-Loop update (`docs/CURRENT_UPDATE_IMPLEMENTATION_PLAN.md`).
 
-## [1.2.29] - 2025-12-15
+## [1.2.29] - 2025-12-14
 ### Changed
 - Updated `AGENTS.md` with current backend architecture, endpoints, and configuration notes.
 

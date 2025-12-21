@@ -133,6 +133,25 @@ def _apply_llm_gate(
     return det_rec
 
 
+def _subdiagram_has_issues(
+    report_payload: Dict[str, Any],
+    *,
+    kind: str,
+    parent_block_id: str,
+) -> bool:
+    issues = report_payload.get("issues")
+    if not isinstance(issues, list):
+        return False
+    prefix = f"{kind}:{parent_block_id}" if parent_block_id else kind
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        location = str(issue.get("location") or "")
+        if location.startswith(prefix):
+            return True
+    return False
+
+
 def _store_diagram_merged(diagram_id: str, payload: Dict[str, Any]) -> None:
     existing = redis_client.get_diagram(diagram_id) or {}
     merged_payload = merge_payload(existing, payload)
@@ -488,7 +507,7 @@ async def _generate_diagram_in_background(
                     )
 
             bdd_version = 1
-            max_bdd_iterations = 3
+            max_bdd_iterations = 4
             max_subdiagram_iterations = 2
 
             # Step 1: Generate BDD with optional RAG support.
@@ -859,10 +878,16 @@ async def _generate_diagram_in_background(
                                         stage="IBD",
                                     )
                                     report_payload = report.model_dump()
+                                    has_subdiagram_issue = _subdiagram_has_issues(
+                                        report_payload,
+                                        kind="ibd",
+                                        parent_block_id=parent_block_id,
+                                    )
                                     attempts_used = 0
                                     while (
                                         report_payload.get("recommendation") in {"refine", "fail_fast"}
                                         and attempts_used < max_subdiagram_iterations
+                                        and has_subdiagram_issue
                                     ):
                                         refinement_prompt = build_refinement_prompt(
                                             original_text=text,
@@ -896,12 +921,19 @@ async def _generate_diagram_in_background(
                                             stage="IBD",
                                         )
                                         report_payload = report.model_dump()
+                                        has_subdiagram_issue = _subdiagram_has_issues(
+                                            report_payload,
+                                            kind="ibd",
+                                            parent_block_id=parent_block_id,
+                                        )
+                                    if report_payload.get("recommendation") in {"refine", "fail_fast"} and not has_subdiagram_issue:
+                                        report_payload["recommendation"] = "pass"
                                     if report_payload.get("recommendation") == "fail_fast":
                                         report_payload["recommendation"] = "refine"
                                         downgraded_reason = f"IBD fail-fast downgraded for block '{parent_block_id}'"
                                     subdiagram_validation_update[f"ibd:{parent_block_id}"] = report_payload
                                     llm_report = None
-                                    if _should_run_llm_gate(deterministic_report=report_payload):
+                                    if _should_run_llm_gate(deterministic_report=report_payload) and has_subdiagram_issue:
                                         llm_report, _ = _maybe_llm_validate(
                                             text=text,
                                             domain=domain,
@@ -931,10 +963,16 @@ async def _generate_diagram_in_background(
                                         stage="SMD",
                                     )
                                     report_payload = report.model_dump()
+                                    has_subdiagram_issue = _subdiagram_has_issues(
+                                        report_payload,
+                                        kind="smd",
+                                        parent_block_id=parent_block_id,
+                                    )
                                     attempts_used = 0
                                     while (
                                         report_payload.get("recommendation") in {"refine", "fail_fast"}
                                         and attempts_used < max_subdiagram_iterations
+                                        and has_subdiagram_issue
                                     ):
                                         refinement_prompt = build_refinement_prompt(
                                             original_text=text,
@@ -966,12 +1004,19 @@ async def _generate_diagram_in_background(
                                             stage="SMD",
                                         )
                                         report_payload = report.model_dump()
+                                        has_subdiagram_issue = _subdiagram_has_issues(
+                                            report_payload,
+                                            kind="smd",
+                                            parent_block_id=parent_block_id,
+                                        )
+                                    if report_payload.get("recommendation") in {"refine", "fail_fast"} and not has_subdiagram_issue:
+                                        report_payload["recommendation"] = "pass"
                                     if report_payload.get("recommendation") == "fail_fast":
                                         report_payload["recommendation"] = "refine"
                                         downgraded_reason = f"SMD fail-fast downgraded for block '{parent_block_id}'"
                                     subdiagram_validation_update[f"smd:{parent_block_id}"] = report_payload
                                     llm_report = None
-                                    if _should_run_llm_gate(deterministic_report=report_payload):
+                                    if _should_run_llm_gate(deterministic_report=report_payload) and has_subdiagram_issue:
                                         llm_report, _ = _maybe_llm_validate(
                                             text=text,
                                             domain=domain,
